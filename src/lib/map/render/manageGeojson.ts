@@ -1,8 +1,8 @@
-import { MapSourceId, updateMapGeojsonSource } from "@/lib/map/layers";
+import type { FeatureCollection } from "geojson";
 import { getMap } from "@/lib/map/map.svelte.js";
+import { MapSourceId, updateMapGeojsonSource } from "@/lib/map/layers";
 import { isFeatureIcon, type MapObjectFeature } from "@/lib/map/render/featureTypes";
 import { ensureMapImage, getMapImageId } from "@/lib/map/render/images";
-import type { FeatureCollection } from "geojson";
 import type maplibre from "maplibre-gl";
 
 let mapObjectsGeoJson: FeatureCollection = {
