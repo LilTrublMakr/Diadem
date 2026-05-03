@@ -15,9 +15,10 @@ import type {
 import { getMasterPokemon } from "@/lib/services/masterfile";
 import type { FeaturePermissionContext, PermittedPolygon } from "@/lib/services/user/checkPerm";
 import type { PokemonData, PvpStats } from "@/lib/types/mapObjectData/pokemon";
+import type { FiltersetPokemon, MinMax } from "@/lib/features/filters/filtersets";
 import { Features } from "@/lib/utils/features";
 import { round } from "@/lib/utils/numberFormat";
-import { getNormalizedForm, League, showPvp } from "@/lib/utils/pokemonUtils";
+import { getNormalizedForm, getBestRank, League, showGreat, showLittle, showPvp, showUltra } from "@/lib/utils/pokemonUtils";
 import { error } from "@sveltejs/kit";
 import { booleanPointInPolygon, point } from "@turf/turf";
 
@@ -60,7 +61,7 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 				}
 				const pokemon = this.makePokemon(p, filter, context);
 				// need to re-check pvp filters after removing mega evolutions
-				if (!shouldDisplayPokemon(pokemon, filter)) continue;
+				if (!this.matchesCleanedPvpRanks(pokemon, filter)) continue;
 
 				data.push(pokemon);
 			}
@@ -175,6 +176,46 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 			rank: stats.rank,
 			value: stats.value
 		});
+	}
+
+	private matchesCleanedPvpRanks(pokemon: PokemonData, filter: FilterPokemon | undefined) {
+		const pvpRankFilters = (filter?.filters?.filter((f) => f.enabled) ?? []).filter(
+			(filterset) => filterset.pvpRankLittle || filterset.pvpRankGreat || filterset.pvpRankUltra
+		);
+		if (pvpRankFilters.length === 0) return true;
+
+		return pvpRankFilters.some((filterset) =>
+			this.matchesCleanedPvpRankFilterset(pokemon, filterset)
+		);
+	}
+
+	private matchesCleanedPvpRankFilterset(pokemon: PokemonData, filterset: FiltersetPokemon) {
+		if (
+			filterset.pvpRankLittle &&
+			!this.matchesPvpRank(pokemon, League.LITTLE, filterset.pvpRankLittle)
+		) {
+			return false;
+		}
+		if (
+			filterset.pvpRankGreat &&
+			!this.matchesPvpRank(pokemon, League.GREAT, filterset.pvpRankGreat)
+		) {
+			return false;
+		}
+		if (
+			filterset.pvpRankUltra &&
+			!this.matchesPvpRank(pokemon, League.ULTRA, filterset.pvpRankUltra)
+		) {
+			return false;
+		}
+
+		return true;
+	}
+
+	private matchesPvpRank(pokemon: PokemonData, league: League, range: MinMax) {
+		const rank = getBestRank(pokemon, league);
+		if (!rank) return false;
+		return rank >= range.min && rank <= range.max;
 	}
 
 	private buildGolbatQueries(

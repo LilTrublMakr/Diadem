@@ -64,9 +64,9 @@
 
 	function selectEntry(entry: PvpEntry) {
 		if (getEntryId(entry) === getEntryId(selectedEntry)) {
-			selectedEntry = undefined;
+			selectedEntry = undefined
 		} else {
-			selectedEntry = entry;
+			selectedEntry = entry
 		}
 	}
 </script>
@@ -85,11 +85,7 @@
 				>
 					<div class="pt-1 pb-0.5">
 						<div class="size-7">
-							<ImagePopup
-								src={getIconPokemon(entry.data)}
-								alt={mPokemon(entry.data)}
-								class="w-full"
-							/>
+							<ImagePopup src={getIconPokemon(entry.data)} alt={mPokemon(entry.data)} class="w-full" />
 						</div>
 					</div>
 					<div class="flex gap-0.5 border-t font-semibold px-2 py-1 items-center">
