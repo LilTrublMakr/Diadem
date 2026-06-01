@@ -1,0 +1,36 @@
+import type { GymData } from "@/lib/types/mapObjectData/gym";
+import type { NestData } from "@/lib/types/mapObjectData/nest";
+import type { PokemonData } from "@/lib/types/mapObjectData/pokemon";
+import type { PokestopData } from "@/lib/types/mapObjectData/pokestop";
+import type { RouteData } from "@/lib/types/mapObjectData/route";
+import type { S2CellData } from "@/lib/types/mapObjectData/s2cell";
+import type { SpawnpointData } from "@/lib/types/mapObjectData/spawnpoint";
+import type { StationData } from "@/lib/types/mapObjectData/station";
+import type { TappableData } from "@/lib/types/mapObjectData/tappable";
+
+export enum MapObjectType {
+	POKEMON = "pokemon",
+	POKESTOP = "pokestop",
+	GYM = "gym",
+	STATION = "station",
+	S2_CELL = "s2cell",
+	NEST = "nest",
+	SPAWNPOINT = "spawnpoint",
+	ROUTE = "route",
+	TAPPABLE = "tappable"
+}
+
+export type MapData =
+	| PokemonData
+	| PokestopData
+	| GymData
+	| StationData
+	| NestData
+	| SpawnpointData
+	| RouteData
+	| TappableData
+	| S2CellData;
+
+export type MinMapObject<T extends MapData> = Omit<T, "type" | "mapId">;
+
+export const allMapObjectTypes = Object.values(MapObjectType);

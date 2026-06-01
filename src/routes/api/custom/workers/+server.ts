@@ -1,13 +1,11 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getWorkerStatus, getAccountStats } from '$lib/server/api/dragoniteStatus';
-
-export { DragoniteWorker, DragoniteArea, DragoniteStatus, AccountStats } from '$lib/server/api/dragoniteStatus';
+import { getWorkerStatus, getScoutStats } from '$lib/server/api/dragoniteStatus';
 
 export const GET: RequestHandler = async () => {
-	const [statusResult, accountsResult] = await Promise.allSettled([
+	const [statusResult, scoutResult] = await Promise.allSettled([
 		getWorkerStatus(),
-		getAccountStats()
+		getScoutStats()
 	]);
 
 	if (statusResult.status === 'rejected') {
@@ -17,6 +15,6 @@ export const GET: RequestHandler = async () => {
 
 	return json({
 		status: statusResult.value,
-		accounts: accountsResult.status === 'fulfilled' ? accountsResult.value : null
+		scout: scoutResult.status === 'fulfilled' ? scoutResult.value : null
 	});
 };

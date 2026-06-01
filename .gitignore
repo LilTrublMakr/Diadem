@@ -1,0 +1,36 @@
+node_modules
+.idea
+.zed
+config/*
+!config/*example*
+config.toml
+.vite/*
+src/components/custom/*
+static/custom/*
+src/routes/(custom)/*
+src/custom.css
+coverage/*
+
+# Output
+.output
+.vercel
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+.pnpm-store
+
+# Docker
+docker-compose.yml

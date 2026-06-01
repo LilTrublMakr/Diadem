@@ -1,0 +1,236 @@
+import { getActiveSearch } from "@/lib/features/activeSearch.svelte";
+import type { FilterPokestop } from "@/lib/features/filters/filters";
+import { MapObjectType } from "@/lib/mapObjects/mapObjectTypes";
+import * as m from "@/lib/paraglide/messages";
+import { mAlignment, mGeneration, mItem, mPokemon, mType } from "@/lib/services/ingameLocale";
+import { getIconContest, getIconPokemon, getIconType } from "@/lib/services/uicons.svelte";
+import { defaultFilter, getUserSettings } from "@/lib/services/userSettings.svelte";
+import type {
+	ContestFocus,
+	Incident,
+	PokestopData,
+	QuestReward
+} from "@/lib/types/mapObjectData/pokestop";
+import { currentTimestamp } from "@/lib/utils/currentTimestamp";
+import { getNormalizedForm } from "@/lib/utils/pokemonUtils";
+
+export const CONTEST_SLOTS = 200;
+export const INCIDENT_DISPLAY_GOLD = 7;
+export const INCIDENT_DISPLAY_KECLEON = 8;
+export const INCIDENT_DISPLAY_CONTEST = 9;
+export const INCIDENT_DISPLAYS_INVASION = [1, 2, 3];
+export const INVASION_CHARACTER_LEADERS = [41, 42, 43, 44, 46];
+export const INVASION_CHARACTER_NOTYPES = [4, 5];
+export const KECLEON_ID = 352;
+
+export enum RewardType {
+	XP = 1,
+	ITEM = 2,
+	STARDUST = 3,
+	CANDY = 4,
+	AVATAR_CLOTHING = 5,
+	QUEST = 6,
+	POKEMON = 7,
+	POKECOINS = 8,
+	XL_CANDY = 9,
+	LEVEL_CAP = 10,
+	STICKER = 11,
+	MEGA_ENERGY = 12,
+	INCIDENT = 13,
+	PLAYER_ATTRIBUTE = 14,
+	EVENT_BADGE = 15,
+	POKEMON_EGG = 16
+}
+
+export function parseQuestReward(reward?: string | null) {
+	const parsed = JSON.parse(reward ?? "[]")[0] as QuestReward | undefined;
+	if (parsed) {
+		// @ts-ignore
+		parsed.info.form = getNormalizedForm(parsed.info.pokemon_id, parsed.info?.["form_id"] ?? 0);
+
+		if ("form_id" in parsed.info) delete parsed.info["form_id"];
+	}
+	return parsed;
+}
+
+export function getArTag(isAr: boolean) {
+	if (isAr) return m.quest_ar_tag();
+	return m.quest_noar_tag();
+}
+
+export function hasFortActiveLure(data: Partial<PokestopData>) {
+	return (
+		data.lure_id && data.lure_expire_timestamp && data.lure_expire_timestamp > currentTimestamp()
+	);
+}
+
+export function isIncidentInvasion(incident: Incident) {
+	return INCIDENT_DISPLAYS_INVASION.includes(incident.display_type);
+}
+
+export function isIncidentGold(incident: Incident) {
+	return incident.display_type === INCIDENT_DISPLAY_GOLD;
+}
+
+export function isIncidentKecleon(incident: Incident) {
+	return incident.display_type === INCIDENT_DISPLAY_KECLEON;
+}
+
+export function isIncidentContest(incident: Incident) {
+	return incident.display_type === INCIDENT_DISPLAY_CONTEST;
+}
+
+export function getRewardText(reward: QuestReward) {
+	switch (reward.type) {
+		case RewardType.XP:
+			if (!reward.info.amount) return m.xp();
+			return m.quest_xp({ count: reward.info.amount });
+		case RewardType.ITEM:
+			if (!reward.info.amount) return mItem(reward.info.item_id);
+			return m.quest_item({ count: reward.info.amount, item: mItem(reward.info.item_id) });
+		case RewardType.STARDUST:
+			if (!reward.info.amount) return m.stardust();
+			return m.quest_stardust({ count: reward.info.amount });
+		case RewardType.CANDY:
+			if (!reward.info.amount) return m.pokemon_candy({ pokemon: mPokemon(reward.info) });
+			return m.quest_candy({ count: reward.info.amount, pokemon: mPokemon(reward.info) });
+		case RewardType.POKEMON:
+			return mPokemon(reward.info);
+		case RewardType.XL_CANDY:
+			if (!reward.info.amount) return m.pokemon_xl_candy({ pokemon: mPokemon(reward.info) });
+			return m.quest_xl_candy({
+				count: reward.info.amount,
+				pokemon: mPokemon(reward.info)
+			});
+		case RewardType.MEGA_ENERGY:
+			if (!reward.info.amount) return m.pokemon_mega_resource({ pokemon: mPokemon(reward.info) });
+			return m.quest_mega_resource({
+				count: reward.info.amount,
+				pokemon: mPokemon(reward.info)
+			});
+		default:
+			return rewardTypeLabel(reward.type);
+	}
+}
+
+export function rewardTypeLabel(rewardType: RewardType) {
+	switch (rewardType) {
+		case RewardType.XP:
+			return m.xp();
+		case RewardType.ITEM:
+			return m.items();
+		case RewardType.STARDUST:
+			return m.stardust();
+		case RewardType.CANDY:
+			return m.candy();
+		case RewardType.AVATAR_CLOTHING:
+			return m.reward_avatar_clothing();
+		case RewardType.QUEST:
+			return m.reward_quest();
+		case RewardType.POKEMON:
+			return m.pogo_pokemon();
+		case RewardType.POKECOINS:
+			return m.reward_pokecoins();
+		case RewardType.XL_CANDY:
+			return m.xl_candy();
+		case RewardType.LEVEL_CAP:
+			return m.reward_level_cap();
+		case RewardType.STICKER:
+			return m.reward_sticker();
+		case RewardType.MEGA_ENERGY:
+			return m.mega_energy();
+		case RewardType.INCIDENT:
+			return m.reward_incident();
+		case RewardType.PLAYER_ATTRIBUTE:
+			return m.reward_player_attribute();
+		case RewardType.EVENT_BADGE:
+			return m.reward_event_badge();
+		case RewardType.POKEMON_EGG:
+			return m.reward_egg();
+		default:
+			return "";
+	}
+}
+
+export function getQuestKey(questReward: string, questTitle: string, questTarget: number) {
+	return `${questReward}/${questTitle}/${questTarget}`;
+}
+
+export function getContestText(rankingStandard: number, focus: ContestFocus) {
+	let metric = m.contest_biggest;
+	let name = "";
+
+	// if ((data?.showcase_expiry ?? 0) < currentTimestamp()) {
+	// 	return m.unknown_contest();
+	// }
+
+	if (rankingStandard === 1) {
+		metric = m.contest_smallest;
+	}
+
+	if (!focus) return metric({ name });
+
+	if (focus.type === "pokemon") {
+		name = mPokemon({ pokemon_id: focus.pokemon_id, form: focus.pokemon_form });
+	} else if (focus.type === "type") {
+		if (focus.pokemon_type_2) {
+			name = m.connected_and({
+				first: mType(focus.pokemon_type_1),
+				second: m.x_type({ type: mType(focus.pokemon_type_2) })
+			});
+		} else {
+			name = m.x_type({ type: mType(focus.pokemon_type_1) });
+		}
+	} else if (focus.type === "buddy") {
+		name = m.contest_buddy_min_level({ level: focus.min_level });
+	} else if (focus.type === "alignment") {
+		name = mAlignment(focus.pokemon_alignment);
+	} else if (focus.type === "class") {
+		// @ts-ignore
+		const func = m["pokemon_class_" + focus.pokemon_class];
+		name = func ? func() : "?";
+	} else if (focus.type === "family") {
+		name = m.contest_pokemon_family({ pokemon: mPokemon({ pokemon_id: focus.pokemon_family }) });
+	} else if (focus.type === "generation") {
+		name = mGeneration(focus.generation) + " " + m.pogo_pokemon();
+	} else if (focus.type === "hatched") {
+		name = focus.hatched ? m.contest_hatched() : m.contest_not_hatched();
+	} else if (focus.type === "mega") {
+		name = focus.restriction === 1 ? m.contest_mega_evolution() : m.contest_not_mega_evolution();
+	} else if (focus.type === "shiny") {
+		name = focus.shiny ? m.contest_shiny() : m.contest_not_shiny();
+	}
+
+	return metric({ name });
+}
+
+export function getContestIcon(focus: ContestFocus | undefined) {
+	if (focus?.type === "pokemon") {
+		return getIconPokemon({ pokemon_id: focus.pokemon_id, form: focus.pokemon_form });
+	} else if (focus?.type === "type") {
+		return getIconType(focus.pokemon_type_1);
+	}
+	return getIconContest();
+}
+
+export function getDefaultPokestopFilter() {
+	return {
+		category: "pokestop",
+		...defaultFilter(),
+		pokestopPlain: { category: "pokestopPlain", ...defaultFilter() },
+		quest: { category: "quest", ...defaultFilter() },
+		invasion: { category: "invasion", ...defaultFilter() },
+		contest: { category: "contest", ...defaultFilter() },
+		kecleon: { category: "kecleon", ...defaultFilter() },
+		goldPokestop: { category: "goldPokestop", ...defaultFilter() },
+		lure: { category: "lure", ...defaultFilter() }
+	} as FilterPokestop;
+}
+
+export function getActivePokestopFilter() {
+	const activeSearch = getActiveSearch();
+	if (activeSearch && activeSearch.mapObject === MapObjectType.POKESTOP) {
+		return activeSearch.filter as FilterPokestop;
+	}
+	return getUserSettings().filters.pokestop;
+}

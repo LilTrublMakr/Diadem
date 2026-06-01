@@ -1,0 +1,287 @@
+[server.log]
+level = "info" # crit, error, warning, info, debug
+# file = "/var/log/diadem.log"
+
+[server.golbat]
+url = "http://127.0.0.1:9001"
+secret = ""
+
+# This can be configured in Fletchling. Match the string to its config
+defaultNestName = "Unknown Nest"
+
+# Dragonite integration for scout
+[server.dragonite]
+url = "http://127.0.0.1:7272"
+secret = ""
+
+# Optional Koji integrtion. Comment out to disable
+[server.koji]
+url = "http://127.0.0.1:8080"
+secret = "secret"
+projectName = "reactmap"
+
+# For address search, both Pelias and Nominatim are supported.
+# Using Photon is highly recommended. Refer to the readme for more info.
+
+#[server.photon]
+#url = "https://photon.komoot.io/"  # You can use their public api, but consider self-hosting; it's pretty easy
+#hasGeometries = false  # Requires Photon to be started with -full-geometries
+
+#[server.pelias]
+#url = "https://api.geocode.earth/"
+#apiKey = "key"
+
+#[server.nominatim]
+#url = "http://127.0.0.1:500"
+#basicAuth = ""
+#userAgent = "Diadem / Contact: name@email.com"
+
+[server.auth]
+enabled = true
+optional = true
+
+[server.auth.discord]
+clientId = ""
+clientSecret = ""
+redirectUri = "https://map.co/login/discord/callback"
+
+[client.discord]
+serverLink = "https://discord.com/invite/VGgsQN2hYG"
+serverId = "1359028304128245934"
+
+# Permissions work by defining permission sets.
+# When a user fulfills every requirement in that set,
+# they will allow access to every configured feature,
+# only in the configured areas.
+#
+# User requirements:
+#   - everyone: bool
+#   - loggedIn: bool
+#   - guildId:  id
+#   - roleId:   id
+#
+# Allows access to:
+#   - areas:    name[]    (area name, as configured in koji)
+#   - features: feature[] (*, pokemon, gym, pokestop, station, weather, s2cell, scout)
+#
+# Below are some examples
+
+# Everyone has access to everything
+[[server.permissions]]
+everyone = true
+features = ["*"]
+
+# Every user gets access to gyms and pokestops in New York
+#[[server.permissions]]
+#everyone = true
+#areas = ["New York"]
+#features = ["gym", "pokestop"]
+
+# Every logged-in user gets access to all Power Spots
+# Above permissions are also granted, since these users also fulfill those requirements
+#[[server.permissions]]
+#loggedIn = true
+#features = ["station"]
+
+# Every user who's a member of my Malte# server gets access to all Pokemon and Scout
+# Above permissions are also granted, since these users also fulfill those requirements
+#[[server.permissions]]
+#guildId = "1359028304128245934"
+#features = ["pokemon", "scout"]
+
+# Every user with that specific role gets access to every feature in Tokyo
+# Above permissions are also granted, since these users also fulfill those requirements
+#[[server.permissions]]
+#guildId = "1359028304128245934"
+#roleId = "1483326963558653982"
+#areas = ["Tokyo"]
+#features = ["*"]
+
+# Rate limits can be used to limit the data clients can fetch from your server
+# Abuse may be rare, but can happen. If you notice abuse, you can enable rate limits.
+#
+# How it works
+# - For every map object type, there's a rolling limit. You can set these limits per-type below.
+# - On every request, a cost is determined:
+#   1. Take the total amount of non-filtered objects in the requested bounding box
+#   2. If the request is not a delta, multiply that number by {nonDeltaMultiplier}
+#   3. If the request is not a delta AND a heavyFilter, multiply the number by another {heavyFilterMultiplier}
+#      - A request is deemed heavyFilter when (actual sent data < total amount of data * {heavyFilterRatio})
+#   4. The cost is added to the user's rate limit quota and gets limited by {server.limits.{type}.rateLimit}.
+# When logged in, rate limits are based on the user ID. And based on IP when not.
+[server.limits]
+enableRateLimiting = false
+nonDeltaMultiplier = 3
+heavyFilterMultiplier = 2
+heavyFilterRatio = 0.2
+
+# Set limits per map object type.
+#   requestLimit: the max amount of objects returned in a single response, and therefore the max
+#       amount of objects of that type to be displayed on the map at once (this is used regardless of whether rate limiting is enabled)
+#   rateLimit is the max amount of objects to be given out in {rateLimitTime} seconds.
+#   rateLimitTime is the amount of seconds for {rateLimit} to reset
+#
+# Available map objects: pokemon, pokestop, gym, station, nest, spawnpoint, tappable
+# When no value is set, sane defaults will be used
+#[server.limits.pokemon]
+#requestLimit = 10000
+#rateLimit = 2000000
+#rateLimitTime = 3600
+
+# Connection to your Golbat DB, user should have SELECT permissions
+[server.db]
+host = "127.0.0.1"
+port = 3306
+database = "golbat"
+user = ""
+password = ""
+
+# Connection to your Diadem DB, user should have ALL permissions
+[server.internalDb]
+host = "127.0.0.1"
+port = 3306
+database = "diadem"
+user = ""
+password = ""
+
+[client.general]
+mapName = "Diadem"
+defaultLocale = "en"  # Only used in link previews, client locale is set based on user preference
+customHome = false  # If enabled, path / will show the config/Home.svelte component, so you can build your own homepage. The map can be found under /map
+
+# Starting map position for new users
+defaultLat = 51.516855
+defaultLon = -0.080500
+defaultZoom = 15
+
+# Min/Max zoom for users, leave commented out to disable
+#minZoom = 0
+#maxZoom = 20
+
+# Values to be used in search engine entries and social media previews
+url = ""  # i.e. "https://malt.ee"
+image = ""  # Full url to a thumbnail to be used in social media links
+description = ""
+
+# robots.txt
+allowCrawlers = false
+disallowedPaths = []  # ["/custom"] would disallow crawlers from indexing any page under /custom
+
+# When enabled, shared links to map objects will show maps in their preview
+[server.staticMap]
+enabled = false
+url = "https://tiles.example.com"  # your tileserver url, must be accessible from diadem (could be a localhost, public url, or docker url)
+diademUrl = "https://example.com"  # your diadem url, must be accessible from your tileserver (could be a localhost, public url, or docker url)
+#style = "positron"  # by default, will match the default light map style
+
+# Tools are extra functionality that go beyond what a pogo map should do.
+# You can configure them here.
+# Note that certain tools may be disabled if they're not set up or users lack permissions.
+[client.tools]
+# Whether to show the tools menu as a whole
+showToolsMenu = true
+
+coverageMap = true
+scout = true
+
+# Map Positions for various maps in the UI
+[client.mapPositions]
+# Starting position when opening the coverage map
+coverageMapLat = 51.516855
+coverageMapLon = -0.080500
+coverageMapZoom = 10
+
+# Profile Menu - Map Style Preview Maps
+# You may change them if you have a style without tiles in Germany
+styleLat = 53.563
+styleLon = 9.979
+styleZoom = 12
+
+# Tools Menu - Coverage Map - Background Map
+# Would generally recommend to set this to a position where you have areas
+coverageLat = 53.563
+coverageLon = 9.979
+coverageZoom = 5.5
+
+# Tools Menu - Scout - Background Map
+# Would generally recommend to set this to a position where you have areas
+scoutLat = 53.563
+scoutLon = 9.979
+scoutZoom = 10.5
+
+### Map Styles
+
+[[client.mapStyles]]
+id = "positron"
+name = "Positron"
+url = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+default = "light"
+
+[[client.mapStyles]]
+id = "dark"
+name = "Dark"
+url = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+default = "dark"
+
+[[client.mapStyles]]
+id = "voyager"
+name = "Voyager"
+url = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+
+
+### UICON Sets
+
+[[client.uiconSets]]
+id = "DEFAULT"  # One DEFAULT is required, and it's intended to be this
+name = "GO"
+url = "https://raw.githubusercontent.com/WatWowMap/wwm-uicons/main/"
+
+base = { scale = 0.5 }
+gym = { offsetY = -27, scale = 0.8 }
+raid_pokemon = { scale = 1.6, offsetY = -40 }
+raid_pokemon_6 = { scale = 1.6, offsetY = -92 }
+raid_egg = { scale = 0.3, offsetY = -62 }
+raid_egg_6 = { scale = 0.3, offsetY = -135 }
+
+[[client.uiconSets]]
+id = "pogoOutline"
+name = "GO"
+url = "https://raw.githubusercontent.com/whitewillem/PogoAssets/refs/heads/main/uicons-outline/"
+
+base = { scale = 0.5 }
+pokemon = { default = true, scale = 0.4 }
+gym = { default = true, offsetY = -26, offsetX = -14 }
+raid_pokemon = { scale = 0.8, offsetX = -11, offsetY = -30 }
+raid_egg = { scale = 0.24, offsetX = -25, offsetY = -40 }
+
+[[client.uiconSets]]
+id = "home"
+name = "Home"
+url = "https://raw.githubusercontent.com/nileplumb/PkmnHomeIcons/master/UICONS_OS_128/"
+
+pokemon = { scale = 0.4 }
+pokestop = { scale = 0.5, offsetY = -30 }
+quest = { scale = 0.4, offsetX = -40, offsetY = -45, spacing = 60 }
+invasion = { scale = 0.35, offsetX = 40, offsetY = -49, spacing = 60 }
+
+[[client.uiconSets]]
+id = "shuffle"
+name = "Shuffle"
+url = "https://raw.githubusercontent.com/nileplumb/PkmnShuffleMap/master/UICONS/"
+
+base = { scale = 0.09 }
+pokemon = { scale = 0.4 }
+pokestop = { default = true, offsetY = -25, scale = 0.5 }
+station = { default = true, offsetY = -25, scale = 0.5 }
+quest = { scale = 0.4, offsetX = -40, offsetY = -40, spacing = 60 }
+invasion = { scale = 0.35, offsetX = 40, offsetY = -44, spacing = 60 }
+max_battle = { scale = 0.4, offsetY = -50 }
+
+[[client.uiconSets]]
+id = "shuffleShiny"
+name = "Shiny"
+url = "https://raw.githubusercontent.com/jms412/PkmnShuffleMap/master/UICONS_Half_Shiny_128/"
+
+base = { scale = 0.25 }
+pokemon = { scale = 0.4 }
+

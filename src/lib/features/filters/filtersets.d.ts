@@ -1,0 +1,159 @@
+import { QuestArType } from "@/lib/features/filters/filterUtilsQuest";
+import type { IconCategory } from "@/lib/features/filters/icons";
+import { m } from "@/lib/paraglide/messages";
+import type { RewardType } from "@/lib/utils/pokestopUtils";
+
+export type AnyFilterset =
+	| FiltersetPokemon
+	| FiltersetPokestopPlain
+	| FiltersetQuest
+	| FiltersetInvasion
+	| FiltersetLure
+	| FiltersetGymPlain
+	| FiltersetRaid
+	| FiltersetStationPlain
+	| FiltersetMaxBattle;
+
+// remember to update zod schemas when editing filterset types!
+
+// auto-generated, localized name
+interface Message<K extends keyof typeof m = keyof typeof m> {
+	message: K | string;
+	params?: Parameters<(typeof m)[K]> | Record<string, string>;
+}
+
+export type FiltersetTitle = {
+	// a user-selected name
+	title?: string;
+} & Message;
+
+export type FiltersetModifiers = {
+	glow?: {
+		color: string;
+		radius?: number;
+		opacity?: number;
+	};
+	scale?: number;
+	rotation?: number;
+	background?: {
+		color: string;
+		radius?: number;
+		opacity?: number;
+	};
+	showBadge?: boolean;
+	showLabel?: string | boolean;
+};
+
+export type BaseFilterset = {
+	id: string;
+	title: FiltersetTitle;
+	enabled: boolean;
+	icon: {
+		isUserSelected: boolean;
+		emoji?: string;
+		uicon?: {
+			category: IconCategory;
+			params: Record<string, any>;
+		};
+	};
+	modifiers?: FiltersetModifiers;
+};
+
+export type MinMax = {
+	min: number;
+	max: number;
+};
+
+type Pokemon = { pokemon_id: number; form: number };
+type QuestReward = { id: string; amount?: number };
+
+export type FiltersetPokemon = BaseFilterset & {
+	pokemon?: Pokemon[];
+	iv?: MinMax;
+	cp?: MinMax;
+	ivAtk?: MinMax;
+	ivDef?: MinMax;
+	ivSta?: MinMax;
+	level?: MinMax;
+	gender?: number[];
+	size?: MinMax;
+	pvpRankLittle?: MinMax;
+	pvpRankGreat?: MinMax;
+	pvpRankUltra?: MinMax;
+};
+
+export type FiltersetPokestopPlain = BaseFilterset & {
+	isSponsored?: boolean;
+	powerUpLevel?: MinMax;
+	isArScanEligible?: boolean;
+	hasDetatils?: boolean;
+};
+
+export type FiltersetQuest = BaseFilterset & {
+	ar?: QuestArType;
+	rewardType?: RewardType;
+	tasks?: { title: string; target: number }[];
+	pokemon?: Pokemon[];
+	item?: QuestReward[];
+	megaResource?: QuestReward[];
+	stardust?: MinMax;
+	xp?: MinMax;
+	candy?: QuestReward[];
+	xlCandy?: QuestReward[];
+};
+
+export type FiltersetInvasion = BaseFilterset & {
+	characters?: number[];
+	rewards?: Pokemon[];
+};
+
+export type FiltersetLure = BaseFilterset & {
+	items: number[];
+};
+
+// this is only used for search and therefore very simplified
+export type FiltersetContest = BaseFilterset & {
+	rankingStandard: number;
+	focus: {
+		pokemon_id?: number;
+		form?: number;
+		type_id?: number;
+	};
+};
+
+export type FiltersetRoute = BaseFilterset & {};
+
+export type FiltersetGymPlain = BaseFilterset & {
+	isSponsored?: boolean;
+	powerUpLevel?: MinMax;
+	isArScanEligible?: boolean;
+	hasDetatils?: boolean;
+	defenderAmount?: MinMax;
+};
+
+export type RaidFilterShow = "egg" | "boss";
+
+export type FiltersetRaid = BaseFilterset & {
+	levels?: number[];
+	bosses?: (Pokemon & { temp_evolution_id?: number })[];
+	show?: RaidFilterShow[];
+};
+
+export type FiltersetStationPlain = BaseFilterset & {};
+
+type BreadModePokemon = Pokemon & { bread_mode: number | undefined };
+
+export type FiltersetMaxBattle = BaseFilterset & {
+	levels?: number[];
+	bosses?: BreadModePokemon[];
+	isActive?: boolean;
+	hasGmax?: boolean;
+};
+
+export type FiltersetNest = BaseFilterset & {
+	pokemon?: Pokemon[];
+};
+
+export type FiltersetSpawnpoint = BaseFilterset & {};
+
+export type FiltersetTappable = BaseFilterset & {};
