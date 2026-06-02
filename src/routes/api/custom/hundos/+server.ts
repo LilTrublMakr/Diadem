@@ -7,6 +7,7 @@ import { getNormalizedForm } from '@/lib/utils/pokemonUtils';
 
 // Golbat stores aggregate IV as a percentage in the `iv` column (100 = hundo).
 type HundoRow = {
+	id: string;
 	pokemon_id: number;
 	form: number;
 	first_seen_timestamp: number;
@@ -14,6 +15,7 @@ type HundoRow = {
 };
 
 export type RecentHundo = {
+	id: string;
 	pokemon_id: number;
 	form: number;
 	name: string;
@@ -25,7 +27,7 @@ export const GET: RequestHandler = async () => {
 	let rows: HundoRow[];
 	try {
 		rows = await query<HundoRow[]>(`
-			SELECT pokemon_id, form, first_seen_timestamp, expire_timestamp
+			SELECT id, pokemon_id, form, first_seen_timestamp, expire_timestamp
 			FROM pokemon
 			WHERE iv = 100
 			  AND expire_timestamp > UNIX_TIMESTAMP() - 86400
@@ -53,6 +55,7 @@ export const GET: RequestHandler = async () => {
 			}
 		}
 		return {
+			id: row.id,
 			pokemon_id: row.pokemon_id,
 			form,
 			name,

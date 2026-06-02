@@ -9,6 +9,7 @@ type EncounterRow = {
 	pokemon_id: number;
 	form: number;
 	count: string;
+	last_seen?: number;
 };
 
 export type TopEncounter = {
@@ -16,6 +17,7 @@ export type TopEncounter = {
 	form: number;
 	name: string;
 	count: number;
+	last_seen?: number;
 };
 
 export type TopEncountersResponse = {
@@ -24,12 +26,25 @@ export type TopEncountersResponse = {
 };
 
 async function fetchTop(intervalSecs: number, asc = false): Promise<EncounterRow[]> {
+	if (asc) {
+		return query<EncounterRow[]>(`
+			SELECT * FROM (
+				SELECT pokemon_id, form, COUNT(*) AS \`count\`, MAX(expire_timestamp) AS last_seen
+				FROM pokemon
+				WHERE expire_timestamp > UNIX_TIMESTAMP() - ?
+				GROUP BY pokemon_id, form
+				ORDER BY COUNT(*) ASC
+				LIMIT 10
+			) sub
+			ORDER BY last_seen DESC
+		`, [intervalSecs]);
+	}
 	return query<EncounterRow[]>(`
-		SELECT pokemon_id, form, COUNT(*) AS count
+		SELECT pokemon_id, form, COUNT(*) AS \`count\`
 		FROM pokemon
 		WHERE expire_timestamp > UNIX_TIMESTAMP() - ?
 		GROUP BY pokemon_id, form
-		ORDER BY count ${asc ? 'ASC' : 'DESC'}
+		ORDER BY COUNT(*) DESC
 		LIMIT 10
 	`, [intervalSecs]);
 }
@@ -48,7 +63,13 @@ function buildList(rows: EncounterRow[]): TopEncounter[] {
 				name = `${baseName} (${formName}${suffix})`;
 			}
 		}
-		return { pokemon_id: row.pokemon_id, form, name, count: Number(row.count) };
+		return {
+			pokemon_id: row.pokemon_id,
+			form,
+			name,
+			count: Number(row.count),
+			...(row.last_seen !== undefined ? { last_seen: row.last_seen } : {})
+		};
 	});
 }
 
