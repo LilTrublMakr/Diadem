@@ -1,37 +1,31 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { query } from '@/lib/server/db/external/internalQuery';
+import { queryStats } from '@/lib/server/db/stats';
 import { masterfileProvider } from '@/lib/server/provider/masterfileProvider';
 import { getMasterPokemon } from '@/lib/services/masterfile';
 import { getNormalizedForm } from '@/lib/utils/pokemonUtils';
 
-// Golbat stores aggregate IV as a percentage in the `iv` column (100 = hundo).
 type HundoRow = {
-	id: string;
 	pokemon_id: number;
 	form: number;
-	first_seen_timestamp: number;
-	expire_timestamp: number;
+	count: string;
 };
 
 export type RecentHundo = {
-	id: string;
 	pokemon_id: number;
 	form: number;
 	name: string;
-	first_seen_timestamp: number;
-	expire_timestamp: number;
+	count: number;
 };
 
 export const GET: RequestHandler = async () => {
 	let rows: HundoRow[];
 	try {
-		rows = await query<HundoRow[]>(`
-			SELECT id, pokemon_id, form, first_seen_timestamp, expire_timestamp
-			FROM pokemon
-			WHERE iv = 100
-			  AND expire_timestamp > UNIX_TIMESTAMP() - 86400
-			ORDER BY first_seen_timestamp DESC
+		rows = await queryStats<HundoRow[]>(`
+			SELECT pokemon_id, form, \`count\`
+			FROM pokemon_iv_distribution
+			WHERE time_slot = '1d' AND iv = 100.0
+			ORDER BY \`count\` DESC
 			LIMIT 10
 		`);
 	} catch (e) {
@@ -54,14 +48,7 @@ export const GET: RequestHandler = async () => {
 				name = `${baseName} (${formName}${suffix})`;
 			}
 		}
-		return {
-			id: row.id,
-			pokemon_id: row.pokemon_id,
-			form,
-			name,
-			first_seen_timestamp: row.first_seen_timestamp,
-			expire_timestamp: row.expire_timestamp
-		};
+		return { pokemon_id: row.pokemon_id, form, name, count: Number(row.count) };
 	});
 
 	return json(hundos);

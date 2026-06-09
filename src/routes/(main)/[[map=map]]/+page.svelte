@@ -25,7 +25,8 @@
 	import {
 		isSearchViewActive,
 		resetActiveSearchFilter,
-		setActiveSearch
+		setActiveSearch,
+		setActiveSearchPokemon
 	} from "@/lib/features/activeSearch.svelte.js";
 	import ActiveSearchView from "@/components/ui/search/ActiveSearchView.svelte";
 	import { isOnMap } from "@/lib/utils/getMapPath";
@@ -34,8 +35,25 @@
 	import MapMenuUi from "@/components/ui/MapMenuUi.svelte";
 	import type maplibre from "maplibre-gl";
 	import { onDestroy, onMount } from "svelte";
+	import { page } from "$app/state";
+	import { getIsLoading } from "@/lib/services/initialLoad.svelte.js";
+	import { getMasterPokemon } from "@/lib/services/masterfile";
 
 	let map: maplibre.Map | undefined = $state(undefined);
+	let searchHandled = $state(false);
+
+	$effect(() => {
+		if (getIsLoading() || searchHandled) return;
+		const pokemonIdParam = page.url.searchParams.get('pokemon_id');
+		if (!pokemonIdParam) return;
+		const pokemonId = parseInt(pokemonIdParam);
+		const form = parseInt(page.url.searchParams.get('form') ?? '0') || 0;
+		const pokemon = getMasterPokemon(pokemonId);
+		if (pokemon) {
+			setActiveSearchPokemon(pokemon.name, { pokemon_id: pokemonId, form });
+			searchHandled = true;
+		}
+	});
 
 	$effect(() => {
 		// When opening a popup on mobile while in a menu, close the menu

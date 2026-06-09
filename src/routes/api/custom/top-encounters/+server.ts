@@ -1,15 +1,14 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { query } from '@/lib/server/db/external/internalQuery';
+import { queryStats } from '@/lib/server/db/stats';
 import { masterfileProvider } from '@/lib/server/provider/masterfileProvider';
 import { getMasterPokemon } from '@/lib/services/masterfile';
 import { getNormalizedForm } from '@/lib/utils/pokemonUtils';
 
-type EncounterRow = {
+type SummaryRow = {
 	pokemon_id: number;
 	form: number;
-	count: string;
-	last_seen?: number;
+	total_count: string;
 };
 
 export type TopEncounter = {
@@ -22,34 +21,10 @@ export type TopEncounter = {
 
 export type TopEncountersResponse = {
 	h24: TopEncounter[];
-	rarest7d: TopEncounter[];
+	rarest24h: TopEncounter[];
 };
 
-async function fetchTop(intervalSecs: number, asc = false): Promise<EncounterRow[]> {
-	if (asc) {
-		return query<EncounterRow[]>(`
-			SELECT * FROM (
-				SELECT pokemon_id, form, COUNT(*) AS \`count\`, MAX(expire_timestamp) AS last_seen
-				FROM pokemon
-				WHERE expire_timestamp > UNIX_TIMESTAMP() - ?
-				GROUP BY pokemon_id, form
-				ORDER BY COUNT(*) ASC
-				LIMIT 10
-			) sub
-			ORDER BY last_seen DESC
-		`, [intervalSecs]);
-	}
-	return query<EncounterRow[]>(`
-		SELECT pokemon_id, form, COUNT(*) AS \`count\`
-		FROM pokemon
-		WHERE expire_timestamp > UNIX_TIMESTAMP() - ?
-		GROUP BY pokemon_id, form
-		ORDER BY COUNT(*) DESC
-		LIMIT 10
-	`, [intervalSecs]);
-}
-
-function buildList(rows: EncounterRow[]): TopEncounter[] {
+function buildList(rows: SummaryRow[]): TopEncounter[] {
 	return rows.map((row) => {
 		const form = getNormalizedForm(row.pokemon_id, row.form);
 		const basePokemon = getMasterPokemon(row.pokemon_id);
@@ -63,22 +38,28 @@ function buildList(rows: EncounterRow[]): TopEncounter[] {
 				name = `${baseName} (${formName}${suffix})`;
 			}
 		}
-		return {
-			pokemon_id: row.pokemon_id,
-			form,
-			name,
-			count: Number(row.count),
-			...(row.last_seen !== undefined ? { last_seen: row.last_seen } : {})
-		};
+		return { pokemon_id: row.pokemon_id, form, name, count: Number(row.total_count) };
 	});
 }
 
 export const GET: RequestHandler = async () => {
-	let rows24h: EncounterRow[], rows7d: EncounterRow[];
+	let rows24h: SummaryRow[], rows7d: SummaryRow[];
 	try {
 		[rows24h, rows7d] = await Promise.all([
-			fetchTop(86400),
-			fetchTop(604800, true)
+			queryStats<SummaryRow[]>(`
+				SELECT pokemon_id, form, total_count
+				FROM pokemon_summary
+				WHERE time_slot = '1d'
+				ORDER BY total_count DESC
+				LIMIT 10
+			`),
+			queryStats<SummaryRow[]>(`
+				SELECT pokemon_id, form, total_count
+				FROM pokemon_summary
+				WHERE time_slot = '1d' AND total_count > 0
+				ORDER BY total_count ASC
+				LIMIT 10
+			`)
 		]);
 	} catch (e) {
 		console.error('[top-encounters API] Query failed:', e);
@@ -89,6 +70,6 @@ export const GET: RequestHandler = async () => {
 
 	return json({
 		h24: buildList(rows24h),
-		rarest7d: buildList(rows7d)
+		rarest24h: buildList(rows7d)
 	} satisfies TopEncountersResponse);
 };

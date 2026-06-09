@@ -68,12 +68,9 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 		deleteSessionTokenCookie(event);
 	}
 
-	if (user && !permissionCache.has(user.id)) {
-		user.permissions = await updatePermissions(user as User, session.discordToken, event.fetch);
-		permissionCache.set(user.id, undefined);
-	}
+	let accessToken = session?.discordToken ?? "";
 
-	// Refresh Discord Auth if necessary
+	// Refresh Discord Auth FIRST so the permissions check below uses a valid token
 	const discord = getDiscordAuth();
 	if (
 		discord &&
@@ -84,10 +81,11 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 
 		try {
 			const tokens = await discord.refreshAccessToken(session.discordRefreshToken);
+			accessToken = tokens.accessToken();
 			await makeNewSession(
 				event,
 				user.id,
-				tokens.accessToken(),
+				accessToken,
 				tokens.refreshToken(),
 				tokens.accessTokenExpiresAt()
 			);
@@ -95,8 +93,17 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 		} catch (e) {
 			console.error("Error while refreshing discord token: " + e.toString());
 			await invalidateSession(session.id);
-			// TODO: handle this properly
 		}
+	}
+
+	if (user && !permissionCache.has(user.id)) {
+		try {
+			user.permissions = await updatePermissions(user as User, accessToken, event.fetch);
+		} catch (e) {
+			console.error("Error updating permissions for user " + user.id + ": " + e.toString());
+			// Keep existing DB permissions — do not write degraded perms on failure
+		}
+		permissionCache.set(user.id, undefined);
 	}
 
 	event.locals.user = user;

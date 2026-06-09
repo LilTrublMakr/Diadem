@@ -1,3 +1,23 @@
+export type MasterMove = {
+	id: number;
+	name: string;
+	proto: string;
+	type: number;
+	power: number;
+	isLegacy?: boolean;
+};
+
+export type MasterEvolution = {
+	pokemonId: number;
+	form: number;
+	candyCost: number;
+	itemRequirement?: string;
+	mustBeBuddy?: boolean;
+	onlyDaytime?: boolean;
+	onlyNighttime?: boolean;
+	questRequirement?: string;
+};
+
 export type MasterPokemon = {
 	name: string;
 	forms: { [key: string]: MasterPokemon };
@@ -13,6 +33,10 @@ export type MasterPokemon = {
 	baseAtk: number;
 	baseDef: number;
 	baseSta: number;
+	quickMoves: MasterMove[];
+	chargedMoves: MasterMove[];
+	evolutions: MasterEvolution[];
+	buddyDistance: number;
 };
 
 export type MasterWeather = {

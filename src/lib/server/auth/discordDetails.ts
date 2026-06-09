@@ -46,6 +46,9 @@ export async function getGuildMemberInfo(guildId: string, accessToken: string) {
 		`${endpoint}/guilds/${guildId}/member`,
 		getFetchOptions(accessToken)
 	);
+	if (!response.ok) {
+		throw new Error(`Discord guild API error ${response.status} for guild ${guildId}`);
+	}
 	const guildMember: DiscordGuildData = await response.json();
 	return guildMember;
 }

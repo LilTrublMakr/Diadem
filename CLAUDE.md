@@ -26,8 +26,8 @@ Node 22+ required. Uses pnpm.
 - **TypeScript** strict mode
 - **Tailwind CSS 4** via PostCSS
 - **MapLibre GL** + `svelte-maplibre` for maps
-- **Database**: MariaDB — two external databases: Golbat (Pokémon data), Dragonite (worker data)
-- **ORM**: Drizzle ORM (internal DB for users/sessions) + raw mysql2 for Golbat/Dragonite
+- **Database**: MariaDB — three external databases: Golbat (scanner/map data), Dragonite (worker data), pokemon_stats (aggregated encounter/shiny stats)
+- **ORM**: Drizzle ORM (internal DB for users/sessions) + raw mysql2 for external DBs
 - **Paraglide.js** (inlang) for i18n — translations in `messages/*.json`, generated code in `src/lib/paraglide/`
 - **bits-ui** for headless UI components
 - **runed** for Svelte reactivity utilities
@@ -100,6 +100,12 @@ DRAGONITE_DB_PORT=3306
 DRAGONITE_DB_NAME=dragonite
 DRAGONITE_DB_USER=your_user
 DRAGONITE_DB_PASSWORD=your_password
+
+STATS_DB_HOST=127.0.0.1
+STATS_DB_PORT=3306
+STATS_DB_NAME=pokemon_stats
+STATS_DB_USER=your_stats_user
+STATS_DB_PASSWORD=your_stats_password
 ```
 
 ### 5. Run development server
@@ -159,8 +165,11 @@ pnpm dev
 ### Database
 
 - **Internal DB** (Drizzle): users + sessions tables in `src/lib/server/db/internal/schema.ts`
-- **External DB** (raw queries): Golbat scanner data via `src/lib/server/db/external/`
-- **Golbat queries**: use `query<T>()` from `@/lib/server/db/external/internalQuery`; use `fence = 'world'` for global aggregates
+- **Golbat DB** (raw queries): map/scanner data via `src/lib/server/db/external/internalQuery` — use `query<T>()`; configured via `[server.db]` in `config.toml`
+- **Stats DB** (raw queries): aggregated encounter/shiny stats via `src/lib/server/db/stats` — use `queryStats<T>()`; configured via `STATS_DB_*` in `.env` (read with `$env/static/private`)
+- **Dragonite DB** (raw queries): historical worker stats via `src/lib/server/db/dragonite` — use `queryDragonite<T>()`; configured via `DRAGONITE_DB_*` in `.env`
+- **`pokemon` table is deprecated** — do not query it; all encounter/shiny data now comes from the `pokemon_stats` database
+- Full `pokemon_stats` schema is documented in `DATABASE_REFERENCE.md`
 
 ### Documentation
 
@@ -178,11 +187,19 @@ All custom code lives in paths that Diadem treats as extension points:
 | `src/routes/(custom)/+layout.svelte` | Shared layout for custom pages — nav, footer, dark background |
 | `src/routes/(custom)/status/+page.svelte` | Live worker status page at `/status` |
 | `src/routes/(custom)/shiny/+page.svelte` | Shiny stats page at `/shiny` |
+| `src/routes/(custom)/seen/+page.svelte` | Seen (encounter) stats page at `/seen` — per-species counts, all time slots |
+| `src/routes/(custom)/pokemon/[id]/+page.svelte` | Per-pokemon detail page at `/pokemon/{id}` — base stats, moves, evolutions, buddy dist, scanner stats |
+| `src/routes/api/custom/pokemon/[id]/+server.ts` | Per-pokemon stats API — queries all 5 stats tables for a given pokemon_id |
 | `src/routes/api/custom/workers/+server.ts` | API endpoint at `/api/custom/workers` |
-| `src/routes/api/custom/shiny/+server.ts` | Shiny stats API — queries `pokemon_shiny_stats` from Golbat |
-| `src/routes/api/custom/recent-shinies/+server.ts` | Recent shinies API (currently unused — see Data Sources) |
+| `src/routes/api/custom/shiny/+server.ts` | Shiny stats API — queries `pokemon_stats.pokemon_summary` |
+| `src/routes/api/custom/seen/+server.ts` | Seen (24h) count — `SUM(total_count)` from `pokemon_summary WHERE time_slot = '1d'` |
+| `src/routes/api/custom/seen-species/+server.ts` | Per-species encounter counts across all time slots from `pokemon_summary` |
+| `src/routes/api/custom/top-encounters/+server.ts` | Top encounters (24h) + recent rare (24h) from `pokemon_summary` |
+| `src/routes/api/custom/hundos/+server.ts` | Top hundo species (24h) from `pokemon_iv_distribution WHERE iv = 100.0` |
+| `src/routes/api/custom/recent-shinies/+server.ts` | Unused — still queries deprecated `pokemon` table, no replacement yet |
+| `src/lib/server/db/stats.ts` | Stats DB connection (`queryStats<T>()`) — reads `STATS_DB_*` via `$env/static/private` |
 | `src/lib/server/api/dragoniteStatus.ts` | Dragonite admin API client — calls `/status/` and scout queue |
-| `src/lib/server/db/dragonite.ts` | Direct Dragonite DB connection for historical `stats_workers` data |
+| `src/lib/server/db/dragonite.ts` | Dragonite DB connection for historical `stats_workers` data (future use) |
 
 ---
 
@@ -201,13 +218,25 @@ Auth is via `X-Dragonite-Admin-Secret` header (`secret` field in `[server.dragon
 
 `connection_status === 'Executing Worker'` means connected. Workers are flattened from `area.worker_managers[].workers[]`.
 
-### Shiny Stats — Golbat `pokemon_shiny_stats`
+### Pokemon Stats DB — `pokemon_stats` database
 
-Table columns: `date`, `area`, `fence`, `pokemon_id`, `form_id`, `count`, `total`
+Full schema in `DATABASE_REFERENCE.md`. All encounter and shiny data comes from here. The `pokemon` table (Golbat) is **deprecated** — do not query it.
 
-Queried with `fence = 'world'` for global aggregates across all areas. Conditional aggregation produces per-period shiny/total counts (24h, 7d, 1m, 3m, 6m, all-time). Custom date ranges via `?start=&end=` params.
+Key tables:
 
-**Important — shiny is per-account**: `pokemon.shiny = 1` means the scanner account encountered a shiny, but shiny rolls are random per account in Pokémon GO. A shiny record in the DB does NOT mean the spawn is shiny for other players. Never gray out, hide, or deprioritize recent shiny records based on despawn status — the spawn being expired is irrelevant because it was never guaranteed for other players anyway. Do not build features that imply a shiny location is actionable for other accounts. The `pokemon_shiny_stats` table is appropriate for aggregate shiny *rates* only.
+| Table | Used for |
+| ----- | -------- |
+| `pokemon_summary` | Total encounters + shiny counts per species, per time slot |
+| `pokemon_iv_distribution` | IV histogram per species; `iv = 100.0` for 100% IV encounters |
+| `pokemon_move_stats` | Move pair popularity (future) |
+| `pokemon_size_stats` | Size distribution (future) |
+| `pokemon_gender_stats` | Gender distribution (future) |
+
+**Time slots**: `1d` (last 24h), `1w` (last 7d), `1m` (last 30d), `3m` (last 90d), `all` (all time). Data rebuilds **every 5 minutes** — stats are not real-time. Always filter by `time_slot`.
+
+**Queries**: use `queryStats<T>()` from `@/lib/server/db/stats`. The connection targets `pokemon_stats` as its default database, so no schema prefix is needed (e.g. `FROM pokemon_summary`, not `FROM pokemon_stats.pokemon_summary`).
+
+**Important — shiny is per-account**: shiny records reflect what the scanner account encountered. Shiny rolls are random per account in Pokémon GO — a shiny encounter does NOT mean the spawn is shiny for other players. Never build features that imply a shiny location is actionable for other accounts. Use `shiny_count`/`total_count` for aggregate shiny *rates* only.
 
 ### Dragonite DB — Historical Stats (future)
 
@@ -221,9 +250,13 @@ For charts/history using `stats_workers`, a direct MariaDB connection is availab
 
 - [x] Live worker status page (`/status`) — summary cards for connected/disconnected/scout queue
 - [x] Custom home page with nav and stat cards
-- [x] Shiny stats page (`/shiny`) — all-period rates per species with custom date range picker
-- [ ] Latest seen panel — recent Pokémon sightings from Golbat `pokemon` table
-- [ ] Top encounters widget — most seen species
+- [x] Shiny stats page (`/shiny`) — per-period rates with Wilson-score weighted ranking
+- [x] Top encounters widget — most seen species (24h) from stats DB
+- [x] Recent rare encounters — rarest species (24h) from stats DB
+- [x] Top 100% IV species widget (24h) from stats DB
+- [x] Seen stats page (`/seen`) — per-species encounter counts, all time slots, count/name sort
+- [x] Per-pokemon detail page (`/pokemon/{id}`) — base stats, types, moves, evolutions, buddy dist, scanner stats
+- [ ] Worker history charts — using `stats_workers` from Dragonite DB
 
 ---
 
@@ -249,4 +282,7 @@ You might be able to use the Svelte MCP server, where you have access to compreh
 - MySQL: cannot reference aggregate aliases in HAVING/ORDER BY — use the actual expression (e.g., `HAVING SUM(\`count\`) > 0`)
 - `count` is a reserved word in MySQL — always backtick-escape it in queries
 - Masterfile: call `masterfileProvider.get()` before using `getMasterPokemon()` or `getNormalizedForm()`
+- `MasterPokemon` now includes `quickMoves`, `chargedMoves` (with name/type/power), `evolutions` (pokemonId/form/candyCost), `buddyDistance` — parsed from WatWowMap raw JSON
+- Bug fixed: raw JSON uses `mythic` not `mythical` — parser now reads the correct field
 - Shiny sprites: `getIconPokemon({ pokemon_id, form, shiny: true })` from `$lib/services/uicons.svelte` — wrap in try/catch
+- Custom pages using `getIconPokemon` for images: always await `initAllIconSets()` alongside `loadMasterFile()` before rendering (race condition on direct page refresh — masterfile can resolve before icon index loads). Pattern: `Promise.all([loadMasterFile(), initAllIconSets()]).then(() => { ready = true; })`

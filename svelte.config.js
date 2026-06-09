@@ -9,6 +9,9 @@ const config = {
 		adapter: adapter(),
 		files: {
 			serviceWorker: "src/lib/serviceWorker/index.ts"
+		},
+		alias: {
+			"@": "./src"
 		}
 	},
 
