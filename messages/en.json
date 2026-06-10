@@ -516,5 +516,6 @@
 	"defender_fed": "{count}x fed",
 	"defender_won": "{count}x won",
 	"defender_lost": "{count}x lost",
-	"defender_placed": "Placed"
+	"defender_placed": "Placed",
+	"coordinates": "Coordinates"
 }
