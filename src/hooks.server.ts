@@ -99,11 +99,19 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 	if (user && !permissionCache.has(user.id)) {
 		try {
 			user.permissions = await updatePermissions(user as User, accessToken, event.fetch);
+			permissionCache.set(user.id, undefined);
 		} catch (e) {
-			console.error("Error updating permissions for user " + user.id + ": " + e.toString());
-			// Keep existing DB permissions — do not write degraded perms on failure
+			const msg = e instanceof Error ? e.message : "";
+			if (msg.startsWith("RATE_LIMITED:")) {
+				const retryAfter = Number(msg.split(":")[1]) || 0;
+				const ttl = Math.max(PERMISSION_UPDATE_INTERVAL, retryAfter) * 1000;
+				permissionCache.set(user.id, undefined, { ttl });
+				console.warn(`Discord rate limited for user ${user.id}, backing off ${ttl / 1000}s`);
+			} else {
+				console.error("Error updating permissions for user " + user.id + ": " + e.toString());
+				permissionCache.set(user.id, undefined);
+			}
 		}
-		permissionCache.set(user.id, undefined);
 	}
 
 	event.locals.user = user;

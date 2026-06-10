@@ -46,6 +46,10 @@ export async function getGuildMemberInfo(guildId: string, accessToken: string) {
 		`${endpoint}/guilds/${guildId}/member`,
 		getFetchOptions(accessToken)
 	);
+	if (response.status === 429) {
+		const retryAfter = Number(response.headers.get("Retry-After") ?? 0);
+		throw new Error(`RATE_LIMITED:${retryAfter}`);
+	}
 	if (!response.ok) {
 		throw new Error(`Discord guild API error ${response.status} for guild ${guildId}`);
 	}
