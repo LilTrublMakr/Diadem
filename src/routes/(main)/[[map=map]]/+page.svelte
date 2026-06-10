@@ -65,6 +65,10 @@
 	const errorHref = getConfig().general.customHome ? "/" : "";
 </script>
 
+<svelte:head>
+	<title>Map — PoGo Map VT</title>
+</svelte:head>
+
 {#if !isOnMap()}
 	<Home />
 {:else if !isWebglSupported()}
