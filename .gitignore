@@ -1,13 +1,7 @@
 node_modules
 .idea
 .zed
-config/*
-!config/*example*
-config.toml
 .vite/*
-static/custom/*
-src/routes/(custom)/*
-coverage/*
 
 # Output
 .output
