@@ -33,6 +33,8 @@
 	import ErrorPageWebGl from "@/components/ui/ErrorPageWebGl.svelte";
 	import MapMain from "@/components/map/MapMain.svelte";
 	import MapMenuUi from "@/components/ui/MapMenuUi.svelte";
+	import MapHomeButton from "@/components/custom/MapHomeButton.svelte";
+	import SessionExpiredBanner from "@/components/custom/SessionExpiredBanner.svelte";
 	import type maplibre from "maplibre-gl";
 	import { onDestroy, onMount } from "svelte";
 	import { page } from "$app/state";
@@ -98,6 +100,8 @@
 	{/if}
 
 	<WeatherOverview />
+	<MapHomeButton />
+	<SessionExpiredBanner />
 
 	<MapMenuUi>
 		{#snippet desktopLeft()}
