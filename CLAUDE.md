@@ -279,6 +279,9 @@ You might be able to use the Svelte MCP server, where you have access to compreh
 ## Notes (important)
 
 - Do not touch parts of the project unrelated to your current task
+- `filterCaretStyle` config option (`[client.general]`): `"chevron"` (default, `>` rotates to `v`) or `"caret"` (`^` rotates to `v`) — controls expand indicator in filter sections; type in `configTypes.d.ts` `General`
+- `[client.defaultFilters]` config section: overrides the filter state new users start with; deep-merged over built-in defaults; user's saved settings always win. Defined in `configTypes.d.ts` as `DefaultFilters`; normalized by `normalizeConfigFilters()` in `userSettings.svelte.ts`. Filterset fields: `title`, `emoji` or `uicon`, `id`, `enabled`, plus any filter-specific keys (`iv`, `cp`, `levels`, `bosses`, `modifiers`, etc.). Glow/background colors use `rgba(r, g, b, {})` — `{}` is the opacity placeholder.
+- `updateUserSettings()` stores only the diff from defaults (via `computeOverrides()`), not the full settings object — reduces localStorage/DB footprint and makes default overrides work correctly for new users
 - MySQL: cannot reference aggregate aliases in HAVING/ORDER BY — use the actual expression (e.g., `HAVING SUM(\`count\`) > 0`)
 - `count` is a reserved word in MySQL — always backtick-escape it in queries
 - Masterfile: call `masterfileProvider.get()` before using `getMasterPokemon()` or `getNormalizedForm()`

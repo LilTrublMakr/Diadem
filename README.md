@@ -6,8 +6,10 @@ A Pokémon GO map for Vermont, built as a custom extension on top of [Diadem](ht
 
 - **Live map** — Pokémon, gyms, PokéStops, raids, and more via Diadem
 - **Worker status** (`/status`) — real-time connected/disconnected worker counts and scout queue depth pulled from the Dragonite admin API
-- **Shiny stats** (`/shiny`) — per-species shiny rates across 24h, 7d, 1 month, 3 month, 6 month, and all-time windows; custom date range picker; shiny sprites; sortable and searchable
-- **Custom home page** — stat cards and navigation hub
+- **Shiny stats** (`/shiny`) — per-species shiny rates across 24h, 7d, 1m, 3m, and all-time windows; Wilson-score weighted ranking; shiny sprites; sortable and searchable
+- **Seen stats** (`/seen`) — per-species encounter counts across all time slots, sortable by count or name
+- **Pokémon detail** (`/pokemon/{id}`) — base stats, types, moves, evolutions, buddy distance, and scanner encounter/shiny stats
+- **Custom home page** — stat cards: top encounters (24h), rarest spawns (24h), top 100% IV species (24h), shiny rates
 
 ---
 
@@ -15,9 +17,10 @@ A Pokémon GO map for Vermont, built as a custom extension on top of [Diadem](ht
 
 - Node 22+
 - pnpm
-- MariaDB (Diadem internal DB + Golbat DB)
+- MariaDB (Diadem internal DB + Golbat DB + pokemon_stats DB)
 - A running [Golbat](https://github.com/UnownHash/Golbat) instance
 - A running [Dragonite](https://github.com/UnownHash/Dragonite-Public) instance (optional — for worker status)
+- A `pokemon_stats` database populated by your stats aggregator (for encounter/shiny stats pages)
 
 ---
 
@@ -89,21 +92,35 @@ secret = "your_dragonite_secret"
 adminUrl = "http://127.0.0.1:7273/api/"  # Dragonite admin panel port
 ```
 
-**Enable the custom home page:**
+**General client options:**
 
 ```toml
 [client.general]
-customHome = true
-```
-
-**Set the map's default position to Vermont:**
-
-```toml
-[client.general]
-defaultLat = 44.2601
+customHome = true           # show custom home at /; map moves to /map
+defaultLat = 44.2601        # starting map position for new users
 defaultLon = -72.5754
 defaultZoom = 9
+# filterCaretStyle = "chevron"  # "chevron" (default, > → v) or "caret" (^ → v)
 ```
+
+**Default filters** — override the filter state new users start with (saved settings always win):
+
+```toml
+# Show Pokémon by default with a 100% IV preset
+[client.defaultFilters.pokemon]
+enabled = true
+[[client.defaultFilters.pokemon.filters]]
+title = "100% IV"
+emoji = "💯"
+iv = { min = 100, max = 100 }
+modifiers = { glow = { color = "rgba(251, 44, 54, {})" } }
+
+# Hide gyms by default
+[client.defaultFilters.gym]
+enabled = false
+```
+
+See `config/config.example.toml` for the full `[client.defaultFilters]` reference.
 
 **Discord auth** (optional but recommended):
 
@@ -144,12 +161,19 @@ MARIADB_DATABASE=diadem
 MARIADB_USER=your_diadem_user
 MARIADB_PASSWORD=your_diadem_password
 
-# Dragonite DB — for future historical stats features (optional)
+# Dragonite DB — for historical stats features (optional)
 DRAGONITE_DB_HOST=127.0.0.1
 DRAGONITE_DB_PORT=3306
 DRAGONITE_DB_NAME=dragonite
 DRAGONITE_DB_USER=your_dragonite_user
 DRAGONITE_DB_PASSWORD=your_dragonite_password
+
+# Stats DB — aggregated encounter/shiny data (required for stats pages)
+STATS_DB_HOST=127.0.0.1
+STATS_DB_PORT=3306
+STATS_DB_NAME=pokemon_stats
+STATS_DB_USER=your_stats_user
+STATS_DB_PASSWORD=your_stats_password
 ```
 
 ### 6. Run the Diadem setup script
@@ -210,9 +234,17 @@ docker compose up -d
 | `src/routes/(custom)/+layout.svelte` | Shared layout for custom pages (nav + footer) |
 | `src/routes/(custom)/status/+page.svelte` | Worker status page at `/status` |
 | `src/routes/(custom)/shiny/+page.svelte` | Shiny stats page at `/shiny` |
+| `src/routes/(custom)/seen/+page.svelte` | Seen encounter counts at `/seen` |
+| `src/routes/(custom)/pokemon/[id]/+page.svelte` | Per-pokémon detail page at `/pokemon/{id}` |
 | `src/routes/api/custom/workers/+server.ts` | Worker status API |
 | `src/routes/api/custom/shiny/+server.ts` | Shiny stats API |
+| `src/routes/api/custom/seen/+server.ts` | Total seen count (24h) |
+| `src/routes/api/custom/seen-species/+server.ts` | Per-species encounter counts |
+| `src/routes/api/custom/top-encounters/+server.ts` | Top encounters + recent rare (24h) |
+| `src/routes/api/custom/hundos/+server.ts` | Top 100% IV species (24h) |
+| `src/routes/api/custom/pokemon/[id]/+server.ts` | Per-pokémon stats (all time slots) |
 | `src/lib/server/api/dragoniteStatus.ts` | Dragonite admin API client |
+| `src/lib/server/db/stats.ts` | Stats DB connection (`queryStats<T>()`) |
 
 ---
 
