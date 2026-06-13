@@ -459,6 +459,7 @@
 	"modifier_show_badge": "Show Badge",
 	"modifier_show_label": "Show Label",
 	"modifier_map_preview": "Map Preview",
+	"modifier_map_preview_hint": "Click the map preview to edit the icon's appearance — background, scale, rotation, and whether the icon and label are shown.",
 	"coveragemap_view": "View",
 	"search_placeholder_pokemon": "Search for Pokémon",
 	"pokemon_picker_selected": "Selected",

@@ -46,6 +46,7 @@
 				subCategory={filterset?.subCategory}
 			/>
 		</div>
+		<p class="text-xs text-muted-foreground px-2 mt-1">{m.modifier_map_preview_hint()}</p>
 	{/if}
 
 	<Separator class="my-3" text={m.filter_attributes()} />
