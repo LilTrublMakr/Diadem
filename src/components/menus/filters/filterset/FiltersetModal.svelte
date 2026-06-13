@@ -30,7 +30,8 @@
 		majorCategory,
 		subCategory = undefined,
 		overview,
-		base
+		base,
+		hint = undefined
 	}: {
 		modalType: ModalType;
 		mapObject: MapObjectType;
@@ -42,6 +43,7 @@
 		subCategory?: FilterCategory;
 		overview: Snippet;
 		base: Snippet;
+		hint?: string;
 	} = $props();
 
 	let modalTitle = $derived.by(() => {
@@ -82,7 +84,7 @@
 		{#if getCurrentFiltersetPage() === "new"}
 			<PageNewFilterset {majorCategory} {subCategory} />
 		{:else if getCurrentFiltersetPage() === "base"}
-			<PageBase {base} />
+			<PageBase {base} {hint} />
 		{:else if getCurrentFiltersetPage() === "overview"}
 			<PageOverview {overview} />
 		{:else if getCurrentFiltersetPage() === "attribute" && getCurrentAttributePage().snippet}

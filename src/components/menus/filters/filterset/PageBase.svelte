@@ -14,9 +14,11 @@
 	import Separator from "@/components/ui/Separator.svelte";
 
 	let {
-		base
+		base,
+		hint = undefined
 	}: {
 		base: Snippet;
+		hint?: string;
 	} = $props();
 
 	let filterset = getCurrentSelectedFilterset();
@@ -46,7 +48,7 @@
 				subCategory={filterset?.subCategory}
 			/>
 		</div>
-		<p class="text-xs text-muted-foreground px-2 mt-1">{m.modifier_map_preview_hint()}</p>
+		{#if hint}<p class="text-xs text-muted-foreground px-2 mt-1">{hint}</p>{/if}
 	{/if}
 
 	<Separator class="my-3" text={m.filter_attributes()} />
