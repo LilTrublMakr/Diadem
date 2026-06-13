@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { ChevronRight, Eye, EyeClosed, FunnelPlus } from "lucide-svelte";
+	import { ChevronRight, ChevronUp, Eye, EyeClosed, FunnelPlus } from "lucide-svelte";
+	import { getConfig } from "@/lib/services/config/config";
 	import type { AnyFilter, FilterCategory } from "@/lib/features/filters/filters";
 	import Switch from "@/components/ui/input/Switch.svelte";
 	import Button from "@/components/ui/input/Button.svelte";
@@ -129,11 +130,19 @@
 					<p class="font-semibold text-base">
 						{title}
 					</p>
-					<ChevronRight
-						size="16"
-						class="transition-[rotate] mt-px"
-						style="rotate: {expanded ? '90deg' : '0deg'}"
-					/>
+					{#if getConfig().general.filterCaretStyle === "caret"}
+						<ChevronUp
+							size="16"
+							class="transition-[rotate] mt-px"
+							style="rotate: {expanded ? '180deg' : '0deg'}"
+						/>
+					{:else}
+						<ChevronRight
+							size="16"
+							class="transition-[rotate] mt-px"
+							style="rotate: {expanded ? '90deg' : '0deg'}"
+						/>
+					{/if}
 				</div>
 
 				{#if isEnabled}

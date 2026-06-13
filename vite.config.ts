@@ -21,6 +21,9 @@ export default defineConfig({
 			"@": path.resolve(__dirname, "./src")
 		}
 	},
+	build: {
+		cssMinify: "esbuild"
+	},
 	server: {
 		allowedHosts: true
 	}

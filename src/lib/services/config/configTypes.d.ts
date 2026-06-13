@@ -34,6 +34,7 @@ type General = {
 	mapName: string;
 	defaultLocale: string;
 	customHome: boolean;
+	filterCaretStyle?: "caret" | "chevron";
 	defaultLat?: number;
 	defaultLon?: number;
 	defaultZoom?: number;
