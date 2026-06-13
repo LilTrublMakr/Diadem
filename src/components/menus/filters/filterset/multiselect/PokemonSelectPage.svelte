@@ -5,6 +5,7 @@
 	import type { PokemonVisual } from "@/lib/types/mapObjectData/pokemon";
 	import type { Pokemon } from "@/lib/features/filters/filtersets";
 	import { slide } from "svelte/transition";
+	import { GENERATIONS, getGeneration } from "@/lib/utils/generations";
 
 	type PokemonKey = {
 		[K in keyof Data]: Data[K] extends Pokemon[] | undefined ? K : never;
@@ -21,6 +22,13 @@
 	} = $props();
 
 	let query: string = $state("");
+	let selectedGen: number | null = $state(null);
+
+	let filteredList = $derived(
+		selectedGen === null
+			? pokemonList
+			: pokemonList.filter((p) => getGeneration(p.pokemon_id)?.gen === selectedGen)
+	);
 
 	function onselect(pokemon: PokemonVisual, isSelected: boolean) {
 		if (!isSelected) {
@@ -40,7 +48,28 @@
 	}
 </script>
 
-<SearchBar placeholder={m.search_placeholder_pokemon()} class="mb-2 mt-1" bind:query />
+<div class="flex gap-1 flex-wrap mt-1 mb-2">
+	<button
+		class="px-2 py-0.5 rounded-md text-xs font-medium border transition-colors {selectedGen === null
+			? 'bg-primary text-primary-foreground border-primary'
+			: 'bg-card border-border hover:bg-accent'}"
+		onclick={() => (selectedGen = null)}
+	>
+		All
+	</button>
+	{#each GENERATIONS as gen}
+		<button
+			class="px-2 py-0.5 rounded-md text-xs font-medium border transition-colors {selectedGen === gen.gen
+				? 'bg-primary text-primary-foreground border-primary'
+				: 'bg-card border-border hover:bg-accent'}"
+			onclick={() => (selectedGen = selectedGen === gen.gen ? null : gen.gen)}
+		>
+			{gen.name}
+		</button>
+	{/each}
+</div>
+
+<SearchBar placeholder={m.search_placeholder_pokemon()} class="mb-2" bind:query />
 
 <div class="space-y-5 mt-2">
 	{#if !query && data[attribute]}
@@ -55,7 +84,7 @@
 	{/if}
 
 	<PokemonSelect
-		{pokemonList}
+		pokemonList={filteredList}
 		selected={data[attribute] ?? []}
 		{onselect}
 		{query}
