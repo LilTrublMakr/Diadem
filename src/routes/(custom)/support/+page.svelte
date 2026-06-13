@@ -60,6 +60,6 @@
 	</div>
 
 	<p class="text-center text-sm text-zinc-400 dark:text-zinc-600 mt-8">
-		PoGo Map VT is a community-run map for Vermont Pokémon GO players.
+		PoGo Map VT is a community map for Vermont Pokémon GO players.
 	</p>
 </div>
