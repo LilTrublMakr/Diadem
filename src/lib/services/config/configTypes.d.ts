@@ -1,6 +1,17 @@
 import { MapObjectType } from "@/lib/mapObjects/mapObjectTypes";
 
 import type { FeaturesKey } from "@/lib/utils/features";
+import type {
+	FilterGym,
+	FilterNest,
+	FilterPokemon,
+	FilterPokestop,
+	FilterRoute,
+	FilterS2Cell,
+	FilterSpawnpoint,
+	FilterStation,
+	FilterTappable
+} from "@/lib/features/filters/filters";
 
 type UiconSetModifiers = {
 	default: boolean;
@@ -122,6 +133,25 @@ type StaticMap = {
 	style?: string;
 };
 
+type DeepPartial<T> =
+	T extends Array<infer U>
+		? DeepPartial<U>[]
+		: T extends object
+			? { [K in keyof T]?: DeepPartial<T[K]> }
+			: T;
+
+export type DefaultFilters = DeepPartial<{
+	pokemon: FilterPokemon;
+	pokestop: FilterPokestop;
+	gym: FilterGym;
+	station: FilterStation;
+	s2cell: FilterS2Cell;
+	nest: FilterNest;
+	spawnpoint: FilterSpawnpoint;
+	route: FilterRoute;
+	tappable: FilterTappable;
+}>;
+
 export type ClientConfig = {
 	mapStyles: MapStyle[];
 	uiconSets: UiconSet[];
@@ -133,6 +163,7 @@ export type ClientConfig = {
 		coverageMap: boolean;
 		scout: boolean;
 	};
+	defaultFilters?: DefaultFilters;
 };
 
 export type ServerConfig = {

@@ -286,3 +286,58 @@ url = "https://raw.githubusercontent.com/jms412/PkmnShuffleMap/master/UICONS_Hal
 base = { scale = 0.25 }
 pokemon = { scale = 0.4 }
 
+
+# Default filters
+# Overrides the filter state new users start with, before they make any changes.
+# This whole section is optional: anything you leave out keeps its built-in default.
+# Saved user settings always win over these defaults.
+#
+# You can override two things:
+# 1. Whether a layer (or sub-layer) is shown by default, via `enabled`.
+# 2. The default filtersets (preset filters) shown for a layer, via [[...filters]].
+#
+# Filtersets are written with a minimal shape; the following are filled in for you:
+# - id: generated automatically if omitted
+# - enabled: defaults to true
+# - title: a plain string; shown as-is (or resolved as a translation key if it matches one)
+# - icon: set `emoji = "..."` or `uicon = { category = "...", params = { ... } }`
+# Any other keys (iv, cp, levels, bosses, modifiers, …) match the in-app filter fields.
+#
+# NOTE: in TOML, scalar keys like `enabled` must come BEFORE any [[...filters]] table
+# of the same layer.
+#
+# Glow/background colors must be `rgba(r, g, b, {})` — the literal `{}` is an opacity
+# placeholder the map fills in (it fades from this color to transparent for glows).
+# A plain hex like "#ff0000" has no placeholder and renders as a solid circle instead.
+
+# Show Pokemon by default, with a "100% IV" preset (soft red glow on 100% IV Pokemon)
+#[client.defaultFilters.pokemon]
+#enabled = true
+#[[client.defaultFilters.pokemon.filters]]
+#title = "100% IV"
+#emoji = "💯"
+#iv = { min = 100, max = 100 }
+#modifiers = { glow = { color = "rgba(251, 44, 54, {})" } }
+
+# Hide gyms by default
+#[client.defaultFilters.gym]
+#enabled = false
+
+# Show only legendary raids by default
+#[[client.defaultFilters.gym.raid.filters]]
+#title = "Legendary"
+#uicon = { category = "raid", params = { level = 5 } }
+#levels = [5]
+
+# Turn on quests (a sub-layer of pokestops) by default
+#[client.defaultFilters.pokestop]
+#enabled = true
+#[client.defaultFilters.pokestop.quest]
+#enabled = true
+
+# Show S2 cells at level 17 by default
+#[client.defaultFilters.s2cell]
+#enabled = true
+#level = 17
+#wayfarerMode = false
+
