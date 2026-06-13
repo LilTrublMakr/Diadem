@@ -1,5 +1,10 @@
 <script lang="ts">
 	import { Heart } from 'lucide-svelte';
+	import { hasFeatureAnywhere } from '@/lib/services/user/checkPerm';
+	import { Features } from '@/lib/utils/features';
+	import { getUserDetails } from '@/lib/services/user/userDetails.svelte';
+
+	let isSupporter = $derived(hasFeatureAnywhere(getUserDetails().permissions, Features.SUPPORTER));
 </script>
 
 <div class="fixed top-2 left-2 z-10 pointer-events-none">
@@ -15,12 +20,14 @@
 			</div>
 			PoGo Map VT
 		</a>
-		<a
-			href="/support"
-			class="inline-flex items-center gap-1.5 text-xs font-medium px-2 h-8 rounded-md border border-input hover:bg-accent hover:text-accent-foreground active:bg-accent active:text-accent-foreground transition-colors"
-		>
-			<Heart class="size-3" />
-			Support
-		</a>
+		{#if !isSupporter}
+			<a
+				href="/support"
+				class="inline-flex items-center gap-1.5 text-xs font-medium px-2 h-8 rounded-md border border-input hover:bg-accent hover:text-accent-foreground active:bg-accent active:text-accent-foreground transition-colors"
+			>
+				<Heart class="size-3" />
+				Support
+			</a>
+		{/if}
 	</div>
 </div>

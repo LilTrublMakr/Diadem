@@ -4,7 +4,8 @@ import type { Polygon } from "geojson";
 enum NonMapObjectFeature {
 	ALL = "*",
 	SCOUT = "scout",
-	WEATHER = "weather"
+	WEATHER = "weather",
+	SUPPORTER = "supporter"
 }
 
 export const Features = { ...MapObjectType, ...NonMapObjectFeature };
