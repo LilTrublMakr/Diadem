@@ -6,7 +6,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
       "Bash(cat \"d:/GIT/psyduck/requirements.txt\")",
-      "Read(//d/GIT/psyduck/**)"
+      "Read(//d/GIT/psyduck/**)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/WatWowMap/Masterfile-Generator/refs/heads/master/master-latest-everything.json\")"
     ]
   }
 }
