@@ -86,7 +86,7 @@
 		{:else if getCurrentFiltersetPage() === "base"}
 			<PageBase {base} {hint} />
 		{:else if getCurrentFiltersetPage() === "overview"}
-			<PageOverview {overview} />
+			<PageOverview {overview} {hint} />
 		{:else if getCurrentFiltersetPage() === "attribute" && getCurrentAttributePage().snippet}
 			<PageAttribute />
 		{/if}

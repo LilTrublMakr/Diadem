@@ -21,9 +21,11 @@
 	import { getModifierPreviewIcon } from "@/lib/features/filters/filtersetUtils.svelte";
 
 	let {
-		overview
+		overview,
+		hint = undefined
 	}: {
 		overview: Snippet;
+		hint?: string;
 	} = $props();
 
 	let filterset = getCurrentSelectedFilterset();
@@ -87,6 +89,8 @@
 			<Pencil class="ml-auto shrink-0 absolute right-4 top-1/2 -translate-y-1/2" size="14" />
 		</Button>
 	</Card>
+
+	{#if hint}<p class="text-xs text-muted-foreground mt-1">{hint}</p>{/if}
 
 	<div class="space-y-3 mt-6">
 		{@render overview()}
