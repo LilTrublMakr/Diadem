@@ -227,6 +227,52 @@
 	// Max stat for bar scaling
 	const MAX_STAT = 300;
 	function statPct(val: number) { return Math.min(100, (val / MAX_STAT) * 100); }
+
+	type MegaBoostEntry = {
+		pokemonId: number;
+		tempEvoId: number;
+		megaName: string;
+		megaTypes: number[];
+	};
+
+	function buildMegaName(baseName: string, tempEvoId: number): string {
+		switch (tempEvoId) {
+			case 1: return `Mega ${baseName}`;
+			case 2: return `Mega ${baseName} X`;
+			case 3: return `Mega ${baseName} Y`;
+			case 4: return `Primal ${baseName}`;
+			default: return `Mega ${baseName}`;
+		}
+	}
+
+	let megaBoostsByType = $derived.by(() => {
+		if (!pokemon || !masterReady) return [];
+		const mf = getMasterFile();
+		if (!mf) return [];
+
+		return pokemon.types.map(typeId => {
+			const boosts: MegaBoostEntry[] = [];
+			for (const [idStr, p] of Object.entries(mf.pokemon)) {
+				if (!p.tempEvos || Object.keys(p.tempEvos).length === 0) continue;
+				for (const [tempEvoIdStr, tempEvo] of Object.entries(p.tempEvos)) {
+					const tempEvoId = parseInt(tempEvoIdStr);
+					if (!tempEvo.types.includes(typeId)) continue;
+					boosts.push({
+						pokemonId: parseInt(idStr),
+						tempEvoId,
+						megaName: buildMegaName(p.name, tempEvoId),
+						megaTypes: tempEvo.types,
+					});
+				}
+			}
+			return { typeId, boosts: boosts.sort((a, b) => a.pokemonId - b.pokemonId) };
+		}).filter(g => g.boosts.length > 0);
+	});
+
+	function megaSprite(pId: number, tempEvoId: number): string {
+		try { return getIconPokemon({ pokemon_id: pId, form: 0, temp_evolution_id: tempEvoId }); }
+		catch { return ''; }
+	}
 </script>
 
 <svelte:head>
@@ -476,6 +522,45 @@
 				<div class="overflow-x-auto flex justify-center pb-2">
 					{@render evoNode(evoTreeRoot)}
 				</div>
+			</div>
+		{/if}
+
+		<!-- Mega Boosts -->
+		{#if megaBoostsByType.length > 0}
+			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 mb-6">
+				<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">Mega Boosts</h2>
+				<p class="text-xs text-zinc-400 dark:text-zinc-600 mb-4">Having these Mega or Primal Pokémon active gives extra candy when catching {pokemon.name}.</p>
+
+				{#each megaBoostsByType as group, gi}
+					<div class="{gi < megaBoostsByType.length - 1 ? 'mb-4' : ''}">
+						<div class="flex items-center gap-2 mb-2">
+							<span class="text-white text-xs font-semibold px-2 py-0.5 rounded-full" style="background-color:{TYPE_COLORS[group.typeId] ?? '#9099a1'}">{TYPE_NAMES[group.typeId] ?? group.typeId}</span>
+						</div>
+						<div class="flex flex-wrap gap-2">
+							{#each group.boosts as boost}
+								<a
+									href="/pokemon/{boost.pokemonId}"
+									class="flex flex-col items-center gap-1 p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+									style="min-width:4.5rem; max-width:6rem; text-decoration:none;"
+								>
+									<img
+										src={megaSprite(boost.pokemonId, boost.tempEvoId)}
+										alt={boost.megaName}
+										class="w-12 h-12 object-contain"
+										onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+										onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }}
+									/>
+									<span class="text-xs text-center leading-tight text-zinc-700 dark:text-zinc-300" style="word-break:break-word;">{boost.megaName}</span>
+									<div class="flex flex-wrap gap-0.5 justify-center">
+										{#each boost.megaTypes as t}
+											<span class="text-white text-xs px-1 py-0.5 rounded" style="font-size:0.65rem; background-color:{TYPE_COLORS[t] ?? '#9099a1'}">{TYPE_NAMES[t] ?? t}</span>
+										{/each}
+									</div>
+								</a>
+							{/each}
+						</div>
+					</div>
+			{/each}
 			</div>
 		{/if}
 
