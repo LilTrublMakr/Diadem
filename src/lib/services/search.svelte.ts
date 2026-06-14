@@ -30,6 +30,7 @@ import microfuzz, {
 	type HighlightRanges
 } from "@nozbe/microfuzz";
 import type { BBox, Geometry } from "geojson";
+import type maplibre from "maplibre-gl";
 import type { Snippet } from "svelte";
 import type { Attachment } from "svelte/attachments";
 
@@ -93,11 +94,15 @@ export type CoordinatesSearchEntry = SearchEntry & {
 export type PokestopSearchEntry = SearchEntry & {
 	imageUrl: string;
 	type: SearchableType.POKESTOP;
+	lat: number;
+	lon: number;
 };
 
 export type GymSearchEntry = SearchEntry & {
 	imageUrl: string;
 	type: SearchableType.GYM;
+	lat: number;
+	lon: number;
 };
 
 export type PokemonSearchEntry = SearchEntry & {
@@ -183,13 +188,17 @@ export type RawFortSearchEntry = {
 	name: string;
 	id: string;
 	url: string;
+	lat: number;
+	lon: number;
 };
 
 export type SearchOptions = {
 	types?: SearchableType[];
 	showRecents?: boolean;
 	resultSnippet: Snippet<[FuzzyResult<AnySearchEntry>[]]>;
-	ignoreAddressMinCharacters?: boolean
+	ignoreAddressMinCharacters?: boolean;
+	textNoResults?: string;
+	textSearchHint?: string;
 };
 
 let currentSearchQuery = $state("");
@@ -253,7 +262,7 @@ export function getSearchedGeomtry() {
 	return searchedGeomtry;
 }
 
-export function openSearchModal(searchOptions: SearchOptions) {
+export function openSearchModal(searchOptions: SearchOptions, map?: maplibre.Map) {
 	openModal("search");
 
 	isSearchingAddress = false;
@@ -261,11 +270,11 @@ export function openSearchModal(searchOptions: SearchOptions) {
 		shouldSearchType(SearchableType.GYM, searchOptions) ||
 		shouldSearchType(SearchableType.POKESTOP, searchOptions)
 	) {
-		getFortSearchEntries(searchOptions).then();
+		getFortSearchEntries(searchOptions, map).then();
 	}
 }
 
-function shouldSearchType(type: SearchableType, searchOptions: SearchOptions) {
+export function shouldSearchType(type: SearchableType, searchOptions: SearchOptions) {
 	return !searchOptions.types || searchOptions.types.includes(type);
 }
 
@@ -482,7 +491,9 @@ export function initSearch(searchOptions: SearchOptions) {
 					imageUrl: fort.url,
 					type: SearchableType.GYM,
 					key: fort.id,
-					category: "pogo_gym"
+					category: "pogo_gym",
+					lat: fort.lat,
+					lon: fort.lon
 				} as GymSearchEntry;
 			}
 
@@ -491,7 +502,9 @@ export function initSearch(searchOptions: SearchOptions) {
 				imageUrl: fort.url,
 				type: SearchableType.POKESTOP,
 				key: fort.id,
-				category: "pogo_pokestop"
+				category: "pogo_pokestop",
+				lat: fort.lat,
+				lon: fort.lon
 			} as PokestopSearchEntry;
 		});
 
@@ -581,22 +594,22 @@ export function addAddressSearchResults(data: AddressData[], query: string) {
 	isSearchingAddress = false;
 }
 
-async function getFortSearchEntries(searchOptions: SearchOptions) {
+async function getFortSearchEntries(searchOptions: SearchOptions, map?: maplibre.Map) {
 	const hasPokestops = hasFeatureAnywhere(getUserDetails().permissions, MapObjectType.POKESTOP);
 	const hasGyms = hasFeatureAnywhere(getUserDetails().permissions, MapObjectType.GYM);
 	if (!hasGyms && !hasPokestops) return;
 
-	const map = getMap();
-	if (!map) return;
+	const usedMap = map ?? getMap();
+	if (!usedMap) return;
 
-	const center = map.getCenter();
+	const center = usedMap.getCenter();
 	const latKey = center.lat.toFixed(2);
 	const lonKey = center.lng.toFixed(2);
 	if (fortData.lat === latKey && fortData.lon === lonKey) {
 		return fortData.data;
 	}
 
-	const bounds = getFixedBounds(8);
+	const bounds = getFixedBounds(8, usedMap);
 	const response = await fetch("/api/search/forts", {
 		body: JSON.stringify(bounds),
 		method: "POST"
