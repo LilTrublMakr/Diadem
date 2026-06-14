@@ -180,6 +180,10 @@ export type ServerConfig = {
 		secret?: string;
 		basicAuth?: string;
 	};
+	rotom?: {
+		url: string;
+		secret?: string;
+	};
 	db: DbCreds;
 	koji?: {
 		url: string;

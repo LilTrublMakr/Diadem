@@ -1,20 +1,13 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getWorkerStatus, getScoutStats } from '$lib/server/api/dragoniteStatus';
+import { getRotomStatus } from '$lib/server/api/rotomStatus';
 
 export const GET: RequestHandler = async () => {
-	const [statusResult, scoutResult] = await Promise.allSettled([
-		getWorkerStatus(),
-		getScoutStats()
-	]);
-
-	if (statusResult.status === 'rejected') {
-		console.error('[workers API] Dragonite /status/ failed:', statusResult.reason);
-		throw error(500, 'Failed to fetch worker status from Dragonite');
+	try {
+		const status = await getRotomStatus();
+		return json({ status });
+	} catch (e) {
+		console.error('[workers API] Rotom /api/status failed:', e);
+		throw error(500, 'Failed to fetch worker status from Rotom');
 	}
-
-	return json({
-		status: statusResult.value,
-		scout: scoutResult.status === 'fulfilled' ? scoutResult.value : null
-	});
 };
