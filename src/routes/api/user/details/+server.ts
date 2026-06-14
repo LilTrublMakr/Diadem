@@ -24,7 +24,15 @@ export async function GET(event) {
 		} as UserData);
 	}
 
-	const isMember = await isGuildMember(getClientConfig().discord.serverId, session.discordToken);
+	let isMember = false;
+	try {
+		isMember = await isGuildMember(getClientConfig().discord.serverId, session.discordToken);
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : "";
+		if (!msg.startsWith("RATE_LIMITED:")) {
+			console.error("[user/details] guild member check failed:", e);
+		}
+	}
 
 	return json({
 		details: data,

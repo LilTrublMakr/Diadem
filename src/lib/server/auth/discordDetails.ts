@@ -1,3 +1,6 @@
+import TTLCache from "@isaacs/ttlcache";
+import { PERMISSION_UPDATE_INTERVAL } from "@/lib/constants";
+
 type DiscordUserData = {
 	id: string;
 	username: string;
@@ -18,6 +21,10 @@ export type DiscordUser = {
 };
 
 const endpoint = "https://discord.com/api/users/@me";
+
+const guildMemberCache = new TTLCache<string, DiscordGuildData>({
+	ttl: PERMISSION_UPDATE_INTERVAL * 1000
+});
 
 function getFetchOptions(accessToken: string): RequestInit {
 	return {
@@ -42,6 +49,10 @@ export async function getUserInfo(accessToken: string): Promise<DiscordUser | un
 }
 
 export async function getGuildMemberInfo(guildId: string, accessToken: string) {
+	const cacheKey = `${guildId}:${accessToken}`;
+	const cached = guildMemberCache.get(cacheKey);
+	if (cached !== undefined) return cached;
+
 	const response = await fetch(
 		`${endpoint}/guilds/${guildId}/member`,
 		getFetchOptions(accessToken)
@@ -54,6 +65,7 @@ export async function getGuildMemberInfo(guildId: string, accessToken: string) {
 		throw new Error(`Discord guild API error ${response.status} for guild ${guildId}`);
 	}
 	const guildMember: DiscordGuildData = await response.json();
+	guildMemberCache.set(cacheKey, guildMember);
 	return guildMember;
 }
 
