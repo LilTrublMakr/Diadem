@@ -14,8 +14,13 @@ function getHeaders() {
 	return headers;
 }
 
+function getBaseUrl() {
+	const { url, adminUrl } = getServerConfig().dragonite;
+	return adminUrl ?? url;
+}
+
 export async function addScoutEntries(username: string, locations: number[][]) {
-	const url = new URL("scout/v2", getServerConfig().dragonite.url);
+	const url = new URL("scout/v2", getBaseUrl());
 
 	const requestData = {
 		username,
@@ -29,7 +34,7 @@ export async function addScoutEntries(username: string, locations: number[][]) {
 	};
 
 	const response = await fetch(url, {
-		headers: getHeaders(),
+		headers: { ...getHeaders(), "Content-Type": "application/json" },
 		method: "POST",
 		body: JSON.stringify(requestData)
 	});
@@ -42,7 +47,7 @@ export async function addScoutEntries(username: string, locations: number[][]) {
 }
 
 export async function getScoutQueue(): Promise<number | undefined> {
-	const url = new URL("scout/queue", getServerConfig().dragonite.url);
+	const url = new URL("scout/queue", getBaseUrl());
 	const response = await fetch(url, { headers: getHeaders() });
 
 	if (response.ok) {
