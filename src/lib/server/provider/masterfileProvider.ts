@@ -23,8 +23,8 @@ type RawMasterFile = {
 			defaultFormId?: number;
 			name: string;
 			types: { [key: string]: any };
-			forms?: (Partial<RawMasterFile["pokemon"]> & { form: number })[];
-			tempEvolutions?: (Partial<RawMasterFile["pokemon"]> & { tempEvoId: number })[];
+			forms?: (Partial<RawMasterFile["pokemon"][string]> & { form: number })[];
+			tempEvolutions?: (Partial<RawMasterFile["pokemon"][string]> & { tempEvoId: number })[];
 			legendary?: boolean;
 			mythic?: boolean;
 			ultraBeast?: boolean;

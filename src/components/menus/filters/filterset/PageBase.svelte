@@ -45,7 +45,7 @@
 			<ModifierPreview
 				filterset={filterset.data}
 				majorCategory={filterset?.majorCategory}
-				subCategory={filterset?.subCategory}
+				subCategory={filterset?.subCategory as FilterCategory | undefined}
 			/>
 		</div>
 		{#if hint}<p class="text-xs text-muted-foreground px-2 mt-1">{hint}</p>{/if}

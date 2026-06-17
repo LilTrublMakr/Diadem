@@ -23,3 +23,9 @@ docker-compose.yml
 
 # Local dev config (contains secrets, not for production)
 config/config.dev.toml
+
+# LLM bullshit
+.claude
+
+# VSCode stuff
+.vscode

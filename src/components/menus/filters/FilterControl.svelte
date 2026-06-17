@@ -2,6 +2,7 @@
 	import { ChevronRight, ChevronUp, Eye, EyeClosed, FunnelPlus } from "lucide-svelte";
 	import { getConfig } from "@/lib/services/config/config";
 	import type { AnyFilter, FilterCategory } from "@/lib/features/filters/filters";
+	import type { AnyFilterset } from "@/lib/features/filters/filtersets";
 	import Switch from "@/components/ui/input/Switch.svelte";
 	import Button from "@/components/ui/input/Button.svelte";
 
@@ -56,9 +57,10 @@
 	} = $props();
 
 	let isEnabled: boolean = $derived(filter.enabled);
-	let hasAnyFilterset: boolean = $derived((filter?.filters?.length ?? 0) > 0);
+	let filtersets = $derived((filter as { filters?: AnyFilterset[] }).filters);
+	let hasAnyFilterset: boolean = $derived((filtersets?.length ?? 0) > 0);
 	let allFiltersetsDisabled: boolean = $derived(
-		hasAnyFilterset && filter.filters?.every((f) => !f.enabled)
+		hasAnyFilterset && (filtersets?.every((f) => !f.enabled) ?? false)
 	);
 	let effectiveExpandable: boolean = $derived(
 		isExpandable ||
@@ -163,7 +165,7 @@
 			<Switch
 				class=""
 				bind:checked={isEnabled}
-				onCheckedChange={(v) => onEnabledChange(subCategory, v)}
+				onCheckedChange={(v) => onEnabledChange(subCategory!, v)}
 			/>
 		</div>
 	</div>
@@ -171,7 +173,7 @@
 	{#if isEnabled && isFilterable}
 		{#if hasAnyFilterset && filterModal && (!collapsibleByFiltersets || expanded)}
 			<div class="w-full my-1 flex flex-col gap-1 pl-2" transition:slide={{ duration: 90 }}>
-				{#each filter.filters ?? [] as filterset (filterset.id)}
+				{#each filtersets ?? [] as filterset (filterset.id)}
 					<Filterset filter={filterset} {majorCategory} {subCategory} {filterModal} {mapObject} />
 				{/each}
 			</div>

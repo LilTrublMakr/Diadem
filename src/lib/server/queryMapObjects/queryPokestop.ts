@@ -8,11 +8,21 @@ import { MapObjectType, type MinMapObject } from "@/lib/mapObjects/mapObjectType
 import { requestLimits } from "@/lib/server/api/rateLimit";
 import { queryJoined } from "@/lib/server/db/external/internalQuery";
 import { DbMapObjectQuery } from "@/lib/server/queryMapObjects/MapObjectQuery";
-import type { PermittedPolygon } from "@/lib/services/user/checkPerm";
-import type { PokestopData } from "@/lib/types/mapObjectData/pokestop";
+import type { FeaturePermissionContext, PermittedPolygon } from "@/lib/services/user/checkPerm";
+import type { Incident, PokestopData } from "@/lib/types/mapObjectData/pokestop";
 import { currentTimestamp } from "@/lib/utils/currentTimestamp";
+import { Features } from "@/lib/utils/features";
 import { getNormalizedForm } from "@/lib/utils/pokemonUtils";
-import { parseQuestReward } from "@/lib/utils/pokestopUtils";
+import {
+	isIncidentContest,
+	isIncidentGold,
+	isIncidentInvasion,
+	isIncidentKecleon,
+	parseQuestReward,
+	stripContestFields,
+	stripLureFields,
+	stripQuestFields
+} from "@/lib/utils/pokestopUtils";
 
 const FIELDS_POKESTOP = [
 	"pokestop.id",
@@ -27,10 +37,6 @@ const FIELDS_POKESTOP = [
 	"pokestop.first_seen_timestamp",
 	"pokestop.deleted",
 	"pokestop.lure_id",
-	"pokestop.ar_scan_eligible",
-	"pokestop.power_up_level",
-	"pokestop.power_up_points",
-	"pokestop.power_up_end_timestamp",
 	"pokestop.quest_timestamp",
 	"pokestop.quest_target",
 	"pokestop.quest_rewards",
@@ -80,13 +86,18 @@ export class PokestopQuery extends DbMapObjectQuery<PokestopData, FilterPokestop
 	filter(
 		data: MinMapObject<PokestopData>,
 		filter: FilterPokestop,
-		polygon: PermittedPolygon
+		polygon: PermittedPolygon,
+		context?: FeaturePermissionContext
 	): boolean {
-		let showThis = Boolean(filter.pokestopPlain.enabled || shouldDisplayLure(data, filter));
+		const plainPermitted = !context || context.isAllowedAt(Features.POKESTOP, data.lat, data.lon);
+
+		let showThis = Boolean(
+			(plainPermitted && filter.pokestopPlain.enabled) || shouldDisplayLure(data, filter)
+		);
 
 		if (!showThis && filter.quest.enabled) {
 			for (const quest of data.quests) {
-				if (shouldDisplayQuest(quest, { mapId: undefined }, filter)) {
+				if (shouldDisplayQuest(quest, { mapId: "" }, filter)) {
 					showThis = true;
 					break;
 				}
@@ -105,14 +116,33 @@ export class PokestopQuery extends DbMapObjectQuery<PokestopData, FilterPokestop
 		return showThis;
 	}
 
-	prepare(data: MinMapObject<PokestopData>): void {
+	private stripUnpermitted(
+		data: MinMapObject<PokestopData>,
+		context: FeaturePermissionContext
+	): void {
+		const at = (feature: Parameters<FeaturePermissionContext["isAllowedAt"]>[0]) =>
+			context.isAllowedAt(feature, data.lat, data.lon);
+
+		if (!at(Features.QUEST)) stripQuestFields(data);
+		if (!at(Features.LURE)) stripLureFields(data);
+		if (!at(Features.CONTEST)) stripContestFields(data);
+
+		data.incident = (data.incident ?? []).filter((incident: Incident) => {
+			if (isIncidentInvasion(incident)) return at(Features.INVASION);
+			if (isIncidentKecleon(incident)) return at(Features.KECLEON);
+			if (isIncidentGold(incident)) return at(Features.GOLDEN_POKESTOP);
+			if (isIncidentContest(incident)) return at(Features.CONTEST);
+			return false;
+		});
+	}
+
+	prepare(data: MinMapObject<PokestopData>, context?: FeaturePermissionContext): void {
 		data.quests = [];
 		if (data.alternative_quest_target && data.alternative_quest_rewards) {
 			const reward = parseQuestReward(data.alternative_quest_rewards);
 			if (reward)
 				data.quests.push({
 					reward,
-					isAr: false,
 					title: data.alternative_quest_title ?? "",
 					target: data.alternative_quest_target ?? 0,
 					timestamp: data.alternative_quest_timestamp ?? 0,
@@ -124,7 +154,6 @@ export class PokestopQuery extends DbMapObjectQuery<PokestopData, FilterPokestop
 			if (reward)
 				data.quests.push({
 					reward,
-					isAr: true,
 					title: data.quest_title ?? "",
 					target: data.quest_target ?? 0,
 					timestamp: data.quest_timestamp ?? 0,
@@ -154,5 +183,7 @@ export class PokestopQuery extends DbMapObjectQuery<PokestopData, FilterPokestop
 			incident.slot_2_form = getNormalizedForm(incident.slot_2_pokemon_id, incident.slot_2_form);
 			incident.slot_3_form = getNormalizedForm(incident.slot_3_pokemon_id, incident.slot_3_form);
 		}
+
+		if (context) this.stripUnpermitted(data, context);
 	}
 }
