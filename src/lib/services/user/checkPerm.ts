@@ -32,6 +32,10 @@ export function hasFeatureAnywhere(perms: Perms, feature: FeaturesKey) {
 	return false;
 }
 
+export function hasAnyFeatureAnywhere(perms: Perms, features: FeaturesKey[]) {
+	return features.some((f) => hasFeatureAnywhere(perms, f));
+}
+
 export type PermittedPolygon = Feature<Polygon | MultiPolygon> | null;
 
 export type PermittedBounds = {
