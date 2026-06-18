@@ -12,7 +12,7 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN ./setup.sh && pnpm run build
+RUN chmod +x setup.sh && ./setup.sh && pnpm run build
 
 # Development image: full source + dev dependencies, runs the Vite dev server
 # (source maps, unminified code, error overlay) instead of the production build.
@@ -21,7 +21,7 @@ FROM base AS dev
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN ./setup.sh
+RUN chmod +x setup.sh && ./setup.sh
 RUN mkdir -p /app/config /app/logs
 RUN chmod +x docker-entrypoint.sh
 ENV NODE_ENV=development
