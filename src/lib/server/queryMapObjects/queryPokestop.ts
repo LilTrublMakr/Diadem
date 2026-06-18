@@ -143,6 +143,7 @@ export class PokestopQuery extends DbMapObjectQuery<PokestopData, FilterPokestop
 			if (reward)
 				data.quests.push({
 					reward,
+					isAr: true,
 					title: data.alternative_quest_title ?? "",
 					target: data.alternative_quest_target ?? 0,
 					timestamp: data.alternative_quest_timestamp ?? 0,
@@ -154,6 +155,7 @@ export class PokestopQuery extends DbMapObjectQuery<PokestopData, FilterPokestop
 			if (reward)
 				data.quests.push({
 					reward,
+					isAr: false,
 					title: data.quest_title ?? "",
 					target: data.quest_target ?? 0,
 					timestamp: data.quest_timestamp ?? 0,
