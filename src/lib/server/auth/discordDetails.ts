@@ -1,6 +1,3 @@
-import TTLCache from "@isaacs/ttlcache";
-import { PERMISSION_UPDATE_INTERVAL } from "@/lib/constants";
-
 type DiscordUserData = {
 	id: string;
 	username: string;
@@ -20,11 +17,12 @@ export type DiscordUser = {
 	avatarUrl: string;
 };
 
-const endpoint = "https://discord.com/api/users/@me";
+export type DiscordUserInfoResult = {
+	status: number;
+	data?: DiscordUser;
+};
 
-const guildMemberCache = new TTLCache<string, DiscordGuildData>({
-	ttl: PERMISSION_UPDATE_INTERVAL * 1000
-});
+const endpoint = "https://discord.com/api/users/@me";
 
 function getFetchOptions(accessToken: string): RequestInit {
 	return {
@@ -34,42 +32,42 @@ function getFetchOptions(accessToken: string): RequestInit {
 	};
 }
 
-export async function getUserInfo(accessToken: string): Promise<DiscordUser | undefined> {
+export async function getUserInfoResult(accessToken: string): Promise<DiscordUserInfoResult> {
 	const response = await fetch(endpoint, getFetchOptions(accessToken));
 
-	if (response.status === 401) return;
+	if (!response.ok) {
+		return { status: response.status };
+	}
 
 	const user: DiscordUserData = await response.json();
 	return {
-		id: user.id,
-		username: "@" + user.username,
-		displayName: user.global_name || user.username || "",
-		avatarUrl: `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}`
+		status: response.status,
+		data: {
+			id: user.id,
+			username: "@" + user.username,
+			displayName: user.global_name || user.username || "",
+			avatarUrl: `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}`
+		}
 	};
 }
 
 export async function getGuildMemberInfo(guildId: string, accessToken: string) {
-	const cacheKey = `${guildId}:${accessToken}`;
-	const cached = guildMemberCache.get(cacheKey);
-	if (cached !== undefined) return cached;
-
 	const response = await fetch(
 		`${endpoint}/guilds/${guildId}/member`,
 		getFetchOptions(accessToken)
 	);
-	if (response.status === 429) {
-		const retryAfter = Number(response.headers.get("Retry-After") ?? 0);
-		throw new Error(`RATE_LIMITED:${retryAfter}`);
+	if (response.status === 404) {
+		return { roles: [] } as DiscordGuildData;
 	}
 	if (!response.ok) {
-		throw new Error(`Discord guild API error ${response.status} for guild ${guildId}`);
+		return undefined;
 	}
 	const guildMember: DiscordGuildData = await response.json();
-	guildMemberCache.set(cacheKey, guildMember);
 	return guildMember;
 }
 
 export async function isGuildMember(guildId: string, accessToken: string) {
 	const guildMember = await getGuildMemberInfo(guildId, accessToken);
+	if (!guildMember) return;
 	return !!guildMember.user;
 }

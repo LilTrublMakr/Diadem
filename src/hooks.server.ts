@@ -1,15 +1,14 @@
-import { DISCORD_REFRESH_INTERVAL, PERMISSION_UPDATE_INTERVAL } from "@/lib/constants";
+import { PERMISSION_UPDATE_INTERVAL } from "@/lib/constants";
 import { locales, serverAsyncLocalStorage } from "@/lib/paraglide/runtime";
 import { paraglideMiddleware } from "@/lib/paraglide/server";
+import { getUserByDiscordId } from "@/lib/server/auth/auth";
 import {
-	deleteSessionTokenCookie,
-	invalidateSession,
-	makeNewSession,
-	sessionCookieName,
-	setSessionTokenCookie,
-	validateSessionToken
-} from "@/lib/server/auth/auth";
-import { getDiscordAuth } from "@/lib/server/auth/discord";
+	AUTH_BASE_PATH,
+	auth,
+	getAuthSession,
+	getDiscordAccessToken,
+	isAuthEnabled
+} from "@/lib/server/auth/betterAuth";
 import { getEveryonePerms, updatePermissions } from "@/lib/server/auth/permissions";
 import type { User } from "@/lib/server/db/internal/schema";
 import { getServerLogger } from "@/lib/server/logging";
@@ -44,79 +43,68 @@ const paraglideHandle: Handle = ({ event, resolve }) =>
 		});
 	});
 
-const permissionCache: TTLCache<string, undefined> = new TTLCache({
+const permissionCache: TTLCache<string, Perms> = new TTLCache({
 	ttl: PERMISSION_UPDATE_INTERVAL * 1000
 });
+const authLog = getServerLogger("auth");
+const permissionUpdateInFlight = new Map<string, Promise<Perms>>();
+
+function updatePermissionsLocked(user: User, accessToken: string, thisFetch: typeof fetch) {
+	let updatePromise = permissionUpdateInFlight.get(user.id);
+	if (!updatePromise) {
+		updatePromise = updatePermissions(user, accessToken, thisFetch).finally(() => {
+			permissionUpdateInFlight.delete(user.id);
+		});
+		permissionUpdateInFlight.set(user.id, updatePromise);
+	}
+	return updatePromise;
+}
 
 const handleAuth: Handle = async ({ event, resolve }) => {
-	const sessionToken = event.cookies.get(sessionCookieName);
+	if (auth && event.url.pathname.startsWith(`${AUTH_BASE_PATH}/`)) {
+		return auth.handler(event.request);
+	}
 
 	event.locals.perms = await getEveryonePerms(event.fetch);
+	event.locals.user = null;
+	event.locals.session = null;
 
-	if (!sessionToken) {
-		event.locals.user = null;
-		event.locals.session = null;
-
+	if (!isAuthEnabled()) {
 		return resolve(event);
 	}
 
-	const { session, user } = await validateSessionToken(sessionToken);
-
-	if (session) {
-		setSessionTokenCookie(event, sessionToken, session.expiresAt);
-	} else {
-		deleteSessionTokenCookie(event);
+	const authSession = await getAuthSession(event);
+	if (!authSession?.session || !authSession.user) {
+		return resolve(event);
 	}
 
-	let accessToken = session?.discordToken ?? "";
-
-	// Refresh Discord Auth FIRST so the permissions check below uses a valid token
-	const discord = getDiscordAuth();
-	if (
-		discord &&
-		session &&
-		session.discordLastRefresh < new Date(Date.now() - DISCORD_REFRESH_INTERVAL * 1000)
-	) {
-		console.log("Refreshing Discord auth token for user " + user.id);
-
-		try {
-			const tokens = await discord.refreshAccessToken(session.discordRefreshToken);
-			accessToken = tokens.accessToken();
-			await makeNewSession(
-				event,
-				user.id,
-				accessToken,
-				tokens.refreshToken(),
-				tokens.accessTokenExpiresAt()
-			);
-			await invalidateSession(session.id);
-		} catch (e) {
-			console.error("Error while refreshing discord token: " + e.toString());
-			await invalidateSession(session.id);
-		}
+	const discordId = authSession.user.discordId;
+	if (!discordId) {
+		authLog.warning("Authenticated user has no discordId in Better Auth session");
+		return resolve(event);
 	}
 
-	if (user && !permissionCache.has(user.id)) {
+	const user = await getUserByDiscordId(discordId);
+	if (!user) {
+		authLog.warning(`No user row found for Discord id ${discordId}`);
+		return resolve(event);
+	}
+
+	let perms = permissionCache.get(user.id);
+	if (!perms) {
+		const accessToken = await getDiscordAccessToken(event);
 		try {
-			user.permissions = await updatePermissions(user as User, accessToken, event.fetch);
-			permissionCache.set(user.id, undefined);
-		} catch (e) {
-			const msg = e instanceof Error ? e.message : "";
-			if (msg.startsWith("RATE_LIMITED:")) {
-				const retryAfter = Number(msg.split(":")[1]) || 0;
-				const ttl = Math.max(PERMISSION_UPDATE_INTERVAL, retryAfter) * 1000;
-				permissionCache.set(user.id, undefined, { ttl });
-				console.warn(`Discord rate limited for user ${user.id}, backing off ${ttl / 1000}s`);
-			} else {
-				console.error("Error updating permissions for user " + user.id + ": " + e.toString());
-				permissionCache.set(user.id, undefined);
-			}
+			perms = await updatePermissionsLocked(user, accessToken ?? "", event.fetch);
+			permissionCache.set(user.id, perms);
+		} catch (error) {
+			authLog.warning(`Failed to update permissions for user ${user.id}: ${error}`);
+			perms = event.locals.perms;
 		}
 	}
 
 	event.locals.user = user;
-	event.locals.session = session;
-	if (user) event.locals.perms = user.permissions as Perms;
+	event.locals.session = authSession.session;
+	event.locals.perms = perms;
 	return resolve(event);
 };
 

@@ -1,4 +1,5 @@
-import { getServerConfig, isAuthRequired } from "@/lib/services/config/config.server";
+import { getServerConfig } from "@/lib/services/config/config.server";
+import { isAuthRequired } from "@/lib/server/auth/betterAuth";
 import type { SupportedFeatures } from "@/lib/services/supportedFeatures";
 import { json } from "@sveltejs/kit";
 

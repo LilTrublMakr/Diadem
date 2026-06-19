@@ -1,6 +1,5 @@
 import { type KojiFeatures } from "@/lib/features/koji";
 import { fetchKojiGeofences } from "@/lib/server/api/kojiApi";
-import { setPermissions } from "@/lib/server/auth/auth";
 import { type DiscordGuildData, getGuildMemberInfo } from "@/lib/server/auth/discordDetails";
 import { type User } from "@/lib/server/db/internal/schema";
 import { getServerConfig } from "@/lib/services/config/config.server";
@@ -77,8 +76,8 @@ export async function getEveryonePerms(thisFetch: typeof fetch, geofences?: Koji
 
 export async function updatePermissions(user: User, accessToken: string, thisFetch: typeof fetch) {
 	const guildCache: { [key: string]: DiscordGuildData } = {};
-	const authConfig = getServerConfig().auth;
 	const permConfig = getServerConfig().permissions;
+	const canCheckGuildRules = accessToken.trim().length > 0;
 
 	const geofences = await getGeofences(thisFetch);
 
@@ -86,14 +85,26 @@ export async function updatePermissions(user: User, accessToken: string, thisFet
 		JSON.stringify(await getEveryonePerms(thisFetch, geofences))
 	);
 
-	if (permConfig && authConfig.enabled) {
+	if (permConfig) {
 		for (const rule of permConfig) {
 			let ruleApplies = !!rule.loggedIn || !!rule.everyone;
 
 			if (!ruleApplies && rule.guildId) {
+				if (!canCheckGuildRules) {
+					continue;
+				}
+
 				let guild = guildCache[rule.guildId];
 				if (!guild) {
-					guild = await getGuildMemberInfo(rule.guildId, accessToken);
+					const lookup = await getGuildMemberInfo(rule.guildId, accessToken);
+					if (!lookup) {
+						log.warning(
+							`discord guild lookup failed for user ${user.id}; treating guild ${rule.guildId} as non-member`
+						);
+						guild = { roles: [] };
+					} else {
+						guild = lookup;
+					}
 					guildCache[rule.guildId] = guild;
 				}
 
@@ -111,6 +122,5 @@ export async function updatePermissions(user: User, accessToken: string, thisFet
 		}
 	}
 
-	await setPermissions(user.id, permissions);
 	return permissions;
 }
