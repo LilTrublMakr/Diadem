@@ -1,16 +1,11 @@
 services:
   diadem:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: ${DIADEM_TARGET:-runtime}
-    image: diadem:latest
+    image: ghcr.io/liltrublmakr/pogo-map-vt:latest
     container_name: diadem
     restart: unless-stopped
     ports:
       - "${DIADEM_PORT:-3900}:3900"
     environment:
-      - DIADEM_TARGET=${DIADEM_TARGET:-runtime}
       - HOST=0.0.0.0
       - PORT=3900
     volumes:
