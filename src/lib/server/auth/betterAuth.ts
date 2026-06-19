@@ -19,7 +19,7 @@ const authSecret =
 export const AUTH_BASE_PATH = "/api/auth";
 export const IS_AUTH_ENABLED = Boolean(authConfig.enabled);
 
-export const auth = IS_AUTH_ENABLED
+export const auth = IS_AUTH_ENABLED && authSecret
 	? betterAuth({
 			secret: authSecret,
 			baseURL: authConfig.baseUrl,
