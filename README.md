@@ -128,12 +128,15 @@ See `config/config.example.toml` for the full `[client.defaultFilters]` referenc
 [server.auth]
 enabled = true
 optional = true
+secret = "your_random_32plus_char_string"   # generate with: openssl rand -base64 32
+baseUrl = "https://your-domain.com"          # public-facing URL, no trailing slash
 
 [server.auth.discord]
 clientId = "your_discord_client_id"
 clientSecret = "your_discord_client_secret"
-redirectUri = "https://your-domain.com/login/discord/callback"
 ```
+
+> **Discord app setup**: in the Discord Developer Portal, add `https://your-domain.com/api/auth/callback/discord` as a redirect URI. Auth uses [Better Auth](https://www.better-auth.com/) — the callback path is fixed at `/api/auth/callback/discord`.
 
 **Permissions** — grant everyone access to everything:
 

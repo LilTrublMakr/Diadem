@@ -32,7 +32,7 @@ Node 22+ required. Uses pnpm.
 - **bits-ui** for headless UI components
 - **runed** for Svelte reactivity utilities
 - **zod** for validation
-- **arctic** for Discord OAuth
+- **better-auth** for Discord OAuth and session management (replaced `arctic`)
 - **Package manager**: pnpm
 
 ---
@@ -147,6 +147,17 @@ pnpm dev
 - **State files** use `.svelte.ts` extension for reactive Svelte 5 state (e.g., `mapObjectsState.svelte.ts`, `userSettings.svelte.ts`)
 - **Config**: TOML-based (`config/config.toml`, symlinked into `src/lib/server/config.toml` by `setup.sh`)
 - **Custom CSS/components**: `config/` directory files symlinked into `src/` by `setup.sh`
+
+### Auth
+
+- **Better Auth** (`better-auth` npm package) handles Discord OAuth, session cookies, and token management — replaces the old custom Oslo/arctic-based "rotom auth"
+- Auth config: `src/lib/server/auth/betterAuth.ts` — exports `auth`, `signInWithDiscord`, `signOut`, `getAuthSession`, `getDiscordAccessToken`, `isAuthRequired()`
+- `isAuthRequired()` lives in `betterAuth.ts`, not `config.server.ts`
+- Permissions are computed fresh on every login from config + Discord guild/role data, then TTL-cached in memory (`hooks.server.ts`); they are **not stored in the DB**
+- `user` table has no `permissions` column; `account` and `verification` tables added for Better Auth
+- Discord OAuth callback path: `/api/auth/callback/discord` (Better Auth built-in) — **not** `/login/discord/callback`; the Discord app's redirect URI must match
+- Vite SSR requires `ssr: { noExternal: ["better-auth"] }` in `vite.config.ts`
+- Config fields: `[server.auth]` requires `secret` (random 32+ char string) and `baseUrl` (public-facing URL); `[server.auth.discord]` no longer has `redirectUri`
 
 ### Data Flow
 

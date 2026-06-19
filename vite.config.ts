@@ -26,5 +26,8 @@ export default defineConfig({
 	},
 	server: {
 		allowedHosts: true
+	},
+	ssr: {
+		noExternal: ["better-auth"]
 	}
 });
