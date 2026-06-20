@@ -7,6 +7,7 @@
 
 	const navLinks = [
 		{ href: '/map', label: 'Map' },
+		{ href: '/events', label: 'Events' },
 		{ href: '/shiny', label: 'Shiny Stats' },
 		{ href: '/seen', label: 'Seen Stats' },
 		{ href: '/status', label: 'Worker Status' }
