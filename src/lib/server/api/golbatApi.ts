@@ -26,6 +26,9 @@ async function callGolbat<T>(
 
 	const headers: HeadersInit = {};
 
+	if (body !== undefined) {
+		headers["Content-Type"] = "application/json";
+	}
 	if (config.auth) {
 		headers["Authorization"] = config.auth;
 	}
