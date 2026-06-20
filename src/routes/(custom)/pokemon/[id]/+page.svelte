@@ -273,6 +273,23 @@
 		try { return getIconPokemon({ pokemon_id: pId, form: 0, temp_evolution_id: tempEvoId }); }
 		catch { return ''; }
 	}
+
+	let sortedIds = $derived.by(() => {
+		if (!masterReady) return [] as number[];
+		const mf = getMasterFile();
+		if (!mf) return [] as number[];
+		return Object.keys(mf.pokemon).map(Number).sort((a, b) => a - b);
+	});
+
+	let prevId = $derived.by(() => {
+		const idx = sortedIds.indexOf(pokemonId);
+		return idx > 0 ? sortedIds[idx - 1] : null;
+	});
+
+	let nextId = $derived.by(() => {
+		const idx = sortedIds.indexOf(pokemonId);
+		return idx !== -1 && idx < sortedIds.length - 1 ? sortedIds[idx + 1] : null;
+	});
 </script>
 
 <svelte:head>
@@ -286,6 +303,42 @@
 	{:else if !pokemon}
 		<div class="text-center text-zinc-400 py-16">Pokémon #{pokemonId} not found.</div>
 	{:else}
+
+		<!-- Prev / Next navigation -->
+		<div class="flex items-center justify-between mb-4">
+			{#if prevId !== null}
+				{@const prevPoke = getMasterPokemon(prevId)}
+				<a
+					href="/pokemon/{prevId}"
+					class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+				>
+					<span>←</span>
+					<img src={evoSprite(prevId)} alt="" class="w-6 h-6 object-contain"
+						onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+						onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }} />
+					<span class="font-medium">{prevPoke?.name ?? `#${prevId}`}</span>
+					<span class="text-xs text-zinc-400 dark:text-zinc-600">#{String(prevId).padStart(4, '0')}</span>
+				</a>
+			{:else}
+				<div></div>
+			{/if}
+			{#if nextId !== null}
+				{@const nextPoke = getMasterPokemon(nextId)}
+				<a
+					href="/pokemon/{nextId}"
+					class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+				>
+					<span class="text-xs text-zinc-400 dark:text-zinc-600">#{String(nextId).padStart(4, '0')}</span>
+					<span class="font-medium">{nextPoke?.name ?? `#${nextId}`}</span>
+					<img src={evoSprite(nextId)} alt="" class="w-6 h-6 object-contain"
+						onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+						onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }} />
+					<span>→</span>
+				</a>
+			{:else}
+				<div></div>
+			{/if}
+		</div>
 
 		<!-- Header card -->
 		<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 mb-6">
