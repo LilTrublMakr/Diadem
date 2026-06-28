@@ -116,7 +116,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5">
 				<div class="text-xs text-zinc-400 dark:text-zinc-600 uppercase tracking-wider mb-1">Best Shiny Rate (7d)</div>
 				{#if best7d}
-					<a href="/pokemon/{best7d.pokemon_id}" class="flex items-center gap-2 mt-1">
+					<a href="/pokedex/{best7d.pokemon_id}" class="flex items-center gap-2 mt-1">
 						<TrackedPokemonImg pokemonId={best7d.pokemon_id} src={shinySprite(best7d.pokemon_id, best7d.form)} alt={best7d.name} class="w-8 h-8 object-contain" />
 						<div>
 							<div class="text-xl font-bold text-yellow-600 dark:text-yellow-400">
@@ -148,7 +148,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 				<div class="text-xs text-zinc-400 dark:text-zinc-600 uppercase tracking-wider mb-1">Top Encounter (24h)</div>
 				{#if topEncounters?.h24[0]}
 					{@const top = topEncounters.h24[0]}
-					<a href="/pokemon/{top.pokemon_id}" class="flex items-center gap-2 mt-1">
+					<a href="/pokedex/{top.pokemon_id}" class="flex items-center gap-2 mt-1">
 						<TrackedPokemonImg pokemonId={top.pokemon_id} src={normalSprite(top.pokemon_id, top.form)} alt={top.name} class="w-8 h-8 object-contain" />
 						<div>
 							<div class="text-xl font-bold text-zinc-800 dark:text-zinc-200">{top.count.toLocaleString()}</div>
@@ -178,7 +178,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 				{:else}
 					<div class="divide-y divide-zinc-100 dark:divide-zinc-800/50">
 						{#each top10Shiny as s, i}
-							<a href="/pokemon/{s.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
+							<a href="/pokedex/{s.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
 								<span class="text-zinc-300 dark:text-zinc-700 text-xs w-4 text-right shrink-0">{i + 1}</span>
 								<TrackedPokemonImg pokemonId={s.pokemon_id} src={shinySprite(s.pokemon_id, s.form)} alt={s.name} class="w-7 h-7 object-contain" />
 								<span class="text-sm flex-1 text-zinc-800 dark:text-zinc-200">{s.name}</span>
@@ -206,7 +206,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 				{:else}
 					<div class="divide-y divide-zinc-100 dark:divide-zinc-800/50">
 						{#each recentHundos as h, i}
-							<a href="/pokemon/{h.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
+							<a href="/pokedex/{h.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
 								<span class="text-zinc-300 dark:text-zinc-700 text-xs w-4 text-right shrink-0">{i + 1}</span>
 								<TrackedPokemonImg pokemonId={h.pokemon_id} src={normalSprite(h.pokemon_id, h.form)} alt={h.name} class="w-7 h-7 object-contain" />
 								<span class="text-sm flex-1 text-zinc-800 dark:text-zinc-200">{h.name}</span>
@@ -232,7 +232,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 				{:else}
 					<div class="divide-y divide-zinc-100 dark:divide-zinc-800/50">
 						{#each list as p, i}
-							<a href="/pokemon/{p.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
+							<a href="/pokedex/{p.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
 								<span class="text-zinc-300 dark:text-zinc-700 text-xs w-4 text-right shrink-0">{i + 1}</span>
 								<TrackedPokemonImg pokemonId={p.pokemon_id} src={normalSprite(p.pokemon_id, p.form)} alt={p.name} class="w-7 h-7 object-contain" />
 								<span class="text-sm flex-1 text-zinc-800 dark:text-zinc-200">{p.name}</span>
@@ -253,7 +253,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 				{:else}
 					<div class="divide-y divide-zinc-100 dark:divide-zinc-800/50">
 						{#each list as p}
-							<a href="/pokemon/{p.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
+							<a href="/pokedex/{p.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
 								<TrackedPokemonImg pokemonId={p.pokemon_id} src={normalSprite(p.pokemon_id, p.form)} alt={p.name} class="w-7 h-7 object-contain" />
 								<span class="text-sm flex-1 text-zinc-800 dark:text-zinc-200">{p.name}</span>
 								<span class="text-zinc-400 dark:text-zinc-500 text-xs font-mono">{p.count.toLocaleString()}</span>

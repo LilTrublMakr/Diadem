@@ -171,7 +171,7 @@
 						<tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
 							<td class="px-4 py-2.5 text-zinc-300 dark:text-zinc-700 text-xs">{i + 1}</td>
 							<td class="px-4 py-2.5">
-								<a href="/pokemon/{s.pokemon_id}" class="flex items-center gap-2.5 group">
+								<a href="/pokedex/{s.pokemon_id}" class="flex items-center gap-2.5 group">
 									<TrackedPokemonImg pokemonId={s.pokemon_id} src={shinySprite(s.pokemon_id, s.form)} alt={s.name} class="w-8 h-8 object-contain" />
 									<span class="text-zinc-800 dark:text-zinc-200 font-medium group-hover:underline">{s.name}</span>
 								</a>

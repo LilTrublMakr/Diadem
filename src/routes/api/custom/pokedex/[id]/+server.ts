@@ -102,7 +102,7 @@ export const GET: RequestHandler = async ({ params }) => {
 			),
 		} satisfies PokemonDetailResponse);
 	} catch (e) {
-		console.error(`[pokemon API] Query failed for id=${pokemonId}:`, e);
+		console.error(`[pokedex API] Query failed for id=${pokemonId}:`, e);
 		throw error(500, 'Failed to query pokemon stats');
 	}
 };

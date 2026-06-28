@@ -199,8 +199,8 @@ All custom code lives in paths that Diadem treats as extension points:
 | `src/routes/(custom)/status/+page.svelte` | Live worker status page at `/status` |
 | `src/routes/(custom)/shiny/+page.svelte` | Shiny stats page at `/shiny` |
 | `src/routes/(custom)/seen/+page.svelte` | Seen (encounter) stats page at `/seen` — per-species counts, all time slots |
-| `src/routes/(custom)/pokemon/[id]/+page.svelte` | Per-pokemon detail page at `/pokemon/{id}` — base stats, moves, evolutions, buddy dist, scanner stats |
-| `src/routes/api/custom/pokemon/[id]/+server.ts` | Per-pokemon stats API — queries all 5 stats tables for a given pokemon_id |
+| `src/routes/(custom)/pokedex/[id]/+page.svelte` | Per-pokemon detail page at `/pokedex/{id}` — base stats, moves, evolutions, buddy dist, scanner stats |
+| `src/routes/api/custom/pokedex/[id]/+server.ts` | Per-pokemon stats API — queries all 5 stats tables for a given pokemon_id |
 | `src/routes/api/custom/workers/+server.ts` | API endpoint at `/api/custom/workers` |
 | `src/routes/api/custom/shiny/+server.ts` | Shiny stats API — queries `pokemon_stats.pokemon_summary` |
 | `src/routes/api/custom/seen/+server.ts` | Seen (24h) count — `SUM(total_count)` from `pokemon_summary WHERE time_slot = '1d'` |

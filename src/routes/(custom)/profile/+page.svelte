@@ -83,7 +83,7 @@
 			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 text-center">
 				<p class="text-zinc-500 dark:text-zinc-400">No Pokémon tracked yet.</p>
 				<p class="text-sm text-zinc-400 dark:text-zinc-600 mt-1">
-					Visit a <a href="/pokemon/1" class="underline hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">Pokémon page</a> and check the boxes.
+					Visit a <a href="/pokedex/1" class="underline hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">Pokémon page</a> and check the boxes.
 				</p>
 			</div>
 		{/if}
@@ -102,7 +102,7 @@
 						<div class="flex items-center gap-3 px-5 py-3">
 							<TrackedPokemonImg pokemonId={row.pokemonId} src={sprite(row.pokemonId)} class="w-10 h-10 object-contain" />
 							<a
-								href="/pokemon/{row.pokemonId}"
+								href="/pokedex/{row.pokemonId}"
 								class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
 							>
 								{poke?.name ?? `#${row.pokemonId}`}
@@ -150,7 +150,7 @@
 						<div class="flex items-center gap-3 px-5 py-3">
 							<TrackedPokemonImg pokemonId={row.pokemonId} src={sprite(row.pokemonId)} class="w-10 h-10 object-contain" />
 							<a
-								href="/pokemon/{row.pokemonId}"
+								href="/pokedex/{row.pokemonId}"
 								class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
 							>
 								{poke?.name ?? `#${row.pokemonId}`}

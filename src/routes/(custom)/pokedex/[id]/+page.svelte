@@ -83,7 +83,7 @@
 		const id = pokemonId;
 		statsLoading = true;
 		statsError = null;
-		fetch(`/api/custom/pokemon/${id}`)
+		fetch(`/api/custom/pokedex/${id}`)
 			.then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
 			.then((d) => { statsData = d; })
 			.catch((e) => { statsError = e.message; })
@@ -341,7 +341,7 @@
 			{#if prevId !== null}
 				{@const prevPoke = getMasterPokemon(prevId)}
 				<a
-					href="/pokemon/{prevId}"
+					href="/pokedex/{prevId}"
 					class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
 				>
 					<span>←</span>
@@ -355,7 +355,7 @@
 			{#if nextId !== null}
 				{@const nextPoke = getMasterPokemon(nextId)}
 				<a
-					href="/pokemon/{nextId}"
+					href="/pokedex/{nextId}"
 					class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
 				>
 					<span class="text-xs text-zinc-400 dark:text-zinc-600">#{String(nextId).padStart(4, '0')}</span>
@@ -553,7 +553,7 @@
 		{#snippet evoCardSnip(id: number)}
 			{@const isCurrent = id === pokemonId}
 			<a
-				href="/pokemon/{id}"
+				href="/pokedex/{id}"
 				style="
 					min-width:72px; text-decoration:none;
 					display:flex; flex-direction:column; align-items:center; gap:0.25rem; padding:0.5rem;
@@ -639,7 +639,7 @@
 						<div class="flex flex-wrap gap-2">
 							{#each group.boosts as boost}
 								<a
-									href="/pokemon/{boost.pokemonId}"
+									href="/pokedex/{boost.pokemonId}"
 									class="flex flex-col items-center gap-1 p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
 									style="min-width:4.5rem; max-width:6rem; text-decoration:none;"
 								>
