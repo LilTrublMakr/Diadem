@@ -208,12 +208,12 @@ All custom code lives in paths that Diadem treats as extension points:
 | `src/routes/api/custom/top-encounters/+server.ts` | Top encounters (24h) + recent rare (24h) from `pokemon_summary` |
 | `src/routes/api/custom/hundos/+server.ts` | Top hundo species (24h) from `pokemon_iv_distribution WHERE iv = 100.0` |
 | `src/routes/api/custom/recent-shinies/+server.ts` | Unused — still queries deprecated `pokemon` table, no replacement yet |
-| `src/routes/api/custom/tracker/[id]/+server.ts` | Per-pokemon tracker API — GET returns `{ shiny, hundo }`, POST updates (insert or update); 401 if not logged in |
-| `src/routes/api/custom/tracker/+server.ts` | All-tracker GET — returns `{ pokemonId, shiny, hundo }[]` for logged-in user |
-| `src/routes/(custom)/profile/+page.svelte` | User profile page at `/profile` — shows tracked shinies and hundos |
-| `src/lib/server/db/internal/schema.ts` | Internal DB schema — includes `pokemon_tracker` table (userId, pokemonId, shiny, hundo, updatedAt; unique on userId+pokemonId) |
-| `src/lib/features/trackerState.svelte.ts` | Global reactive tracker state — `loadTrackers()`, `getTrackers()`, `setTrackerEntry()`, `isTrackerLoaded()` |
-| `src/components/custom/TrackedPokemonImg.svelte` | Drop-in `<img>` wrapper — overlays ✨ (upper-right) and 💯 (lower-right) badges when user has tracked shiny/hundo |
+| `src/routes/api/custom/tracker/[id]/+server.ts` | Per-pokemon tracker API — GET returns `{ shiny, hundo, nundo, shundo }`, POST updates (insert or update); 401 if not logged in |
+| `src/routes/api/custom/tracker/+server.ts` | All-tracker GET — returns `{ pokemonId, shiny, hundo, nundo, shundo }[]` for logged-in user |
+| `src/routes/(custom)/profile/+page.svelte` | User profile page at `/profile` — shows tracked shundos, hundos, shinies, nundos (in that order) |
+| `src/lib/server/db/internal/schema.ts` | Internal DB schema — includes `pokemon_tracker` table (userId, pokemonId, shiny, hundo, nundo, shundo, updatedAt; unique on userId+pokemonId) |
+| `src/lib/features/trackerState.svelte.ts` | Global reactive tracker state — `loadTrackers()`, `getTrackers()`, `setTrackerEntry()`, `isTrackerLoaded()`; `TrackerEntry = { shiny, hundo, nundo, shundo }` |
+| `src/components/custom/TrackedPokemonImg.svelte` | Drop-in `<img>` wrapper — badge positions: ✨ top-left, 🌟 top-right, 0️⃣ bottom-left, 💯 bottom-right |
 | `src/lib/server/db/stats.ts` | Stats DB connection (`queryStats<T>()`) — reads `STATS_DB_*` via `$env/static/private` |
 | `src/lib/server/api/dragoniteStatus.ts` | Dragonite admin API client — calls `/status/` and scout queue |
 | `src/lib/server/db/dragonite.ts` | Dragonite DB connection for historical `stats_workers` data (future use) |
@@ -272,8 +272,9 @@ For charts/history using `stats_workers`, a direct MariaDB connection is availab
 - [x] Recent rare encounters — rarest species (24h) from stats DB
 - [x] Top 100% IV species widget (24h) from stats DB
 - [x] Seen stats page (`/seen`) — per-species encounter counts, all time slots, count/name sort
-- [x] Per-pokemon detail page (`/pokemon/{id}`) — base stats, types, moves, evolutions, buddy dist, scanner stats
+- [x] Per-pokemon detail page (`/pokedex/{id}`) — base stats, types, moves, evolutions, buddy dist, scanner stats
 - [x] Personal shiny/hundo tracker — per-user DB table, checkboxes on pokemon detail page and map popup, badges on all pokemon images, profile page at `/profile`
+- [x] Nundo (0% IV) + shundo (shiny 100% IV) tracker — extends tracker with nundo/shundo booleans; badges on pokemon images; DB columns `nundo`/`shundo` on `pokemon_tracker`
 - [x] NavBar username → dropdown with avatar, Profile link, Logout
 - [ ] Worker history charts — using `stats_workers` from Dragonite DB
 
@@ -309,7 +310,11 @@ You might be able to use the Svelte MCP server, where you have access to compreh
 - Shiny sprites: `getIconPokemon({ pokemon_id, form, shiny: true })` from `$lib/services/uicons.svelte` — wrap in try/catch
 - Custom pages using `getIconPokemon` for images: always await `initAllIconSets()` alongside `loadMasterFile()` before rendering (race condition on direct page refresh — masterfile can resolve before icon index loads). Pattern: `Promise.all([loadMasterFile(), initAllIconSets()]).then(() => { ready = true; })`
 - Tracker state (`trackerState.svelte.ts`): `loadTrackers()` is called in `(custom)/+layout.svelte`, `(main)/+layout.svelte`, and `Home.svelte` — Home is self-contained (not under custom layout), and the map lives under main layout. All three must call it independently; the function is idempotent (no-ops after first load).
-- `TrackedPokemonImg` replaces bare `<img>` tags wherever pokemon images appear — import from `@/components/custom/TrackedPokemonImg.svelte`; pass `pokemonId`, `src`, optional `alt` and `class`
+- `TrackedPokemonImg` replaces bare `<img>` tags wherever pokemon images appear — import from `@/components/custom/TrackedPokemonImg.svelte`; pass `pokemonId`, `src`, optional `alt` and `class`; badges: ✨ top-left, 🌟 top-right, 0️⃣ bottom-left, 💯 bottom-right
+- Tracker `toggleTracker` type is `'shiny' | 'hundo' | 'nundo' | 'shundo'`; button/section order everywhere: shundo → hundo → shiny → nundo
+- `pokemon_tracker` DB migration (run manually if columns missing): `ALTER TABLE pokemon_tracker ADD nundo boolean DEFAULT false NOT NULL; ALTER TABLE pokemon_tracker ADD shundo boolean DEFAULT false NOT NULL;`
+- `getBestRank` in `pokemonUtils.ts` casts `data.pvp` to `Record<string, PvpStats[] | undefined>` because `League.MASTER` is not in the typed pvp object — do not remove the cast
+- Diadem upstream strategy: do NOT run `git merge diadem/main` (250 file conflicts from native mobile app + duplicate cherry-picks). Use surgical `git cherry-pick <hash>` per commit. Tier order: security → bug fixes → features. After each pick run `pnpm run check`.
 - TypeScript cannot import types from parameterized route files (e.g. `../../api/custom/pokemon/[id]/+server`) — inline the type in the consuming file instead
 - TypeScript 5.8 DOM lib has incomplete `Highlight` / `HighlightRegistry` types (only `forEach`, no `add`/`delete`/`set`) — cast `highlight` to `Set<AbstractRange>` and `CSS.highlights` to `Map<string, Highlight>` at call sites
 
