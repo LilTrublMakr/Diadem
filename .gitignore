@@ -21,6 +21,11 @@ vite.config.ts.timestamp-*
 # Docker
 docker-compose.yml
 
+# Config files (contain secrets, never commit)
+config/config.toml
+src/lib/server/config.toml
+.env
+
 # Local dev config (contains secrets, not for production)
 config/config.dev.toml
 

@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "C:/Users/Matt/AppData/Local/Programs/gortex/gortex.exe hook",
+            "command": "C:/Users/Matt/AppData/Local/Programs/gortex/gortex.exe hook --mode=consult-unlock",
             "statusMessage": "Injecting Gortex orientation snapshot...",
             "timeout": 3000,
             "type": "command"
@@ -16,7 +16,7 @@
       {
         "hooks": [
           {
-            "command": "C:/Users/Matt/AppData/Local/Programs/gortex/gortex.exe hook",
+            "command": "C:/Users/Matt/AppData/Local/Programs/gortex/gortex.exe hook --mode=consult-unlock",
             "statusMessage": "Enriching with Gortex graph context...",
             "timeout": 3000,
             "type": "command"
@@ -29,7 +29,7 @@
       {
         "hooks": [
           {
-            "command": "C:/Users/Matt/AppData/Local/Programs/gortex/gortex.exe hook",
+            "command": "C:/Users/Matt/AppData/Local/Programs/gortex/gortex.exe hook --mode=consult-unlock",
             "statusMessage": "Loading Gortex graph orientation...",
             "timeout": 3000,
             "type": "command"
@@ -41,7 +41,7 @@
       {
         "hooks": [
           {
-            "command": "C:/Users/Matt/AppData/Local/Programs/gortex/gortex.exe hook",
+            "command": "C:/Users/Matt/AppData/Local/Programs/gortex/gortex.exe hook --mode=consult-unlock",
             "statusMessage": "Running Gortex post-task diagnostics...",
             "timeout": 5000,
             "type": "command"
@@ -53,7 +53,7 @@
       {
         "hooks": [
           {
-            "command": "C:/Users/Matt/AppData/Local/Programs/gortex/gortex.exe hook",
+            "command": "C:/Users/Matt/AppData/Local/Programs/gortex/gortex.exe hook --mode=consult-unlock",
             "statusMessage": "Surfacing relevant Gortex symbols...",
             "timeout": 3000,
             "type": "command"
