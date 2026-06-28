@@ -30,7 +30,7 @@ src/lib/server/config.toml
 config/config.dev.toml
 
 # LLM bullshit
-.claude
+/.claude
 
 # VSCode stuff
-.vscode
+/.vscode
