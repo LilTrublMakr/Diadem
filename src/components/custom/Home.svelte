@@ -4,8 +4,10 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 	import type { SeenStats } from '../../routes/api/custom/seen/+server';
 	import type { TopEncounter, TopEncountersResponse } from '../../routes/api/custom/top-encounters/+server';
 	import { getIconPokemon } from '$lib/services/uicons.svelte';
+	import { loadTrackers } from '$lib/features/trackerState.svelte';
 	import NavBar from './NavBar.svelte';
 	import Footer from './Footer.svelte';
+	import TrackedPokemonImg from './TrackedPokemonImg.svelte';
 
 	function shinySprite(pokemonId: number, form: number): string {
 		try { return getIconPokemon({ pokemon_id: pokemonId, form, shiny: true }); } catch { return ''; }
@@ -13,6 +15,8 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 	function normalSprite(pokemonId: number, form: number): string {
 		try { return getIconPokemon({ pokemon_id: pokemonId, form }); } catch { return ''; }
 	}
+	$effect(() => { loadTrackers(); });
+
 	let shinyStats = $state<ShinyStat[] | null>(null);
 	$effect(() => {
 		fetch('/api/custom/shiny').then((r) => r.json()).then((d: ShinyStat[]) => (shinyStats = d)).catch(() => {});
@@ -45,6 +49,14 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 			.then((d: TopEncountersResponse) => (topEncounters = d))
 			.catch(() => (topError = true));
 	});
+
+	function timeAgo(ts: number): string {
+		const diff = Math.floor(Date.now() / 1000) - ts;
+		if (diff < 60) return `${diff}s ago`;
+		if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+		if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+		return `${Math.floor(diff / 86400)}d ago`;
+	}
 
 	function wilsonLowerBound(sh: number, total: number): number {
 		if (total === 0 || sh === 0) return 0;
@@ -105,7 +117,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 				<div class="text-xs text-zinc-400 dark:text-zinc-600 uppercase tracking-wider mb-1">Best Shiny Rate (7d)</div>
 				{#if best7d}
 					<a href="/pokemon/{best7d.pokemon_id}" class="flex items-center gap-2 mt-1">
-						<img src={shinySprite(best7d.pokemon_id, best7d.form)} alt={best7d.name} class="w-8 h-8 object-contain" onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }} />
+						<TrackedPokemonImg pokemonId={best7d.pokemon_id} src={shinySprite(best7d.pokemon_id, best7d.form)} alt={best7d.name} class="w-8 h-8 object-contain" />
 						<div>
 							<div class="text-xl font-bold text-yellow-600 dark:text-yellow-400">
 								1 in {Math.round(best7d.total_1w / best7d.shiny_1w).toLocaleString()}
@@ -137,7 +149,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 				{#if topEncounters?.h24[0]}
 					{@const top = topEncounters.h24[0]}
 					<a href="/pokemon/{top.pokemon_id}" class="flex items-center gap-2 mt-1">
-						<img src={normalSprite(top.pokemon_id, top.form)} alt={top.name} class="w-8 h-8 object-contain" onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }} />
+						<TrackedPokemonImg pokemonId={top.pokemon_id} src={normalSprite(top.pokemon_id, top.form)} alt={top.name} class="w-8 h-8 object-contain" />
 						<div>
 							<div class="text-xl font-bold text-zinc-800 dark:text-zinc-200">{top.count.toLocaleString()}</div>
 							<div class="text-xs text-zinc-400 dark:text-zinc-600">{top.name}</div>
@@ -168,7 +180,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 						{#each top10Shiny as s, i}
 							<a href="/pokemon/{s.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
 								<span class="text-zinc-300 dark:text-zinc-700 text-xs w-4 text-right shrink-0">{i + 1}</span>
-								<img src={shinySprite(s.pokemon_id, s.form)} alt={s.name} class="w-7 h-7 object-contain shrink-0" onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }} />
+								<TrackedPokemonImg pokemonId={s.pokemon_id} src={shinySprite(s.pokemon_id, s.form)} alt={s.name} class="w-7 h-7 object-contain" />
 								<span class="text-sm flex-1 text-zinc-800 dark:text-zinc-200">{s.name}</span>
 								<div class="text-xs font-mono text-right">
 									<span class="text-zinc-800 dark:text-zinc-200">~1 in {Math.round(s.total_1w / s.shiny_1w).toLocaleString()}</span>
@@ -196,7 +208,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 						{#each recentHundos as h, i}
 							<a href="/pokemon/{h.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
 								<span class="text-zinc-300 dark:text-zinc-700 text-xs w-4 text-right shrink-0">{i + 1}</span>
-								<img src={normalSprite(h.pokemon_id, h.form)} alt={h.name} class="w-7 h-7 object-contain shrink-0" onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }} />
+								<TrackedPokemonImg pokemonId={h.pokemon_id} src={normalSprite(h.pokemon_id, h.form)} alt={h.name} class="w-7 h-7 object-contain" />
 								<span class="text-sm flex-1 text-zinc-800 dark:text-zinc-200">{h.name}</span>
 								<span class="text-zinc-400 dark:text-zinc-500 text-xs font-mono">{h.count.toLocaleString()}</span>
 							</a>
@@ -222,7 +234,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 						{#each list as p, i}
 							<a href="/pokemon/{p.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
 								<span class="text-zinc-300 dark:text-zinc-700 text-xs w-4 text-right shrink-0">{i + 1}</span>
-								<img src={normalSprite(p.pokemon_id, p.form)} alt={p.name} class="w-7 h-7 object-contain shrink-0" onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }} />
+								<TrackedPokemonImg pokemonId={p.pokemon_id} src={normalSprite(p.pokemon_id, p.form)} alt={p.name} class="w-7 h-7 object-contain" />
 								<span class="text-sm flex-1 text-zinc-800 dark:text-zinc-200">{p.name}</span>
 								<span class="text-zinc-400 dark:text-zinc-500 text-xs font-mono">{p.count.toLocaleString()}</span>
 							</a>
@@ -242,7 +254,7 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 					<div class="divide-y divide-zinc-100 dark:divide-zinc-800/50">
 						{#each list as p}
 							<a href="/pokemon/{p.pokemon_id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
-								<img src={normalSprite(p.pokemon_id, p.form)} alt={p.name} class="w-7 h-7 object-contain shrink-0" onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }} />
+								<TrackedPokemonImg pokemonId={p.pokemon_id} src={normalSprite(p.pokemon_id, p.form)} alt={p.name} class="w-7 h-7 object-contain" />
 								<span class="text-sm flex-1 text-zinc-800 dark:text-zinc-200">{p.name}</span>
 								<span class="text-zinc-400 dark:text-zinc-500 text-xs font-mono">{p.count.toLocaleString()}</span>
 								{#if p.last_seen}

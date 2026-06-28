@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ShinyStat } from '../../api/custom/shiny/+server';
 	import { getIconPokemon } from '$lib/services/uicons.svelte';
+	import TrackedPokemonImg from '@/components/custom/TrackedPokemonImg.svelte';
 
 	type PeriodKey = '1d' | '1w' | '1m' | '3m' | 'all';
 
@@ -171,12 +172,7 @@
 							<td class="px-4 py-2.5 text-zinc-300 dark:text-zinc-700 text-xs">{i + 1}</td>
 							<td class="px-4 py-2.5">
 								<a href="/pokemon/{s.pokemon_id}" class="flex items-center gap-2.5 group">
-									<img
-										src={shinySprite(s.pokemon_id, s.form)}
-										alt={s.name}
-										class="w-8 h-8 object-contain"
-										onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }}
-									/>
+									<TrackedPokemonImg pokemonId={s.pokemon_id} src={shinySprite(s.pokemon_id, s.form)} alt={s.name} class="w-8 h-8 object-contain" />
 									<span class="text-zinc-800 dark:text-zinc-200 font-medium group-hover:underline">{s.name}</span>
 								</a>
 							</td>

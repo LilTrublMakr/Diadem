@@ -2,8 +2,17 @@
 	import { page } from '$app/state';
 	import { getMasterPokemon, getMasterFile, loadMasterFile } from '$lib/services/masterfile';
 	import { getIconPokemon, initAllIconSets } from '$lib/services/uicons.svelte';
+	import { getUserDetails } from '$lib/services/user/userDetails.svelte';
+	import { getTrackers, setTrackerEntry } from '$lib/features/trackerState.svelte';
+	import TrackedPokemonImg from '@/components/custom/TrackedPokemonImg.svelte';
 	import type { MasterEvolution, MasterPokemon } from '$lib/types/masterfile';
-	import type { PokemonDetailResponse } from '../../api/custom/pokemon/[id]/+server';
+	type PokemonDetailResponse = {
+		summary:    { form: number; time_slot: string; total_count: string; shiny_count: string; event_count: string; ditto_count: string }[];
+		ivDist:     { form: number; time_slot: string; iv: number; count: string }[];
+		moveStats:  { form: number; time_slot: string; move_1: number; move_2: number; count: string }[];
+		sizeStats:  { form: number; time_slot: string; size: number; count: string }[];
+		genderStats: { form: number; time_slot: string; gender: number; count: string }[];
+	};
 
 	type PeriodKey = '1d' | '1w' | '1m' | '3m' | 'all';
 	const PERIODS: { key: PeriodKey; label: string }[] = [
@@ -32,7 +41,7 @@
 	const SIZE_LABELS: Record<number, string> = { 1:'XXS', 2:'XS', 3:'M', 4:'XL', 5:'XXL' };
 	const GENDER_LABELS: Record<number, string> = { 1:'Male', 2:'Female', 3:'Genderless' };
 
-	const pokemonId = $derived(parseInt(page.params.id));
+	const pokemonId = $derived(parseInt(page.params.id!));
 
 	let masterReady = $state(false);
 	let statsData = $state<PokemonDetailResponse | null>(null);
@@ -42,6 +51,29 @@
 	let activePeriod = $state<PeriodKey>('1d');
 	let activeForm = $state(0);
 	let showShadow = $state(false);
+
+	let loggedIn = $derived(!!getUserDetails().details);
+	let trackerData = $derived(getTrackers()[pokemonId] ?? { shiny: false, hundo: false });
+	let trackerSaving = $state(false);
+
+	async function toggleTracker(field: 'shiny' | 'hundo', value: boolean) {
+		const prev = getTrackers()[pokemonId] ?? { shiny: false, hundo: false };
+		setTrackerEntry(pokemonId, { [field]: value });
+		trackerSaving = true;
+		try {
+			const res = await fetch(`/api/custom/tracker/${pokemonId}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ [field]: value })
+			});
+			if (res.ok) setTrackerEntry(pokemonId, await res.json());
+			else setTrackerEntry(pokemonId, prev);
+		} catch {
+			setTrackerEntry(pokemonId, prev);
+		} finally {
+			trackerSaving = false;
+		}
+	}
 
 	$effect(() => {
 		Promise.all([loadMasterFile(), initAllIconSets()]).then(() => { masterReady = true; });
@@ -313,9 +345,7 @@
 					class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
 				>
 					<span>←</span>
-					<img src={evoSprite(prevId)} alt="" class="w-6 h-6 object-contain"
-						onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-						onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }} />
+					<TrackedPokemonImg pokemonId={prevId} src={evoSprite(prevId)} class="w-6 h-6 object-contain" />
 					<span class="font-medium">{prevPoke?.name ?? `#${prevId}`}</span>
 					<span class="text-xs text-zinc-400 dark:text-zinc-600">#{String(prevId).padStart(4, '0')}</span>
 				</a>
@@ -330,9 +360,7 @@
 				>
 					<span class="text-xs text-zinc-400 dark:text-zinc-600">#{String(nextId).padStart(4, '0')}</span>
 					<span class="font-medium">{nextPoke?.name ?? `#${nextId}`}</span>
-					<img src={evoSprite(nextId)} alt="" class="w-6 h-6 object-contain"
-						onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-						onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }} />
+					<TrackedPokemonImg pokemonId={nextId} src={evoSprite(nextId)} class="w-6 h-6 object-contain" />
 					<span>→</span>
 				</a>
 			{:else}
@@ -366,13 +394,7 @@
 			<div class="flex items-center gap-6">
 				<!-- Left: sprite + type pills (33%) -->
 				<div class="flex flex-col items-center justify-center gap-3" style="width:33%; flex-shrink:0;">
-					<img
-						src={sprite(activeForm, showShadow)}
-						alt={activePokemon?.name}
-						class="w-40 h-40 object-contain"
-						onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-						onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }}
-					/>
+					<TrackedPokemonImg pokemonId={pokemonId} src={sprite(activeForm, showShadow)} alt={activePokemon?.name ?? ''} class="w-40 h-40 object-contain" />
 					<button
 						onclick={() => (showShadow = !showShadow)}
 						class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors {showShadow
@@ -469,6 +491,43 @@
 
 		</div>
 
+		<!-- Personal tracker -->
+		<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 mb-6">
+			<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">My Collection</h2>
+			{#if loggedIn}
+				<div class="flex items-center gap-6">
+					<label class="flex items-center gap-2 cursor-pointer select-none group">
+						<input
+							type="checkbox"
+							checked={trackerData.shiny}
+							onchange={(e) => toggleTracker('shiny', e.currentTarget.checked)}
+							disabled={trackerSaving}
+							class="w-4 h-4 rounded accent-yellow-400 cursor-pointer"
+						/>
+						<span class="text-sm text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">
+							✨ Got shiny
+						</span>
+					</label>
+					<label class="flex items-center gap-2 cursor-pointer select-none group">
+						<input
+							type="checkbox"
+							checked={trackerData.hundo}
+							onchange={(e) => toggleTracker('hundo', e.currentTarget.checked)}
+							disabled={trackerSaving}
+							class="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
+						/>
+						<span class="text-sm text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">
+							💯 Got hundo
+						</span>
+					</label>
+				</div>
+			{:else}
+				<p class="text-sm text-zinc-400 dark:text-zinc-600">
+					<a href="/login/discord" class="underline hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">Log in</a> to track your collection.
+				</p>
+			{/if}
+		</div>
+
 		<!-- Forms card -->
 		{#if formOptions.length > 1}
 			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 mb-6">
@@ -481,13 +540,7 @@
 								? 'bg-zinc-900 dark:bg-zinc-100'
 								: 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700'}"
 						>
-							<img
-								src={sprite(opt.form)}
-								alt={opt.label}
-								class="w-14 h-14 object-contain"
-								onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-								onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }}
-							/>
+							<TrackedPokemonImg pokemonId={pokemonId} src={sprite(opt.form)} alt={opt.label} class="w-14 h-14 object-contain" />
 							<span class="text-xs font-medium {activeForm === opt.form ? 'text-white dark:text-zinc-900' : 'text-zinc-600 dark:text-zinc-400'}">
 								{opt.label}
 							</span>
@@ -509,13 +562,7 @@
 					border:1px solid {isCurrent ? (isDark ? '#d4d4d8' : '#27272a') : (isDark ? '#3f3f46' : '#e4e4e7')};
 				"
 			>
-				<img
-					src={evoSprite(id)}
-					alt=""
-					style="width:3rem; height:3rem; object-fit:contain;"
-					onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-					onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }}
-				/>
+				<TrackedPokemonImg pokemonId={id} src={evoSprite(id)} class="w-12 h-12 object-contain" />
 				<span style="font-size:0.75rem; font-weight:500; text-align:center; line-height:1.25; color:{isCurrent ? (isDark ? '#18181b' : '#ffffff') : (isDark ? '#d4d4d8' : '#3f3f46')};">
 					{getMasterPokemon(id)?.name ?? `#${id}`}
 				</span>
@@ -596,13 +643,7 @@
 									class="flex flex-col items-center gap-1 p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
 									style="min-width:4.5rem; max-width:6rem; text-decoration:none;"
 								>
-									<img
-										src={megaSprite(boost.pokemonId, boost.tempEvoId)}
-										alt={boost.megaName}
-										class="w-12 h-12 object-contain"
-										onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-										onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }}
-									/>
+									<TrackedPokemonImg pokemonId={boost.pokemonId} src={megaSprite(boost.pokemonId, boost.tempEvoId)} alt={boost.megaName} class="w-12 h-12 object-contain" />
 									<span class="text-xs text-center leading-tight text-zinc-700 dark:text-zinc-300" style="word-break:break-word;">{boost.megaName}</span>
 									<div class="flex flex-wrap gap-0.5 justify-center">
 										{#each boost.megaTypes as t}

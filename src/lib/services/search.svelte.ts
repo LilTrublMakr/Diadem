@@ -219,7 +219,7 @@ let fuzzy: FuzzySearcher<AnySearchEntry>;
 let highlight: Highlight;
 if (browser) {
 	highlight = new Highlight();
-	CSS.highlights.set(highlightKey, highlight);
+	(CSS.highlights as Map<string, Highlight>).set(highlightKey, highlight);
 }
 
 export function getCurrentSearchQuery() {
@@ -525,7 +525,7 @@ export function initSearch(searchOptions: SearchOptions) {
 		...lureEntries,
 		...fortEntries
 	];
-	fuzzy = createFuzzySearch(allSearchResults, { getText: (e) => [e.name, m[e.category]?.()] });
+	fuzzy = createFuzzySearch(allSearchResults, { getText: (e) => [e.name, (m[e.category as keyof typeof m] as (() => string) | undefined)?.() ?? ''] });
 }
 
 function parseCoordinates(query: string): { lat: number; lon: number } | undefined {
@@ -645,11 +645,11 @@ export function highlightSearchMatches(match: HighlightRanges | null | undefined
 			const range = new Range();
 			range.setStart(text, indexes[0]);
 			range.setEnd(text, indexes[1] + 1);
-			highlight.add(range);
+			(highlight as unknown as Set<AbstractRange>).add(range);
 			ranges.push(range);
 		}
 
-		return () => ranges.forEach((r) => highlight.delete(r));
+		return () => ranges.forEach((r) => (highlight as unknown as Set<AbstractRange>).delete(r));
 	};
 }
 

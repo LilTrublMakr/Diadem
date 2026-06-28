@@ -6,10 +6,14 @@
 	import Modal from "@/components/ui/modal/Modal.svelte";
 	import { getSelectOptions } from "@/lib/ui/modal.svelte";
 	import Loading from "@/components/ui/Loading.svelte";
+	import { loadTrackers } from "$lib/features/trackerState.svelte";
 
 	let { data, children } = $props();
 
-	onMount(() => load().then());
+	onMount(() => {
+		load().then();
+		loadTrackers();
+	});
 </script>
 
 {#if getIsToastOpen()}

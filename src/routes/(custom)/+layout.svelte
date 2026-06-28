@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { updateUserDetails } from '$lib/services/user/userDetails.svelte';
 	import { initAllIconSets } from '$lib/services/uicons.svelte';
+	import { loadTrackers } from '$lib/features/trackerState.svelte';
 	import NavBar from '@/components/custom/NavBar.svelte';
 	import Footer from '@/components/custom/Footer.svelte';
 
@@ -10,6 +11,7 @@
 	onMount(() => {
 		updateUserDetails();
 		initAllIconSets();
+		loadTrackers();
 	});
 </script>
 

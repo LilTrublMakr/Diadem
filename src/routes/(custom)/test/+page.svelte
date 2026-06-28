@@ -272,9 +272,9 @@
 						<div class="flex flex-col items-center justify-center gap-1 px-1 self-center">
 							<div class="text-zinc-400 dark:text-zinc-600 text-lg leading-none">›</div>
 							<div class="flex flex-col items-center gap-0.5 text-center">
-								<span class="text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{item.arrow.candy} candy</span>
-								{#if item.arrow.req}
-									<span class="text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap max-w-20 leading-tight">{item.arrow.req}</span>
+								<span class="text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{item.arrow!.candy} candy</span>
+								{#if item.arrow!.req}
+									<span class="text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap max-w-20 leading-tight">{item.arrow!.req}</span>
 								{/if}
 							</div>
 						</div>

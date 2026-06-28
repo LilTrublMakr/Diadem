@@ -53,6 +53,10 @@ export interface ScoutStats {
 	[key: string]: unknown;
 }
 
+export interface AccountStats {
+	[key: string]: unknown;
+}
+
 function fetchWithTimeout(url: URL, headers: HeadersInit, timeoutMs = 10000): Promise<Response> {
 	return fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
 }

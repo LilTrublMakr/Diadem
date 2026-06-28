@@ -2,9 +2,11 @@ import {
 	boolean,
 	datetime,
 	index,
+	int,
 	json,
 	mysqlTable,
 	text,
+	timestamp,
 	uniqueIndex,
 	varchar
 } from "drizzle-orm/mysql-core";
@@ -95,3 +97,25 @@ export const verification = mysqlTable(
 );
 
 export type User = typeof user.$inferSelect;
+
+export const pokemonTracker = mysqlTable(
+	"pokemon_tracker",
+	{
+		id: int("id").autoincrement().primaryKey(),
+		userId: varchar("user_id", { length: 255 })
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		pokemonId: int("pokemon_id").notNull(),
+		shiny: boolean("shiny").default(false).notNull(),
+		hundo: boolean("hundo").default(false).notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
+	},
+	(table) => ({
+		userPokemonUnique: uniqueIndex("pokemon_tracker_user_pokemon_unique").on(
+			table.userId,
+			table.pokemonId
+		)
+	})
+);
+
+export type PokemonTracker = typeof pokemonTracker.$inferSelect;

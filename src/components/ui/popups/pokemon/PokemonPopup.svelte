@@ -63,6 +63,7 @@
 	import { isPointInAllowedArea } from "@/lib/services/user/checkPerm";
 	import { getUserDetails } from "@/lib/services/user/userDetails.svelte";
 	import { Features } from "@/lib/utils/features";
+	import { getTrackers, setTrackerEntry } from "$lib/features/trackerState.svelte";
 
 	let data: PokemonData = $derived(
 		(getMapObjects()[getCurrentSelectedMapId()] as PokemonData) ??
@@ -95,6 +96,26 @@
 	let maxLittleRank = $derived(getMaxPvpRank("pvpRankLittle", getUserSettings().filters.pokemon));
 	let maxGreatRank = $derived(getMaxPvpRank("pvpRankGreat", getUserSettings().filters.pokemon));
 	let maxUltraRank = $derived(getMaxPvpRank("pvpRankUltra", getUserSettings().filters.pokemon));
+
+	let tracker = $derived(getTrackers()[data?.pokemon_id] ?? { shiny: false, hundo: false });
+	let loggedIn = $derived(!!getUserDetails().details);
+
+	async function toggleTracker(pokemonId: number, field: 'shiny' | 'hundo') {
+		const prev = getTrackers()[pokemonId] ?? { shiny: false, hundo: false };
+		const newVal = !prev[field];
+		setTrackerEntry(pokemonId, { [field]: newVal });
+		try {
+			const res = await fetch(`/api/custom/tracker/${pokemonId}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ [field]: newVal })
+			});
+			if (res.ok) setTrackerEntry(pokemonId, await res.json());
+			else setTrackerEntry(pokemonId, prev);
+		} catch {
+			setTrackerEntry(pokemonId, prev);
+		}
+	}
 </script>
 
 {#snippet timer()}
@@ -236,6 +257,24 @@
 				{/if}
 			</span>
 		</p>
+		{#if loggedIn}
+			<div class="flex gap-1.5 mt-1">
+				<button
+					class="text-[11px] px-2 py-0.5 rounded border transition-colors cursor-pointer {tracker.shiny
+						? 'bg-yellow-400/20 border-yellow-400/60 text-yellow-600 dark:text-yellow-400'
+						: 'border-border text-muted-foreground hover:border-yellow-400/60 hover:text-yellow-600 dark:hover:text-yellow-400'}"
+					onclick={() => toggleTracker(data.pokemon_id, 'shiny')}
+					title="Toggle shiny caught"
+				>✨</button>
+				<button
+					class="text-[11px] px-2 py-0.5 rounded border transition-colors cursor-pointer {tracker.hundo
+						? 'bg-indigo-400/20 border-indigo-400/60 text-indigo-600 dark:text-indigo-400'
+						: 'border-border text-muted-foreground hover:border-indigo-400/60 hover:text-indigo-600 dark:hover:text-indigo-400'}"
+					onclick={() => toggleTracker(data.pokemon_id, 'hundo')}
+					title="Toggle 100% IV caught"
+				>💯</button>
+			</div>
+		{/if}
 	{/snippet}
 
 	{#snippet description()}
