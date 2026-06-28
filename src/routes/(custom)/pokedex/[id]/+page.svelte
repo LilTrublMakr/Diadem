@@ -53,11 +53,11 @@
 	let showShadow = $state(false);
 
 	let loggedIn = $derived(!!getUserDetails().details);
-	let trackerData = $derived(getTrackers()[pokemonId] ?? { shiny: false, hundo: false });
+	let trackerData = $derived(getTrackers()[pokemonId] ?? { shiny: false, hundo: false, nundo: false, shundo: false });
 	let trackerSaving = $state(false);
 
-	async function toggleTracker(field: 'shiny' | 'hundo', value: boolean) {
-		const prev = getTrackers()[pokemonId] ?? { shiny: false, hundo: false };
+	async function toggleTracker(field: 'shiny' | 'hundo' | 'nundo' | 'shundo', value: boolean) {
+		const prev = getTrackers()[pokemonId] ?? { shiny: false, hundo: false, nundo: false, shundo: false };
 		setTrackerEntry(pokemonId, { [field]: value });
 		trackerSaving = true;
 		try {
@@ -184,6 +184,24 @@
 			});
 		} catch { return ''; }
 	}
+
+	function pogoHeroUrl(id: number, form: number): string {
+		const paddedId = String(id).padStart(3, '0');
+		const paddedForm = String(form).padStart(2, '0');
+		return `https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_${paddedId}_${paddedForm}.png`;
+	}
+
+	let heroImgFailed = $state(false);
+	let heroSrc = $derived(
+		showShadow || heroImgFailed
+			? sprite(activeForm, showShadow)
+			: pogoHeroUrl(pokemonId, activeForm)
+	);
+
+	$effect(() => {
+		pokemonId; activeForm;
+		heroImgFailed = false;
+	});
 
 	// --- Top card derived stats (fixed periods for overview) ---
 	let lastSeen = $derived.by(() => {
@@ -391,10 +409,12 @@
 			</div>
 
 			<!-- Body: image + stats -->
-			<div class="flex items-center gap-6">
-				<!-- Left: sprite + type pills (33%) -->
-				<div class="flex flex-col items-center justify-center gap-3" style="width:33%; flex-shrink:0;">
-					<TrackedPokemonImg pokemonId={pokemonId} src={sprite(activeForm, showShadow)} alt={activePokemon?.name ?? ''} class="w-40 h-40 object-contain" />
+			<div class="flex items-start gap-6">
+				<!-- Left: sprite + type pills -->
+				<div class="flex flex-col items-center justify-start gap-3 flex-shrink-0">
+					<div class="flex items-center justify-center">
+						<TrackedPokemonImg pokemonId={pokemonId} src={heroSrc} alt={activePokemon?.name ?? ''} class="max-w-48 object-contain" badgeClass="text-2xl" onerror={() => { heroImgFailed = true; }} />
+					</div>
 					<button
 						onclick={() => (showShadow = !showShadow)}
 						class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors {showShadow
@@ -431,6 +451,41 @@
 					</div>
 				</div>
 
+				<!-- My Collection: tracker pills -->
+				{#if loggedIn}
+				<div class="flex-shrink-0 self-stretch rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-3 py-3 flex flex-col gap-2 items-start">
+					<div class="text-xs font-medium text-zinc-500 dark:text-zinc-400">My Collection</div>
+					<button
+						class="w-full text-xs px-2 py-1.5 rounded border transition-colors cursor-pointer disabled:opacity-50 {trackerData.shundo
+							? 'bg-amber-400/20 border-amber-400/60 text-amber-600 dark:text-amber-400'
+							: 'border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:border-amber-400/60 hover:text-amber-600 dark:hover:text-amber-400'}"
+						onclick={() => toggleTracker('shundo', !trackerData.shundo)}
+						disabled={trackerSaving}
+					>🌟 Have shundo</button>
+					<button
+						class="w-full text-xs px-2 py-1.5 rounded border transition-colors cursor-pointer disabled:opacity-50 {trackerData.hundo
+							? 'bg-indigo-400/20 border-indigo-400/60 text-indigo-600 dark:text-indigo-400'
+							: 'border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:border-indigo-400/60 hover:text-indigo-600 dark:hover:text-indigo-400'}"
+						onclick={() => toggleTracker('hundo', !trackerData.hundo)}
+						disabled={trackerSaving}
+					>💯 Have hundo</button>
+					<button
+						class="w-full text-xs px-2 py-1.5 rounded border transition-colors cursor-pointer disabled:opacity-50 {trackerData.shiny
+							? 'bg-yellow-400/20 border-yellow-400/60 text-yellow-600 dark:text-yellow-400'
+							: 'border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:border-yellow-400/60 hover:text-yellow-600 dark:hover:text-yellow-400'}"
+						onclick={() => toggleTracker('shiny', !trackerData.shiny)}
+						disabled={trackerSaving}
+					>✨ Have shiny</button>
+					<button
+						class="w-full text-xs px-2 py-1.5 rounded border transition-colors cursor-pointer disabled:opacity-50 {trackerData.nundo
+							? 'bg-red-400/20 border-red-400/60 text-red-600 dark:text-red-400'
+							: 'border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:border-red-400/60 hover:text-red-600 dark:hover:text-red-400'}"
+						onclick={() => toggleTracker('nundo', !trackerData.nundo)}
+						disabled={trackerSaving}
+					>0️⃣ Have nundo</button>
+				</div>
+				{/if}
+
 				<!-- Right: 2×2 stat sub-cards -->
 				<div class="flex-1 min-w-0" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
 					<div class="rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-3 py-3">
@@ -465,235 +520,10 @@
 				</div>
 			</div>
 
-			<!-- Base stats -->
-			<div class="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-				<div class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Base Stats</div>
-				{#each [
-					{ label: 'Attack',  val: activePokemon?.baseAtk ?? 0, hex: '#f97316' },
-					{ label: 'Defense', val: activePokemon?.baseDef ?? 0, hex: '#3b82f6' },
-					{ label: 'Stamina', val: activePokemon?.baseSta ?? 0, hex: '#22c55e' },
-				] as stat}
-					<div class="flex items-center gap-3 mb-2">
-						<span class="w-16 text-xs text-zinc-500 dark:text-zinc-400 text-right">{stat.label}</span>
-						<div class="flex-1 bg-zinc-100 dark:bg-zinc-800 rounded-full h-3">
-							<div class="h-3 rounded-full transition-all" style="width:{statPct(stat.val)}%; background-color:{stat.hex}"></div>
-						</div>
-						<span class="w-8 text-xs font-mono text-zinc-700 dark:text-zinc-300 text-right">{stat.val}</span>
-					</div>
-				{/each}
-				<div class="mt-2 flex items-center gap-2">
-					<span class="text-xs text-zinc-500 dark:text-zinc-400">Buddy distance</span>
-					<span class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-						{activePokemon?.buddyDistance ?? pokemon.buddyDistance ?? '?'} km
-					</span>
-				</div>
-			</div>
-
-		</div>
-
-		<!-- Personal tracker -->
-		<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 mb-6">
-			<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">My Collection</h2>
-			{#if loggedIn}
-				<div class="flex items-center gap-6">
-					<label class="flex items-center gap-2 cursor-pointer select-none group">
-						<input
-							type="checkbox"
-							checked={trackerData.shiny}
-							onchange={(e) => toggleTracker('shiny', e.currentTarget.checked)}
-							disabled={trackerSaving}
-							class="w-4 h-4 rounded accent-yellow-400 cursor-pointer"
-						/>
-						<span class="text-sm text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">
-							✨ Got shiny
-						</span>
-					</label>
-					<label class="flex items-center gap-2 cursor-pointer select-none group">
-						<input
-							type="checkbox"
-							checked={trackerData.hundo}
-							onchange={(e) => toggleTracker('hundo', e.currentTarget.checked)}
-							disabled={trackerSaving}
-							class="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
-						/>
-						<span class="text-sm text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">
-							💯 Got hundo
-						</span>
-					</label>
-				</div>
-			{:else}
-				<p class="text-sm text-zinc-400 dark:text-zinc-600">
-					<a href="/login/discord" class="underline hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">Log in</a> to track your collection.
-				</p>
-			{/if}
-		</div>
-
-		<!-- Forms card -->
-		{#if formOptions.length > 1}
-			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 mb-6">
-				<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Forms</h2>
-				<div class="flex flex-wrap gap-3">
-					{#each formOptions as opt}
-						<button
-							onclick={() => (activeForm = opt.form)}
-							class="flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors {activeForm === opt.form
-								? 'bg-zinc-900 dark:bg-zinc-100'
-								: 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700'}"
-						>
-							<TrackedPokemonImg pokemonId={pokemonId} src={sprite(opt.form)} alt={opt.label} class="w-14 h-14 object-contain" />
-							<span class="text-xs font-medium {activeForm === opt.form ? 'text-white dark:text-zinc-900' : 'text-zinc-600 dark:text-zinc-400'}">
-								{opt.label}
-							</span>
-						</button>
-					{/each}
-				</div>
-			</div>
-		{/if}
-
-		{#snippet evoCardSnip(id: number)}
-			{@const isCurrent = id === pokemonId}
-			<a
-				href="/pokedex/{id}"
-				style="
-					min-width:72px; text-decoration:none;
-					display:flex; flex-direction:column; align-items:center; gap:0.25rem; padding:0.5rem;
-					border-radius:0.5rem;
-					background:{isCurrent ? (isDark ? '#f4f4f5' : '#18181b') : (isDark ? '#27272a' : '#f4f4f5')};
-					border:1px solid {isCurrent ? (isDark ? '#d4d4d8' : '#27272a') : (isDark ? '#3f3f46' : '#e4e4e7')};
-				"
-			>
-				<TrackedPokemonImg pokemonId={id} src={evoSprite(id)} class="w-12 h-12 object-contain" />
-				<span style="font-size:0.75rem; font-weight:500; text-align:center; line-height:1.25; color:{isCurrent ? (isDark ? '#18181b' : '#ffffff') : (isDark ? '#d4d4d8' : '#3f3f46')};">
-					{getMasterPokemon(id)?.name ?? `#${id}`}
-				</span>
-			</a>
-		{/snippet}
-
-		{#snippet evoNode(node: EvoTreeNode)}
-			{#if node.children.length === 0}
-				{@render evoCardSnip(node.id)}
-			{:else if node.children.length === 1}
-				{@const child = node.children[0]}
-				<div style="display:flex; align-items:center;">
-					{@render evoCardSnip(node.id)}
-					<div style="display:flex; flex-direction:column; align-items:center; padding:0 0.75rem; min-width:5rem;">
-						<span style="font-size:0.7rem; color:#71717a; text-align:center; margin-bottom:0.25rem; line-height:1.3; white-space:nowrap;">
-							{child.evo ? buildReqLabel(child.evo) : ''}
-						</span>
-						<div style="display:flex; align-items:center; width:100%;">
-							<div style="flex:1; height:2px; background:{connColor};"></div>
-							<div style="width:0; height:0; border-top:4px solid transparent; border-bottom:4px solid transparent; border-left:6px solid {connColor};"></div>
-						</div>
-					</div>
-					{@render evoNode(child)}
-				</div>
-			{:else}
-				<div style="display:flex; flex-direction:column; align-items:center;">
-					{@render evoCardSnip(node.id)}
-					<div style="width:2px; height:16px; background:{connColor};"></div>
-					<div style="display:flex; align-items:flex-start;">
-						{#each node.children as child, i}
-							{@const isFirst = i === 0}
-							{@const isLast = i === node.children.length - 1}
-							<div style="display:flex; flex-direction:column; align-items:center; min-width:7.5rem;">
-								<div style="display:flex; align-self:stretch; height:2px;">
-									<div style="flex:{isFirst ? '1' : '1.03'} 1 0%; background:{isFirst ? 'transparent' : connColor};"></div>
-									<div style="flex:{isLast ? '1' : '1.03'} 1 0%; background:{isLast ? 'transparent' : connColor};"></div>
-								</div>
-								<div style="width:2px; height:10px; background:{connColor};"></div>
-								<div style="min-height:2.5rem; display:flex; align-items:flex-start; justify-content:center; text-align:center; padding:0 0.5rem;">
-									<span style="font-size:0.7rem; color:#71717a; line-height:1.3;">
-										{child.evo ? buildReqLabel(child.evo) : ''}
-									</span>
-								</div>
-								<div style="width:2px; height:8px; background:{connColor};"></div>
-								{@render evoNode(child)}
-							</div>
-						{/each}
-					</div>
-				</div>
-			{/if}
-		{/snippet}
-
-		<!-- Evolution family -->
-		{#if evoTreeRoot}
-			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 mb-6">
-				<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Evolution Family</h2>
-				<div class="overflow-x-auto flex justify-center pb-2">
-					{@render evoNode(evoTreeRoot)}
-				</div>
-			</div>
-		{/if}
-
-		<!-- Mega Boosts -->
-		{#if megaBoostsByType.length > 0}
-			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 mb-6">
-				<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">Mega Boosts</h2>
-				<p class="text-xs text-zinc-400 dark:text-zinc-600 mb-4">Having these Mega or Primal Pokémon active gives extra candy when catching {pokemon.name}.</p>
-
-				{#each megaBoostsByType as group, gi}
-					<div class="{gi < megaBoostsByType.length - 1 ? 'mb-4' : ''}">
-						<div class="flex items-center gap-2 mb-2">
-							<span class="text-white text-xs font-semibold px-2 py-0.5 rounded-full" style="background-color:{TYPE_COLORS[group.typeId] ?? '#9099a1'}">{TYPE_NAMES[group.typeId] ?? group.typeId}</span>
-						</div>
-						<div class="flex flex-wrap gap-2">
-							{#each group.boosts as boost}
-								<a
-									href="/pokedex/{boost.pokemonId}"
-									class="flex flex-col items-center gap-1 p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-									style="min-width:4.5rem; max-width:6rem; text-decoration:none;"
-								>
-									<TrackedPokemonImg pokemonId={boost.pokemonId} src={megaSprite(boost.pokemonId, boost.tempEvoId)} alt={boost.megaName} class="w-12 h-12 object-contain" />
-									<span class="text-xs text-center leading-tight text-zinc-700 dark:text-zinc-300" style="word-break:break-word;">{boost.megaName}</span>
-									<div class="flex flex-wrap gap-0.5 justify-center">
-										{#each boost.megaTypes as t}
-											<span class="text-white text-xs px-1 py-0.5 rounded" style="font-size:0.65rem; background-color:{TYPE_COLORS[t] ?? '#9099a1'}">{TYPE_NAMES[t] ?? t}</span>
-										{/each}
-									</div>
-								</a>
-							{/each}
-						</div>
-					</div>
-			{/each}
-			</div>
-		{/if}
-
-		<!-- Moves (from masterfile) -->
-		<div class="mb-6" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-			{#each [
-				{ label: 'Quick Moves', moves: activePokemon?.quickMoves ?? [] },
-				{ label: 'Charged Moves', moves: activePokemon?.chargedMoves ?? [] },
-			] as group}
-				<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4">
-					<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">{group.label}</h2>
-					{#if group.moves.length === 0}
-						<p class="text-sm text-zinc-400 dark:text-zinc-600">None</p>
-					{:else}
-						<div class="flex flex-col gap-2">
-							{#each group.moves as move}
-								<div class="flex items-center justify-between gap-2">
-									<div class="flex items-center gap-1.5 min-w-0">
-										<span class="text-sm text-zinc-800 dark:text-zinc-200">{move.name}</span>
-										{#if move.isLegacy}
-											<span class="text-xs text-zinc-400 dark:text-zinc-500">Legacy</span>
-										{/if}
-									</div>
-									<div class="flex items-center gap-2 flex-shrink-0">
-										<span class="text-xs text-zinc-400 dark:text-zinc-600 font-mono">{move.power}</span>
-										<span class="type-badge text-white text-xs px-1.5 py-0.5 rounded" style="background-color:{TYPE_COLORS[move.type] ?? '#9099a1'}">
-											{TYPE_NAMES[move.type] ?? move.type}
-										</span>
-									</div>
-								</div>
-							{/each}
-						</div>
-					{/if}
-				</div>
-			{/each}
 		</div>
 
 		<!-- Scanner stats -->
-		<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+		<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden mb-6">
 			<div class="px-4 pt-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
 				<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Scanner Stats</h2>
 				<div class="flex flex-wrap gap-1">
@@ -833,6 +663,194 @@
 
 				</div>
 			{/if}
+		</div>
+
+		<!-- Forms card -->
+		{#if formOptions.length > 1}
+			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 mb-6">
+				<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Forms</h2>
+				<div class="flex flex-wrap gap-3">
+					{#each formOptions as opt}
+						<button
+							onclick={() => (activeForm = opt.form)}
+							class="flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors {activeForm === opt.form
+								? 'bg-zinc-900 dark:bg-zinc-100'
+								: 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700'}"
+						>
+							<TrackedPokemonImg pokemonId={pokemonId} src={sprite(opt.form)} alt={opt.label} class="w-14 h-14 object-contain" />
+							<span class="text-xs font-medium {activeForm === opt.form ? 'text-white dark:text-zinc-900' : 'text-zinc-600 dark:text-zinc-400'}">
+								{opt.label}
+							</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
+		{#snippet evoCardSnip(id: number)}
+			{@const isCurrent = id === pokemonId}
+			<a
+				href="/pokedex/{id}"
+				style="
+					min-width:72px; text-decoration:none;
+					display:flex; flex-direction:column; align-items:center; gap:0.25rem; padding:0.5rem;
+					border-radius:0.5rem;
+					background:{isCurrent ? (isDark ? '#f4f4f5' : '#18181b') : (isDark ? '#27272a' : '#f4f4f5')};
+					border:1px solid {isCurrent ? (isDark ? '#d4d4d8' : '#27272a') : (isDark ? '#3f3f46' : '#e4e4e7')};
+				"
+			>
+				<TrackedPokemonImg pokemonId={id} src={evoSprite(id)} class="w-12 h-12 object-contain" />
+				<span style="font-size:0.75rem; font-weight:500; text-align:center; line-height:1.25; color:{isCurrent ? (isDark ? '#18181b' : '#ffffff') : (isDark ? '#d4d4d8' : '#3f3f46')};">
+					{getMasterPokemon(id)?.name ?? `#${id}`}
+				</span>
+			</a>
+		{/snippet}
+
+		{#snippet evoNode(node: EvoTreeNode)}
+			{#if node.children.length === 0}
+				{@render evoCardSnip(node.id)}
+			{:else if node.children.length === 1}
+				{@const child = node.children[0]}
+				<div style="display:flex; align-items:center;">
+					{@render evoCardSnip(node.id)}
+					<div style="display:flex; flex-direction:column; align-items:center; padding:0 0.75rem; min-width:5rem;">
+						<span style="font-size:0.7rem; color:#71717a; text-align:center; margin-bottom:0.25rem; line-height:1.3; white-space:nowrap;">
+							{child.evo ? buildReqLabel(child.evo) : ''}
+						</span>
+						<div style="display:flex; align-items:center; width:100%;">
+							<div style="flex:1; height:2px; background:{connColor};"></div>
+							<div style="width:0; height:0; border-top:4px solid transparent; border-bottom:4px solid transparent; border-left:6px solid {connColor};"></div>
+						</div>
+					</div>
+					{@render evoNode(child)}
+				</div>
+			{:else}
+				<div style="display:flex; flex-direction:column; align-items:center;">
+					{@render evoCardSnip(node.id)}
+					<div style="width:2px; height:16px; background:{connColor};"></div>
+					<div style="display:flex; align-items:flex-start;">
+						{#each node.children as child, i}
+							{@const isFirst = i === 0}
+							{@const isLast = i === node.children.length - 1}
+							<div style="display:flex; flex-direction:column; align-items:center; min-width:7.5rem;">
+								<div style="display:flex; align-self:stretch; height:2px;">
+									<div style="flex:{isFirst ? '1' : '1.03'} 1 0%; background:{isFirst ? 'transparent' : connColor};"></div>
+									<div style="flex:{isLast ? '1' : '1.03'} 1 0%; background:{isLast ? 'transparent' : connColor};"></div>
+								</div>
+								<div style="width:2px; height:10px; background:{connColor};"></div>
+								<div style="min-height:2.5rem; display:flex; align-items:flex-start; justify-content:center; text-align:center; padding:0 0.5rem;">
+									<span style="font-size:0.7rem; color:#71717a; line-height:1.3;">
+										{child.evo ? buildReqLabel(child.evo) : ''}
+									</span>
+								</div>
+								<div style="width:2px; height:8px; background:{connColor};"></div>
+								{@render evoNode(child)}
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+		{/snippet}
+
+		<!-- Evolution family -->
+		{#if evoTreeRoot}
+			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 mb-6">
+				<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Evolution Family</h2>
+				<div class="overflow-x-auto flex justify-center pb-2">
+					{@render evoNode(evoTreeRoot)}
+				</div>
+			</div>
+		{/if}
+
+		<!-- Mega Boosts -->
+		{#if megaBoostsByType.length > 0}
+			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 mb-6">
+				<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">Mega Boosts</h2>
+				<p class="text-xs text-zinc-400 dark:text-zinc-600 mb-4">Having these Mega or Primal Pokémon active gives extra candy when catching {pokemon.name}.</p>
+
+				{#each megaBoostsByType as group, gi}
+					<div class="{gi < megaBoostsByType.length - 1 ? 'mb-4' : ''}">
+						<div class="flex items-center gap-2 mb-2">
+							<span class="text-white text-xs font-semibold px-2 py-0.5 rounded-full" style="background-color:{TYPE_COLORS[group.typeId] ?? '#9099a1'}">{TYPE_NAMES[group.typeId] ?? group.typeId}</span>
+						</div>
+						<div class="flex flex-wrap gap-2">
+							{#each group.boosts as boost}
+								<a
+									href="/pokedex/{boost.pokemonId}"
+									class="flex flex-col items-center gap-1 p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+									style="min-width:4.5rem; max-width:6rem; text-decoration:none;"
+								>
+									<TrackedPokemonImg pokemonId={boost.pokemonId} src={megaSprite(boost.pokemonId, boost.tempEvoId)} alt={boost.megaName} class="w-12 h-12 object-contain" />
+									<span class="text-xs text-center leading-tight text-zinc-700 dark:text-zinc-300" style="word-break:break-word;">{boost.megaName}</span>
+									<div class="flex flex-wrap gap-0.5 justify-center">
+										{#each boost.megaTypes as t}
+											<span class="text-white text-xs px-1 py-0.5 rounded" style="font-size:0.65rem; background-color:{TYPE_COLORS[t] ?? '#9099a1'}">{TYPE_NAMES[t] ?? t}</span>
+										{/each}
+									</div>
+								</a>
+							{/each}
+						</div>
+					</div>
+			{/each}
+			</div>
+		{/if}
+
+		<!-- Base stats + Moves (3-column) -->
+		<div class="mb-6" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
+			<!-- Base stats -->
+			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4">
+				<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Base Stats</h2>
+				{#each [
+					{ label: 'Attack',  val: activePokemon?.baseAtk ?? 0, hex: '#f97316' },
+					{ label: 'Defense', val: activePokemon?.baseDef ?? 0, hex: '#3b82f6' },
+					{ label: 'Stamina', val: activePokemon?.baseSta ?? 0, hex: '#22c55e' },
+				] as stat}
+					<div class="flex items-center gap-3 mb-2">
+						<span class="w-16 text-xs text-zinc-500 dark:text-zinc-400 text-right">{stat.label}</span>
+						<div class="flex-1 bg-zinc-100 dark:bg-zinc-800 rounded-full h-3">
+							<div class="h-3 rounded-full transition-all" style="width:{statPct(stat.val)}%; background-color:{stat.hex}"></div>
+						</div>
+						<span class="w-8 text-xs font-mono text-zinc-700 dark:text-zinc-300 text-right">{stat.val}</span>
+					</div>
+				{/each}
+				<div class="mt-2 flex items-center gap-2">
+					<span class="text-xs text-zinc-500 dark:text-zinc-400">Buddy distance</span>
+					<span class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+						{activePokemon?.buddyDistance ?? pokemon.buddyDistance ?? '?'} km
+					</span>
+				</div>
+			</div>
+			<!-- Quick Moves + Charged Moves -->
+			{#each [
+				{ label: 'Quick Moves', moves: activePokemon?.quickMoves ?? [] },
+				{ label: 'Charged Moves', moves: activePokemon?.chargedMoves ?? [] },
+			] as group}
+				<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4">
+					<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">{group.label}</h2>
+					{#if group.moves.length === 0}
+						<p class="text-sm text-zinc-400 dark:text-zinc-600">None</p>
+					{:else}
+						<div class="flex flex-col gap-2">
+							{#each group.moves as move}
+								<div class="flex items-center justify-between gap-2">
+									<div class="flex items-center gap-1.5 min-w-0">
+										<span class="text-sm text-zinc-800 dark:text-zinc-200">{move.name}</span>
+										{#if move.isLegacy}
+											<span class="text-xs text-zinc-400 dark:text-zinc-500">Legacy</span>
+										{/if}
+									</div>
+									<div class="flex items-center gap-2 flex-shrink-0">
+										<span class="text-xs text-zinc-400 dark:text-zinc-600 font-mono">{move.power}</span>
+										<span class="type-badge text-white text-xs px-1.5 py-0.5 rounded" style="background-color:{TYPE_COLORS[move.type] ?? '#9099a1'}">
+											{TYPE_NAMES[move.type] ?? move.type}
+										</span>
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/each}
 		</div>
 		<p class="text-xs text-zinc-400 dark:text-zinc-600 mt-3">Stats updated every 5 minutes. Moves from game data.</p>
 

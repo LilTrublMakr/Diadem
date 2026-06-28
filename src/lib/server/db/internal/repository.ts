@@ -35,11 +35,11 @@ export async function getAllTrackers(userId: string) {
 export async function upsertTracker(
 	userId: string,
 	pokemonId: number,
-	data: { shiny?: boolean; hundo?: boolean }
+	data: { shiny?: boolean; hundo?: boolean; nundo?: boolean; shundo?: boolean }
 ) {
 	await db
 		.insert(table.pokemonTracker)
-		.values({ userId, pokemonId, shiny: data.shiny ?? false, hundo: data.hundo ?? false })
+		.values({ userId, pokemonId, shiny: data.shiny ?? false, hundo: data.hundo ?? false, nundo: data.nundo ?? false, shundo: data.shundo ?? false })
 		.onDuplicateKeyUpdate({ set: data });
 	return getTracker(userId, pokemonId);
 }

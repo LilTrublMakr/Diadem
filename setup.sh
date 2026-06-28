@@ -64,7 +64,13 @@ ensure_linked_file \
   "config/Home.svelte" \
   "config/Home.example.svelte"
 
+if [ "${DIADEM_ENV}" = "dev" ] || [ "$1" = "--dev" ]; then
+  ACTIVE_CONFIG="config/config.dev.toml"
+else
+  ACTIVE_CONFIG="config/config.toml"
+fi
+
 ensure_linked_file \
   "src/lib/server/config.toml" \
-  "config/config.toml" \
+  "${ACTIVE_CONFIG}" \
   "config/config.example.toml"

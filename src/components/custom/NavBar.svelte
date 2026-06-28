@@ -4,6 +4,7 @@
 	import { getUserSettings } from '$lib/services/userSettings.svelte';
 	import { setThemeMode } from '$lib/services/themeMode';
 	import { Sun, Moon, Menu, X, ChevronDown } from 'lucide-svelte';
+	import PokedexSearch from './PokedexSearch.svelte';
 
 	const navLinks = [
 		{ href: '/map', label: 'Map' },
@@ -58,6 +59,7 @@
 					{link.label}
 				</a>
 			{/each}
+			<PokedexSearch />
 			<span class="w-px h-4 bg-zinc-200 dark:bg-zinc-800"></span>
 			<button
 				onclick={toggleTheme}
@@ -139,6 +141,9 @@
 	<!-- Mobile dropdown -->
 	{#if menuOpen}
 		<div class="md:hidden border-t border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-6 py-3 flex flex-col gap-1">
+			<div class="pb-2">
+				<PokedexSearch />
+			</div>
 			{#each navLinks as link}
 				<a
 					href={link.href}

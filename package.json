@@ -4,7 +4,8 @@
 	"type": "module",
 	"packageManager": "pnpm@9.15.9",
 	"scripts": {
-		"dev": "vite dev",
+		"setup:dev": "bash setup.sh --dev",
+		"dev": "pnpm run setup:dev && vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

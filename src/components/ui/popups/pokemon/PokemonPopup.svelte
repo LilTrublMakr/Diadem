@@ -97,11 +97,11 @@
 	let maxGreatRank = $derived(getMaxPvpRank("pvpRankGreat", getUserSettings().filters.pokemon));
 	let maxUltraRank = $derived(getMaxPvpRank("pvpRankUltra", getUserSettings().filters.pokemon));
 
-	let tracker = $derived(getTrackers()[data?.pokemon_id] ?? { shiny: false, hundo: false });
+	let tracker = $derived(getTrackers()[data?.pokemon_id] ?? { shiny: false, hundo: false, nundo: false, shundo: false });
 	let loggedIn = $derived(!!getUserDetails().details);
 
-	async function toggleTracker(pokemonId: number, field: 'shiny' | 'hundo') {
-		const prev = getTrackers()[pokemonId] ?? { shiny: false, hundo: false };
+	async function toggleTracker(pokemonId: number, field: 'shiny' | 'hundo' | 'nundo' | 'shundo') {
+		const prev = getTrackers()[pokemonId] ?? { shiny: false, hundo: false, nundo: false, shundo: false };
 		const newVal = !prev[field];
 		setTrackerEntry(pokemonId, { [field]: newVal });
 		try {
@@ -258,7 +258,21 @@
 			</span>
 		</p>
 		{#if loggedIn}
-			<div class="flex gap-1.5 mt-1">
+			<div class="flex gap-1.5 mt-1 flex-wrap">
+				<button
+					class="text-[11px] px-2 py-0.5 rounded border transition-colors cursor-pointer {tracker.shundo
+						? 'bg-amber-400/20 border-amber-400/60 text-amber-600 dark:text-amber-400'
+						: 'border-border text-muted-foreground hover:border-amber-400/60 hover:text-amber-600 dark:hover:text-amber-400'}"
+					onclick={() => toggleTracker(data.pokemon_id, 'shundo')}
+					title="Toggle shiny 100% IV caught"
+				>🌟</button>
+				<button
+					class="text-[11px] px-2 py-0.5 rounded border transition-colors cursor-pointer {tracker.hundo
+						? 'bg-indigo-400/20 border-indigo-400/60 text-indigo-600 dark:text-indigo-400'
+						: 'border-border text-muted-foreground hover:border-indigo-400/60 hover:text-indigo-600 dark:hover:text-indigo-400'}"
+					onclick={() => toggleTracker(data.pokemon_id, 'hundo')}
+					title="Toggle 100% IV caught"
+				>💯</button>
 				<button
 					class="text-[11px] px-2 py-0.5 rounded border transition-colors cursor-pointer {tracker.shiny
 						? 'bg-yellow-400/20 border-yellow-400/60 text-yellow-600 dark:text-yellow-400'
@@ -267,12 +281,12 @@
 					title="Toggle shiny caught"
 				>✨</button>
 				<button
-					class="text-[11px] px-2 py-0.5 rounded border transition-colors cursor-pointer {tracker.hundo
-						? 'bg-indigo-400/20 border-indigo-400/60 text-indigo-600 dark:text-indigo-400'
-						: 'border-border text-muted-foreground hover:border-indigo-400/60 hover:text-indigo-600 dark:hover:text-indigo-400'}"
-					onclick={() => toggleTracker(data.pokemon_id, 'hundo')}
-					title="Toggle 100% IV caught"
-				>💯</button>
+					class="text-[11px] px-2 py-0.5 rounded border transition-colors cursor-pointer {tracker.nundo
+						? 'bg-red-400/20 border-red-400/60 text-red-600 dark:text-red-400'
+						: 'border-border text-muted-foreground hover:border-red-400/60 hover:text-red-600 dark:hover:text-red-400'}"
+					onclick={() => toggleTracker(data.pokemon_id, 'nundo')}
+					title="Toggle 0% IV caught"
+				>0️⃣</button>
 			</div>
 		{/if}
 	{/snippet}

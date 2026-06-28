@@ -24,6 +24,18 @@
 			.map(([id, v]) => ({ pokemonId: parseInt(id), ...v }))
 			.sort((a, b) => a.pokemonId - b.pokemonId)
 	);
+	let nundos = $derived(
+		Object.entries(getTrackers())
+			.filter(([, v]) => v.nundo)
+			.map(([id, v]) => ({ pokemonId: parseInt(id), ...v }))
+			.sort((a, b) => a.pokemonId - b.pokemonId)
+	);
+	let shundos = $derived(
+		Object.entries(getTrackers())
+			.filter(([, v]) => v.shundo)
+			.map(([id, v]) => ({ pokemonId: parseInt(id), ...v }))
+			.sort((a, b) => a.pokemonId - b.pokemonId)
+	);
 
 	onMount(() => {
 		Promise.all([loadMasterFile(), initAllIconSets()]).then(() => {
@@ -31,8 +43,8 @@
 		});
 	});
 
-	async function toggleTracker(pokemonId: number, field: 'shiny' | 'hundo', value: boolean) {
-		const prev = getTrackers()[pokemonId] ?? { shiny: false, hundo: false };
+	async function toggleTracker(pokemonId: number, field: 'shiny' | 'hundo' | 'nundo' | 'shundo', value: boolean) {
+		const prev = getTrackers()[pokemonId] ?? { shiny: false, hundo: false, nundo: false, shundo: false };
 		setTrackerEntry(pokemonId, { [field]: value });
 		saving = new Set([...saving, pokemonId]);
 		try {
@@ -79,7 +91,7 @@
 	{:else if !ready || !trackerLoaded}
 		<div class="text-center text-zinc-400 py-16">Loading…</div>
 	{:else}
-		{#if shinies.length === 0 && hundos.length === 0}
+		{#if shinies.length === 0 && hundos.length === 0 && nundos.length === 0 && shundos.length === 0}
 			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 text-center">
 				<p class="text-zinc-500 dark:text-zinc-400">No Pokémon tracked yet.</p>
 				<p class="text-sm text-zinc-400 dark:text-zinc-600 mt-1">
@@ -88,16 +100,16 @@
 			</div>
 		{/if}
 
-		<!-- Shinies -->
-		{#if shinies.length > 0}
+		<!-- Shundos -->
+		{#if shundos.length > 0}
 			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden mb-6">
 				<div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
-					<span class="text-lg">✨</span>
-					<h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Shinies</h2>
-					<span class="ml-auto text-xs text-zinc-400 dark:text-zinc-600">{shinies.length}</span>
+					<span class="text-lg">🌟</span>
+					<h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Shundos</h2>
+					<span class="ml-auto text-xs text-zinc-400 dark:text-zinc-600">{shundos.length}</span>
 				</div>
 				<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
-					{#each shinies as row}
+					{#each shundos as row}
 						{@const poke = getMasterPokemon(row.pokemonId)}
 						<div class="flex items-center gap-3 px-5 py-3">
 							<TrackedPokemonImg pokemonId={row.pokemonId} src={sprite(row.pokemonId)} class="w-10 h-10 object-contain" />
@@ -112,22 +124,12 @@
 								<label class="flex items-center gap-1.5 cursor-pointer select-none">
 									<input
 										type="checkbox"
-										checked={row.shiny}
-										onchange={(e) => toggleTracker(row.pokemonId, 'shiny', e.currentTarget.checked)}
+										checked={row.shundo}
+										onchange={(e) => toggleTracker(row.pokemonId, 'shundo', e.currentTarget.checked)}
 										disabled={saving.has(row.pokemonId)}
-										class="w-4 h-4 rounded accent-yellow-400 cursor-pointer"
+										class="w-4 h-4 rounded accent-amber-400 cursor-pointer"
 									/>
-									<span class="text-xs text-zinc-500 dark:text-zinc-400">Shiny</span>
-								</label>
-								<label class="flex items-center gap-1.5 cursor-pointer select-none">
-									<input
-										type="checkbox"
-										checked={row.hundo}
-										onchange={(e) => toggleTracker(row.pokemonId, 'hundo', e.currentTarget.checked)}
-										disabled={saving.has(row.pokemonId)}
-										class="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
-									/>
-									<span class="text-xs text-zinc-500 dark:text-zinc-400">Hundo</span>
+									<span class="text-xs text-zinc-500 dark:text-zinc-400">Shundo</span>
 								</label>
 							</div>
 						</div>
@@ -183,5 +185,92 @@
 				</div>
 			</div>
 		{/if}
+
+		<!-- Shinies -->
+		{#if shinies.length > 0}
+			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden mb-6">
+				<div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
+					<span class="text-lg">✨</span>
+					<h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Shinies</h2>
+					<span class="ml-auto text-xs text-zinc-400 dark:text-zinc-600">{shinies.length}</span>
+				</div>
+				<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
+					{#each shinies as row}
+						{@const poke = getMasterPokemon(row.pokemonId)}
+						<div class="flex items-center gap-3 px-5 py-3">
+							<TrackedPokemonImg pokemonId={row.pokemonId} src={sprite(row.pokemonId)} class="w-10 h-10 object-contain" />
+							<a
+								href="/pokedex/{row.pokemonId}"
+								class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+							>
+								{poke?.name ?? `#${row.pokemonId}`}
+								<span class="ml-1 text-xs text-zinc-400 dark:text-zinc-600">#{String(row.pokemonId).padStart(4, '0')}</span>
+							</a>
+							<div class="flex items-center gap-4 flex-shrink-0">
+								<label class="flex items-center gap-1.5 cursor-pointer select-none">
+									<input
+										type="checkbox"
+										checked={row.shiny}
+										onchange={(e) => toggleTracker(row.pokemonId, 'shiny', e.currentTarget.checked)}
+										disabled={saving.has(row.pokemonId)}
+										class="w-4 h-4 rounded accent-yellow-400 cursor-pointer"
+									/>
+									<span class="text-xs text-zinc-500 dark:text-zinc-400">Shiny</span>
+								</label>
+								<label class="flex items-center gap-1.5 cursor-pointer select-none">
+									<input
+										type="checkbox"
+										checked={row.hundo}
+										onchange={(e) => toggleTracker(row.pokemonId, 'hundo', e.currentTarget.checked)}
+										disabled={saving.has(row.pokemonId)}
+										class="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
+									/>
+									<span class="text-xs text-zinc-500 dark:text-zinc-400">Hundo</span>
+								</label>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
+		<!-- Nundos -->
+		{#if nundos.length > 0}
+			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden mb-6">
+				<div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
+					<span class="text-lg">0️⃣</span>
+					<h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Nundos</h2>
+					<span class="ml-auto text-xs text-zinc-400 dark:text-zinc-600">{nundos.length}</span>
+				</div>
+				<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
+					{#each nundos as row}
+						{@const poke = getMasterPokemon(row.pokemonId)}
+						<div class="flex items-center gap-3 px-5 py-3">
+							<TrackedPokemonImg pokemonId={row.pokemonId} src={sprite(row.pokemonId)} class="w-10 h-10 object-contain" />
+							<a
+								href="/pokedex/{row.pokemonId}"
+								class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+							>
+								{poke?.name ?? `#${row.pokemonId}`}
+								<span class="ml-1 text-xs text-zinc-400 dark:text-zinc-600">#{String(row.pokemonId).padStart(4, '0')}</span>
+							</a>
+							<div class="flex items-center gap-4 flex-shrink-0">
+								<label class="flex items-center gap-1.5 cursor-pointer select-none">
+									<input
+										type="checkbox"
+										checked={row.nundo}
+										onchange={(e) => toggleTracker(row.pokemonId, 'nundo', e.currentTarget.checked)}
+										disabled={saving.has(row.pokemonId)}
+										class="w-4 h-4 rounded accent-red-500 cursor-pointer"
+									/>
+									<span class="text-xs text-zinc-500 dark:text-zinc-400">Nundo</span>
+								</label>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 	{/if}
 </div>
