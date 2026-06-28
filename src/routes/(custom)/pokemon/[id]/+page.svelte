@@ -757,11 +757,12 @@
 						{#if sizeRows.length > 0}
 							{@const sizeTotal = sizeRows.reduce((s, r) => s + Number(r.count), 0)}
 							<div>
-								<h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">Size Distribution</h3>
-								<div class="flex gap-1 items-end h-10">
+								<h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Size Distribution</h3>
+								<div class="flex gap-1 items-end">
 									{#each sizeRows as row}
 										{@const pct = sizeTotal > 0 ? Number(row.count) / sizeTotal * 100 : 0}
 										<div class="flex flex-col items-center flex-1 gap-0.5">
+											<span class="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums leading-none">{pct.toFixed(1)}% · {Number(row.count).toLocaleString()}</span>
 											<div class="w-full bg-zinc-200 dark:bg-zinc-700 rounded-sm flex items-end" style="height:32px">
 												<div class="w-full bg-blue-500 rounded-sm" style="height:{pct}%"></div>
 											</div>

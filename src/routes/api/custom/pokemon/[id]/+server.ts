@@ -22,6 +22,21 @@ function norm<T extends { form: number }>(rows: T[], pokemonId: number): T[] {
 	return rows.map((r) => ({ ...r, form: getNormalizedForm(pokemonId, r.form) }));
 }
 
+function normAndAggregate<T extends { form: number }>(
+	rows: T[],
+	pokemonId: number,
+	groupKey: (r: T) => string,
+	merge: (a: T, b: T) => T
+): T[] {
+	const map = new Map<string, T>();
+	for (const r of norm(rows, pokemonId)) {
+		const k = groupKey(r);
+		const existing = map.get(k);
+		map.set(k, existing ? merge(existing, r) : r);
+	}
+	return [...map.values()];
+}
+
 export const GET: RequestHandler = async ({ params }) => {
 	const pokemonId = parseInt(params.id);
 	if (isNaN(pokemonId) || pokemonId < 1 || pokemonId > 9999) throw error(400, 'Invalid pokemon ID');
@@ -59,11 +74,32 @@ export const GET: RequestHandler = async ({ params }) => {
 		]);
 
 		return json({
-			summary:    norm(summary,    pokemonId),
-			ivDist:     norm(ivDist,     pokemonId),
-			moveStats:  norm(moveStats,  pokemonId),
-			sizeStats:  norm(sizeStats,  pokemonId),
-			genderStats: norm(genderStats, pokemonId),
+			summary: normAndAggregate(summary, pokemonId,
+				r => `${r.form}-${r.time_slot}`,
+				(a, b) => ({
+					...a,
+					total_count: (Number(a.total_count) + Number(b.total_count)).toString(),
+					shiny_count: (Number(a.shiny_count) + Number(b.shiny_count)).toString(),
+					event_count: (Number(a.event_count) + Number(b.event_count)).toString(),
+					ditto_count: (Number(a.ditto_count) + Number(b.ditto_count)).toString(),
+				})
+			),
+			ivDist: normAndAggregate(ivDist, pokemonId,
+				r => `${r.form}-${r.time_slot}-${r.iv}`,
+				(a, b) => ({ ...a, count: (Number(a.count) + Number(b.count)).toString() })
+			),
+			moveStats: normAndAggregate(moveStats, pokemonId,
+				r => `${r.form}-${r.time_slot}-${r.move_1}-${r.move_2}`,
+				(a, b) => ({ ...a, count: (Number(a.count) + Number(b.count)).toString() })
+			),
+			sizeStats: normAndAggregate(sizeStats, pokemonId,
+				r => `${r.form}-${r.time_slot}-${r.size}`,
+				(a, b) => ({ ...a, count: (Number(a.count) + Number(b.count)).toString() })
+			),
+			genderStats: normAndAggregate(genderStats, pokemonId,
+				r => `${r.form}-${r.time_slot}-${r.gender}`,
+				(a, b) => ({ ...a, count: (Number(a.count) + Number(b.count)).toString() })
+			),
 		} satisfies PokemonDetailResponse);
 	} catch (e) {
 		console.error(`[pokemon API] Query failed for id=${pokemonId}:`, e);
