@@ -38,7 +38,7 @@ jobs:
           context: .
           target: runtime
           push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/liltrublmakr/pogo-map-vt:latest
+          platforms: linux/arm64
+          tags: ghcr.io/liltrublmakr/diadem:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
