@@ -1,11 +1,18 @@
 import mysql from 'mysql2/promise';
+import {
+	STATS_DB_HOST,
+	STATS_DB_PORT,
+	STATS_DB_USER,
+	STATS_DB_PASSWORD,
+	STATS_DB_NAME
+} from '$env/static/private';
 
 const pool = mysql.createPool({
-	host: process.env.STATS_DB_HOST ?? '127.0.0.1',
-	port: Number(process.env.STATS_DB_PORT ?? 3306),
-	user: process.env.STATS_DB_USER ?? '',
-	password: process.env.STATS_DB_PASSWORD ?? '',
-	database: process.env.STATS_DB_NAME ?? 'pokemon_stats',
+	host: STATS_DB_HOST ?? '127.0.0.1',
+	port: Number(STATS_DB_PORT ?? 3306),
+	user: STATS_DB_USER ?? '',
+	password: STATS_DB_PASSWORD ?? '',
+	database: STATS_DB_NAME ?? 'pokemon_stats',
 	waitForConnections: true,
 	connectionLimit: 5
 });
