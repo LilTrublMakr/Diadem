@@ -531,5 +531,8 @@
 	"lasts_until": "Lasts until",
 	"unknown_league": "Unknown League",
 	"target_cp": "Target CP",
-	"considered_max_level": "Considered max level"
+	"considered_max_level": "Considered max level",
+	"notifications": "Notifications",
+	"browser_notifications": "Browser notifications",
+	"notifications_blocked": "Notifications are blocked by your browser. Enable them in browser settings."
 }

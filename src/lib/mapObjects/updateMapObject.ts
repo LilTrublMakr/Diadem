@@ -1,5 +1,7 @@
 import { getActiveSearch } from "@/lib/features/activeSearch.svelte.js";
-import type { AnyFilter, FilterS2Cell } from "@/lib/features/filters/filters";
+import type { AnyFilter, FilterPokemon, FilterS2Cell } from "@/lib/features/filters/filters";
+import { checkAndFirePokemonNotifications } from "@/lib/features/notifications/browserNotifications";
+import type { PokemonData } from "@/lib/types/mapObjectData/pokemon";
 import { updateFeatures } from "@/lib/map/featuresGen.svelte";
 import { type Bounds, getBounds } from "@/lib/mapObjects/mapBounds";
 import {
@@ -141,6 +143,14 @@ export async function updateMapObject(
 	if (!data) {
 		if (!signal) updateFeatures(getMapObjects());
 		return;
+	}
+
+	if (isDelta && type === MapObjectType.POKEMON && filter) {
+		const existing = getMapObjects();
+		const newPokemon = data.filter((p) => !existing[p.mapId]);
+		if (newPokemon.length > 0) {
+			checkAndFirePokemonNotifications(newPokemon as PokemonData[], filter as FilterPokemon);
+		}
 	}
 
 	try {

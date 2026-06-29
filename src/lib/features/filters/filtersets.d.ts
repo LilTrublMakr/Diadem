@@ -79,6 +79,7 @@ export type FiltersetPokemon = BaseFilterset & {
 	pvpRankLittle?: MinMax;
 	pvpRankGreat?: MinMax;
 	pvpRankUltra?: MinMax;
+	notify?: boolean;
 };
 
 export type FiltersetPokestopPlain = BaseFilterset & {

@@ -26,6 +26,12 @@
 	import { hasFeatureAnywhere } from "@/lib/services/user/checkPerm";
 	import { getUserDetails } from "@/lib/services/user/userDetails.svelte";
 	import { Features } from "@/lib/utils/features";
+	import AttributeToggle from "@/components/menus/filters/filterset/AttributeToggle.svelte";
+	import Separator from "@/components/ui/Separator.svelte";
+	import {
+		isNotificationsSupported,
+		requestNotificationPermission
+	} from "@/lib/features/notifications/browserNotifications";
 
 	let data: FiltersetPokemon | undefined = $derived(getCurrentSelectedFilterset()?.data) as
 		| FiltersetPokemon
@@ -47,6 +53,22 @@
 	{#snippet base()}
 		{#if data}
 			<PokemonFilterDisplay {data} />
+			{#if isNotificationsSupported()}
+				<Separator class="my-3" text={m.notifications()} />
+				<AttributeToggle
+					label={m.browser_notifications()}
+					value={data.notify ?? false}
+					onchange={async (v) => {
+						if (v && Notification.permission !== 'granted') {
+							await requestNotificationPermission();
+						}
+						data.notify = v;
+					}}
+				/>
+				{#if data.notify && Notification.permission === 'denied'}
+					<p class="text-xs text-destructive px-4 mt-1">{m.notifications_blocked()}</p>
+				{/if}
+			{/if}
 		{/if}
 	{/snippet}
 	{#snippet overview()}
