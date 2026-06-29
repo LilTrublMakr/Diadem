@@ -49,6 +49,7 @@
 	titleShared={m.shared_pokemon_filter()}
 	titleNew={m.filterset_title_new_pokemon()}
 	titleEdit={m.filterset_title_edit_pokemon()}
+	hint={m.filter_visual_hint()}
 >
 	{#snippet base()}
 		{#if data}

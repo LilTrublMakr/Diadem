@@ -532,6 +532,7 @@
 	"unknown_league": "Unknown League",
 	"target_cp": "Target CP",
 	"considered_max_level": "Considered max level",
+	"filter_visual_hint": "Click the map above to change the appearance of this filter on the map.",
 	"notifications": "Notifications",
 	"browser_notifications": "Browser notifications",
 	"notifications_blocked": "Notifications are blocked by your browser. Enable them in browser settings."
