@@ -8,7 +8,8 @@
 		alt = '',
 		class: className = 'w-8 h-8 object-contain',
 		badgeClass = 'text-[10px]',
-		onerror: onErrorProp = undefined
+		onerror: onErrorProp = undefined,
+		loading = 'eager'
 	}: {
 		pokemonId: number;
 		form?: number;
@@ -17,6 +18,7 @@
 		class?: string;
 		badgeClass?: string;
 		onerror?: () => void;
+		loading?: 'eager' | 'lazy';
 	} = $props();
 
 	let visible = $state(true);
@@ -38,6 +40,7 @@
 		<img
 			{src}
 			{alt}
+			{loading}
 			class={className}
 			onerror={() => { if (onErrorProp) { onErrorProp(); } else { visible = false; } }}
 			onload={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }}

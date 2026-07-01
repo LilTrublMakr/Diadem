@@ -1,10 +1,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getMasterPokemon, loadMasterFile } from '$lib/services/masterfile';
+	import { getMasterFile, getMasterPokemon, loadMasterFile } from '$lib/services/masterfile';
 	import { getIconPokemon, initAllIconSets } from '$lib/services/uicons.svelte';
 	import { getUserDetails } from '$lib/services/user/userDetails.svelte';
 	import { getTrackers, isTrackerLoaded, setTrackerEntry, trackerKey } from '$lib/features/trackerState.svelte';
 	import TrackedPokemonImg from '@/components/custom/TrackedPokemonImg.svelte';
+	import type { MasterPokemon } from '$lib/types/masterfile';
+
+	const TEMP_EVO_LABELS: Record<number, string> = { 1: 'Mega', 2: 'Mega X', 3: 'Mega Y', 4: 'Primal' };
+
+	const TRACKER_FIELDS = [
+		['shundo', '🌟', 'Shundo'],
+		['hundo', '💯', 'Hundo'],
+		['shiny', '✨', 'Shiny'],
+		['nundo', '0️⃣', 'Nundo'],
+	] as const;
 
 	let ready = $state(false);
 	let saving = $state<Set<string>>(new Set());
@@ -12,20 +22,56 @@
 	let loggedIn = $derived(!!getUserDetails().details);
 	let trackerLoaded = $derived(isTrackerLoaded());
 
-	function sortEntries<T extends { pokemonId: number; form: number }>(arr: T[]): T[] {
-		return arr.sort((a, b) => a.pokemonId !== b.pokemonId ? a.pokemonId - b.pokemonId : a.form - b.form);
-	}
-
-	let shinies = $derived(sortEntries(Object.values(getTrackers()).filter(v => v.shiny)));
-	let hundos   = $derived(sortEntries(Object.values(getTrackers()).filter(v => v.hundo)));
-	let nundos   = $derived(sortEntries(Object.values(getTrackers()).filter(v => v.nundo)));
-	let shundos  = $derived(sortEntries(Object.values(getTrackers()).filter(v => v.shundo)));
-
 	onMount(() => {
 		Promise.all([loadMasterFile(), initAllIconSets()]).then(() => {
 			ready = true;
 		});
 	});
+
+	let search = $state('');
+
+	let allPokemon = $derived.by((): [number, MasterPokemon][] => {
+		if (!ready) return [];
+		const mf = getMasterFile();
+		if (!mf) return [];
+		const q = search.trim().toLowerCase();
+		return Object.entries(mf.pokemon)
+			.map(([id, p]) => [parseInt(id), p] as [number, MasterPokemon])
+			.filter(([, p]) => !q || p.name.toLowerCase().includes(q))
+			.sort((a, b) => a[0] - b[0]);
+	});
+
+	let selectedForms = $state<Record<number, number>>({});
+
+	function getFormOptions(p: MasterPokemon): { form: number; label: string }[] {
+		const options: { form: number; label: string }[] = [{ form: 0, label: p.name }];
+		for (const [fid, f] of Object.entries(p.forms)) {
+			const num = parseInt(fid);
+			if (num === 0 || num === (p.defaultFormId ?? -1) || f.isCostume) continue;
+			options.push({ form: num, label: f.name || `Form ${num}` });
+		}
+		for (const [tid, t] of Object.entries(p.tempEvos)) {
+			const num = parseInt(tid);
+			options.push({ form: num, label: t.name || TEMP_EVO_LABELS[num] || `Mega ${num}` });
+		}
+		return options;
+	}
+
+	function pogoFallbackUrl(id: number): string {
+		return `https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_${String(id).padStart(3, '0')}_00.png`;
+	}
+
+	function sprite(id: number, form: number): string {
+		const p = getMasterPokemon(id);
+		const isTempEvo = form !== 0 && !!p?.tempEvos[form.toString()];
+		try {
+			return getIconPokemon({
+				pokemon_id: id,
+				form: isTempEvo ? 0 : form,
+				temp_evolution_id: isTempEvo ? form : undefined,
+			}) || pogoFallbackUrl(id);
+		} catch { return pogoFallbackUrl(id); }
+	}
 
 	async function toggleTracker(pokemonId: number, form: number, field: 'shiny' | 'hundo' | 'nundo' | 'shundo', value: boolean) {
 		const key = trackerKey(pokemonId, form);
@@ -46,36 +92,22 @@
 			saving = new Set([...saving].filter((k) => k !== key));
 		}
 	}
-
-	function pogoFallbackUrl(id: number): string {
-		return `https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_${String(id).padStart(3, '0')}_00.png`;
-	}
-
-	function sprite(pokemonId: number, form: number): string {
-		try {
-			return getIconPokemon({ pokemon_id: pokemonId, form }) || pogoFallbackUrl(pokemonId);
-		} catch {
-			return pogoFallbackUrl(pokemonId);
-		}
-	}
-
-	function formLabel(pokemonId: number, form: number): string {
-		if (form === 0) return '';
-		const poke = getMasterPokemon(pokemonId);
-		return poke?.forms[String(form)]?.name ?? `Form ${form}`;
-	}
-
-	function formHref(pokemonId: number, form: number): string {
-		return form === 0 ? `/pokedex/${pokemonId}` : `/pokedex/${pokemonId}#${form}`;
-	}
 </script>
 
 <svelte:head>
-	<title>Profile — PoGo Map VT</title>
+	<title>My Collection — PoGo Map VT</title>
 </svelte:head>
 
-<div class="max-w-4xl mx-auto p-6">
-	<h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">My Collection</h1>
+<div class="max-w-7xl mx-auto p-6">
+	<div class="flex items-center justify-between mb-6">
+		<h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">My Collection</h1>
+		<input
+			type="search"
+			placeholder="Search Pokémon…"
+			bind:value={search}
+			class="rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-1.5 text-sm text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none focus:border-zinc-400 dark:focus:border-zinc-600 w-48"
+		/>
+	</div>
 
 	{#if !loggedIn}
 		<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 text-center">
@@ -90,158 +122,62 @@
 	{:else if !ready || !trackerLoaded}
 		<div class="text-center text-zinc-400 py-16">Loading…</div>
 	{:else}
-		{#if shinies.length === 0 && hundos.length === 0 && nundos.length === 0 && shundos.length === 0}
-			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 text-center">
-				<p class="text-zinc-500 dark:text-zinc-400">No Pokémon tracked yet.</p>
-				<p class="text-sm text-zinc-400 dark:text-zinc-600 mt-1">
-					Visit a <a href="/pokedex/1" class="underline hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">Pokémon page</a> and check the boxes.
-				</p>
-			</div>
-		{/if}
+		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+			{#each allPokemon as [id, poke]}
+				{@const selectedForm = selectedForms[id] ?? 0}
+				{@const formOpts = getFormOptions(poke)}
+				{@const entry = getTrackers()[trackerKey(id, selectedForm)] ?? { shiny: false, hundo: false, nundo: false, shundo: false }}
+				{@const key = trackerKey(id, selectedForm)}
 
-		<!-- Shundos -->
-		{#if shundos.length > 0}
-			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden mb-6">
-				<div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
-					<span class="text-lg">🌟</span>
-					<h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Shundos</h2>
-					<span class="ml-auto text-xs text-zinc-400 dark:text-zinc-600">{shundos.length}</span>
-				</div>
-				<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
-					{#each shundos as row}
-						{@const poke = getMasterPokemon(row.pokemonId)}
-						{@const fl = formLabel(row.pokemonId, row.form)}
-						<div class="flex items-center gap-3 px-5 py-3">
-							<TrackedPokemonImg pokemonId={row.pokemonId} form={row.form} src={sprite(row.pokemonId, row.form)} class="w-10 h-10 object-contain" />
-							<a href={formHref(row.pokemonId, row.form)} class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-								{poke?.name ?? `#${row.pokemonId}`}{#if fl}<span class="ml-1 text-zinc-500 dark:text-zinc-400">({fl})</span>{/if}
-								<span class="ml-1 text-xs text-zinc-400 dark:text-zinc-600">#{String(row.pokemonId).padStart(4, '0')}</span>
-							</a>
-							<div class="flex items-center gap-4 flex-shrink-0">
-								<label class="flex items-center gap-1.5 cursor-pointer select-none">
-									<input
-										type="checkbox"
-										checked={row.shundo}
-										onchange={(e) => toggleTracker(row.pokemonId, row.form, 'shundo', e.currentTarget.checked)}
-										disabled={saving.has(trackerKey(row.pokemonId, row.form))}
-										class="w-4 h-4 rounded accent-amber-400 cursor-pointer"
-									/>
-									<span class="text-xs text-zinc-500 dark:text-zinc-400">Shundo</span>
-								</label>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</div>
-		{/if}
+				<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 flex flex-col gap-2">
+					<!-- Header -->
+					<div class="flex items-baseline justify-between gap-1 min-w-0">
+						<a href="/pokedex/{id}" class="text-sm font-semibold text-zinc-800 dark:text-zinc-200 hover:underline truncate">{poke.name}</a>
+						<span class="text-[10px] text-zinc-400 dark:text-zinc-600 shrink-0">#{String(id).padStart(4, '0')}</span>
+					</div>
 
-		<!-- Hundos -->
-		{#if hundos.length > 0}
-			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden mb-6">
-				<div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
-					<span class="text-lg">💯</span>
-					<h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Hundos</h2>
-					<span class="ml-auto text-xs text-zinc-400 dark:text-zinc-600">{hundos.length}</span>
-				</div>
-				<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
-					{#each hundos as row}
-						{@const poke = getMasterPokemon(row.pokemonId)}
-						{@const fl = formLabel(row.pokemonId, row.form)}
-						<div class="flex items-center gap-3 px-5 py-3">
-							<TrackedPokemonImg pokemonId={row.pokemonId} form={row.form} src={sprite(row.pokemonId, row.form)} class="w-10 h-10 object-contain" />
-							<a href={formHref(row.pokemonId, row.form)} class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-								{poke?.name ?? `#${row.pokemonId}`}{#if fl}<span class="ml-1 text-zinc-500 dark:text-zinc-400">({fl})</span>{/if}
-								<span class="ml-1 text-xs text-zinc-400 dark:text-zinc-600">#{String(row.pokemonId).padStart(4, '0')}</span>
-							</a>
-							<div class="flex items-center gap-4 flex-shrink-0">
-								<label class="flex items-center gap-1.5 cursor-pointer select-none">
-									<input
-										type="checkbox"
-										checked={row.hundo}
-										onchange={(e) => toggleTracker(row.pokemonId, row.form, 'hundo', e.currentTarget.checked)}
-										disabled={saving.has(trackerKey(row.pokemonId, row.form))}
-										class="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
-									/>
-									<span class="text-xs text-zinc-500 dark:text-zinc-400">Hundo</span>
-								</label>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</div>
-		{/if}
+					<!-- Form selector (always rendered for consistent height alignment) -->
+					<select
+						onchange={(e) => { selectedForms[id] = parseInt(e.currentTarget.value); }}
+						value={selectedForm}
+						disabled={formOpts.length <= 1}
+						class="w-full rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] px-1.5 py-1 text-zinc-700 dark:text-zinc-300 outline-none focus:border-zinc-400 dark:focus:border-zinc-600
+							   {formOpts.length <= 1 ? 'invisible' : ''}"
+					>
+						{#each formOpts as opt}
+							<option value={opt.form}>{opt.label}</option>
+						{/each}
+					</select>
 
-		<!-- Shinies -->
-		{#if shinies.length > 0}
-			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden mb-6">
-				<div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
-					<span class="text-lg">✨</span>
-					<h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Shinies</h2>
-					<span class="ml-auto text-xs text-zinc-400 dark:text-zinc-600">{shinies.length}</span>
-				</div>
-				<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
-					{#each shinies as row}
-						{@const poke = getMasterPokemon(row.pokemonId)}
-						{@const fl = formLabel(row.pokemonId, row.form)}
-						<div class="flex items-center gap-3 px-5 py-3">
-							<TrackedPokemonImg pokemonId={row.pokemonId} form={row.form} src={sprite(row.pokemonId, row.form)} class="w-10 h-10 object-contain" />
-							<a href={formHref(row.pokemonId, row.form)} class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-								{poke?.name ?? `#${row.pokemonId}`}{#if fl}<span class="ml-1 text-zinc-500 dark:text-zinc-400">({fl})</span>{/if}
-								<span class="ml-1 text-xs text-zinc-400 dark:text-zinc-600">#{String(row.pokemonId).padStart(4, '0')}</span>
-							</a>
-							<div class="flex items-center gap-4 flex-shrink-0">
-								<label class="flex items-center gap-1.5 cursor-pointer select-none">
-									<input
-										type="checkbox"
-										checked={row.shiny}
-										onchange={(e) => toggleTracker(row.pokemonId, row.form, 'shiny', e.currentTarget.checked)}
-										disabled={saving.has(trackerKey(row.pokemonId, row.form))}
-										class="w-4 h-4 rounded accent-yellow-400 cursor-pointer"
-									/>
-									<span class="text-xs text-zinc-500 dark:text-zinc-400">Shiny</span>
-								</label>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</div>
-		{/if}
+					<!-- Image -->
+					<div class="flex justify-center py-1">
+						<TrackedPokemonImg
+							pokemonId={id}
+							form={selectedForm}
+							src={sprite(id, selectedForm)}
+							class="w-16 h-16 object-contain"
+							badgeClass="text-[9px]"
+							loading="lazy"
+						/>
+					</div>
 
-		<!-- Nundos -->
-		{#if nundos.length > 0}
-			<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden mb-6">
-				<div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
-					<span class="text-lg">0️⃣</span>
-					<h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Nundos</h2>
-					<span class="ml-auto text-xs text-zinc-400 dark:text-zinc-600">{nundos.length}</span>
+					<!-- Tracker buttons -->
+					<div class="flex gap-1">
+						{#each TRACKER_FIELDS as [field, emoji, label]}
+							<button
+								onclick={() => toggleTracker(id, selectedForm, field, !entry[field])}
+								disabled={saving.has(key)}
+								title={label}
+								class="flex-1 py-1 rounded-lg text-sm transition-colors
+									   {entry[field]
+									       ? 'bg-zinc-900 dark:bg-zinc-100'
+									       : 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700'}
+									   disabled:opacity-50 disabled:cursor-not-allowed"
+							>{emoji}</button>
+						{/each}
+					</div>
 				</div>
-				<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
-					{#each nundos as row}
-						{@const poke = getMasterPokemon(row.pokemonId)}
-						{@const fl = formLabel(row.pokemonId, row.form)}
-						<div class="flex items-center gap-3 px-5 py-3">
-							<TrackedPokemonImg pokemonId={row.pokemonId} form={row.form} src={sprite(row.pokemonId, row.form)} class="w-10 h-10 object-contain" />
-							<a href={formHref(row.pokemonId, row.form)} class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-								{poke?.name ?? `#${row.pokemonId}`}{#if fl}<span class="ml-1 text-zinc-500 dark:text-zinc-400">({fl})</span>{/if}
-								<span class="ml-1 text-xs text-zinc-400 dark:text-zinc-600">#{String(row.pokemonId).padStart(4, '0')}</span>
-							</a>
-							<div class="flex items-center gap-4 flex-shrink-0">
-								<label class="flex items-center gap-1.5 cursor-pointer select-none">
-									<input
-										type="checkbox"
-										checked={row.nundo}
-										onchange={(e) => toggleTracker(row.pokemonId, row.form, 'nundo', e.currentTarget.checked)}
-										disabled={saving.has(trackerKey(row.pokemonId, row.form))}
-										class="w-4 h-4 rounded accent-red-500 cursor-pointer"
-									/>
-									<span class="text-xs text-zinc-500 dark:text-zinc-400">Nundo</span>
-								</label>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</div>
-		{/if}
-
+			{/each}
+		</div>
 	{/if}
 </div>
