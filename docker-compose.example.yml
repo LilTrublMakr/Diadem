@@ -8,6 +8,16 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=3900
+      - STATS_DB_HOST=${STATS_DB_HOST:-127.0.0.1}
+      - STATS_DB_PORT=${STATS_DB_PORT:-3306}
+      - STATS_DB_NAME=${STATS_DB_NAME:-pokemon_stats}
+      - STATS_DB_USER=${STATS_DB_USER}
+      - STATS_DB_PASSWORD=${STATS_DB_PASSWORD}
+      - DRAGONITE_DB_HOST=${DRAGONITE_DB_HOST:-127.0.0.1}
+      - DRAGONITE_DB_PORT=${DRAGONITE_DB_PORT:-3306}
+      - DRAGONITE_DB_NAME=${DRAGONITE_DB_NAME:-dragonite}
+      - DRAGONITE_DB_USER=${DRAGONITE_DB_USER}
+      - DRAGONITE_DB_PASSWORD=${DRAGONITE_DB_PASSWORD}
     volumes:
       # Required: Mount your config file (both paths needed for runtime and db:push)
       - ./config/config.toml:/app/build/server/config.toml:ro
