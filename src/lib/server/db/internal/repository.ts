@@ -15,12 +15,16 @@ export async function getUserSettings(userId: string): Promise<undefined | strin
 	return result?.user?.userSettings as string | undefined;
 }
 
-export async function getTracker(userId: string, pokemonId: number) {
+export async function getTracker(userId: string, pokemonId: number, form = 0) {
 	const [result] = await db
 		.select()
 		.from(table.pokemonTracker)
 		.where(
-			and(eq(table.pokemonTracker.userId, userId), eq(table.pokemonTracker.pokemonId, pokemonId))
+			and(
+				eq(table.pokemonTracker.userId, userId),
+				eq(table.pokemonTracker.pokemonId, pokemonId),
+				eq(table.pokemonTracker.form, form)
+			)
 		);
 	return result ?? null;
 }
@@ -35,11 +39,12 @@ export async function getAllTrackers(userId: string) {
 export async function upsertTracker(
 	userId: string,
 	pokemonId: number,
+	form: number,
 	data: { shiny?: boolean; hundo?: boolean; nundo?: boolean; shundo?: boolean }
 ) {
 	await db
 		.insert(table.pokemonTracker)
-		.values({ userId, pokemonId, shiny: data.shiny ?? false, hundo: data.hundo ?? false, nundo: data.nundo ?? false, shundo: data.shundo ?? false })
+		.values({ userId, pokemonId, form, shiny: data.shiny ?? false, hundo: data.hundo ?? false, nundo: data.nundo ?? false, shundo: data.shundo ?? false })
 		.onDuplicateKeyUpdate({ set: data });
-	return getTracker(userId, pokemonId);
+	return getTracker(userId, pokemonId, form);
 }

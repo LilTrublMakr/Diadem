@@ -18,30 +18,37 @@ import { isMaxBattleActive } from "@/lib/utils/stationUtils";
 export const DEFAULT_UICONS = "DEFAULT";
 
 const iconSets: { [key: string]: UICONS } = {};
+const iconSetInitPromises: Record<string, Promise<void>> = {};
 
 export async function initIconSet(id: string, url: string, thisFetch: typeof fetch = fetch) {
 	if (id in iconSets) return;
+	if (id in iconSetInitPromises) return iconSetInitPromises[id];
 
 	url = url.endsWith("/") ? url.slice(0, -1) : url;
 
 	const newSet = new UICONS(url);
-	iconSets[id] = newSet;
 
-	const data = await thisFetch(`${url}/index.json`);
-	if (!data.ok) {
-		console.error("Failed to load uicon set: " + id);
-		return;
-	}
+	iconSetInitPromises[id] = (async () => {
+		const data = await thisFetch(`${url}/index.json`);
+		if (!data.ok) {
+			console.error("Failed to load uicon set: " + id);
+			return;
+		}
 
-	const raw = await data.text();
+		const raw = await data.text();
 
-	try {
-		const indexFile = JSON.parse(raw);
-		newSet.init(indexFile);
-	} catch (e) {
-		console.error(raw);
-		console.error("Error while parsing uicon index " + id, e);
-	}
+		try {
+			const indexFile = JSON.parse(raw);
+			newSet.init(indexFile);
+		} catch (e) {
+			console.error(raw);
+			console.error("Error while parsing uicon index " + id, e);
+		}
+
+		iconSets[id] = newSet;
+	})();
+
+	return iconSetInitPromises[id];
 }
 
 export async function initAllIconSets(thisFetch: typeof fetch = fetch) {

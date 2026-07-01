@@ -3,39 +3,23 @@
 	import { getMasterPokemon, loadMasterFile } from '$lib/services/masterfile';
 	import { getIconPokemon, initAllIconSets } from '$lib/services/uicons.svelte';
 	import { getUserDetails } from '$lib/services/user/userDetails.svelte';
-	import { getTrackers, isTrackerLoaded, setTrackerEntry } from '$lib/features/trackerState.svelte';
+	import { getTrackers, isTrackerLoaded, setTrackerEntry, trackerKey } from '$lib/features/trackerState.svelte';
 	import TrackedPokemonImg from '@/components/custom/TrackedPokemonImg.svelte';
 
 	let ready = $state(false);
-	let saving = $state<Set<number>>(new Set());
+	let saving = $state<Set<string>>(new Set());
 
 	let loggedIn = $derived(!!getUserDetails().details);
 	let trackerLoaded = $derived(isTrackerLoaded());
 
-	let shinies = $derived(
-		Object.entries(getTrackers())
-			.filter(([, v]) => v.shiny)
-			.map(([id, v]) => ({ pokemonId: parseInt(id), ...v }))
-			.sort((a, b) => a.pokemonId - b.pokemonId)
-	);
-	let hundos = $derived(
-		Object.entries(getTrackers())
-			.filter(([, v]) => v.hundo)
-			.map(([id, v]) => ({ pokemonId: parseInt(id), ...v }))
-			.sort((a, b) => a.pokemonId - b.pokemonId)
-	);
-	let nundos = $derived(
-		Object.entries(getTrackers())
-			.filter(([, v]) => v.nundo)
-			.map(([id, v]) => ({ pokemonId: parseInt(id), ...v }))
-			.sort((a, b) => a.pokemonId - b.pokemonId)
-	);
-	let shundos = $derived(
-		Object.entries(getTrackers())
-			.filter(([, v]) => v.shundo)
-			.map(([id, v]) => ({ pokemonId: parseInt(id), ...v }))
-			.sort((a, b) => a.pokemonId - b.pokemonId)
-	);
+	function sortEntries<T extends { pokemonId: number; form: number }>(arr: T[]): T[] {
+		return arr.sort((a, b) => a.pokemonId !== b.pokemonId ? a.pokemonId - b.pokemonId : a.form - b.form);
+	}
+
+	let shinies = $derived(sortEntries(Object.values(getTrackers()).filter(v => v.shiny)));
+	let hundos   = $derived(sortEntries(Object.values(getTrackers()).filter(v => v.hundo)));
+	let nundos   = $derived(sortEntries(Object.values(getTrackers()).filter(v => v.nundo)));
+	let shundos  = $derived(sortEntries(Object.values(getTrackers()).filter(v => v.shundo)));
 
 	onMount(() => {
 		Promise.all([loadMasterFile(), initAllIconSets()]).then(() => {
@@ -43,31 +27,46 @@
 		});
 	});
 
-	async function toggleTracker(pokemonId: number, field: 'shiny' | 'hundo' | 'nundo' | 'shundo', value: boolean) {
-		const prev = getTrackers()[pokemonId] ?? { shiny: false, hundo: false, nundo: false, shundo: false };
-		setTrackerEntry(pokemonId, { [field]: value });
-		saving = new Set([...saving, pokemonId]);
+	async function toggleTracker(pokemonId: number, form: number, field: 'shiny' | 'hundo' | 'nundo' | 'shundo', value: boolean) {
+		const key = trackerKey(pokemonId, form);
+		const prev = getTrackers()[key] ?? { shiny: false, hundo: false, nundo: false, shundo: false };
+		setTrackerEntry(pokemonId, form, { [field]: value });
+		saving = new Set([...saving, key]);
 		try {
 			const res = await fetch(`/api/custom/tracker/${pokemonId}`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ [field]: value })
+				body: JSON.stringify({ form, [field]: value })
 			});
-			if (res.ok) setTrackerEntry(pokemonId, await res.json());
-			else setTrackerEntry(pokemonId, prev);
+			if (res.ok) setTrackerEntry(pokemonId, form, await res.json());
+			else setTrackerEntry(pokemonId, form, prev);
 		} catch {
-			setTrackerEntry(pokemonId, prev);
+			setTrackerEntry(pokemonId, form, prev);
 		} finally {
-			saving = new Set([...saving].filter((id) => id !== pokemonId));
+			saving = new Set([...saving].filter((k) => k !== key));
 		}
 	}
 
-	function sprite(pokemonId: number): string {
+	function pogoFallbackUrl(id: number): string {
+		return `https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_${String(id).padStart(3, '0')}_00.png`;
+	}
+
+	function sprite(pokemonId: number, form: number): string {
 		try {
-			return getIconPokemon({ pokemon_id: pokemonId, form: 0 });
+			return getIconPokemon({ pokemon_id: pokemonId, form }) || pogoFallbackUrl(pokemonId);
 		} catch {
-			return '';
+			return pogoFallbackUrl(pokemonId);
 		}
+	}
+
+	function formLabel(pokemonId: number, form: number): string {
+		if (form === 0) return '';
+		const poke = getMasterPokemon(pokemonId);
+		return poke?.forms[String(form)]?.name ?? `Form ${form}`;
+	}
+
+	function formHref(pokemonId: number, form: number): string {
+		return form === 0 ? `/pokedex/${pokemonId}` : `/pokedex/${pokemonId}#${form}`;
 	}
 </script>
 
@@ -111,13 +110,11 @@
 				<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
 					{#each shundos as row}
 						{@const poke = getMasterPokemon(row.pokemonId)}
+						{@const fl = formLabel(row.pokemonId, row.form)}
 						<div class="flex items-center gap-3 px-5 py-3">
-							<TrackedPokemonImg pokemonId={row.pokemonId} src={sprite(row.pokemonId)} class="w-10 h-10 object-contain" />
-							<a
-								href="/pokedex/{row.pokemonId}"
-								class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
-							>
-								{poke?.name ?? `#${row.pokemonId}`}
+							<TrackedPokemonImg pokemonId={row.pokemonId} form={row.form} src={sprite(row.pokemonId, row.form)} class="w-10 h-10 object-contain" />
+							<a href={formHref(row.pokemonId, row.form)} class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+								{poke?.name ?? `#${row.pokemonId}`}{#if fl}<span class="ml-1 text-zinc-500 dark:text-zinc-400">({fl})</span>{/if}
 								<span class="ml-1 text-xs text-zinc-400 dark:text-zinc-600">#{String(row.pokemonId).padStart(4, '0')}</span>
 							</a>
 							<div class="flex items-center gap-4 flex-shrink-0">
@@ -125,8 +122,8 @@
 									<input
 										type="checkbox"
 										checked={row.shundo}
-										onchange={(e) => toggleTracker(row.pokemonId, 'shundo', e.currentTarget.checked)}
-										disabled={saving.has(row.pokemonId)}
+										onchange={(e) => toggleTracker(row.pokemonId, row.form, 'shundo', e.currentTarget.checked)}
+										disabled={saving.has(trackerKey(row.pokemonId, row.form))}
 										class="w-4 h-4 rounded accent-amber-400 cursor-pointer"
 									/>
 									<span class="text-xs text-zinc-500 dark:text-zinc-400">Shundo</span>
@@ -149,32 +146,20 @@
 				<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
 					{#each hundos as row}
 						{@const poke = getMasterPokemon(row.pokemonId)}
+						{@const fl = formLabel(row.pokemonId, row.form)}
 						<div class="flex items-center gap-3 px-5 py-3">
-							<TrackedPokemonImg pokemonId={row.pokemonId} src={sprite(row.pokemonId)} class="w-10 h-10 object-contain" />
-							<a
-								href="/pokedex/{row.pokemonId}"
-								class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
-							>
-								{poke?.name ?? `#${row.pokemonId}`}
+							<TrackedPokemonImg pokemonId={row.pokemonId} form={row.form} src={sprite(row.pokemonId, row.form)} class="w-10 h-10 object-contain" />
+							<a href={formHref(row.pokemonId, row.form)} class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+								{poke?.name ?? `#${row.pokemonId}`}{#if fl}<span class="ml-1 text-zinc-500 dark:text-zinc-400">({fl})</span>{/if}
 								<span class="ml-1 text-xs text-zinc-400 dark:text-zinc-600">#{String(row.pokemonId).padStart(4, '0')}</span>
 							</a>
 							<div class="flex items-center gap-4 flex-shrink-0">
 								<label class="flex items-center gap-1.5 cursor-pointer select-none">
 									<input
 										type="checkbox"
-										checked={row.shiny}
-										onchange={(e) => toggleTracker(row.pokemonId, 'shiny', e.currentTarget.checked)}
-										disabled={saving.has(row.pokemonId)}
-										class="w-4 h-4 rounded accent-yellow-400 cursor-pointer"
-									/>
-									<span class="text-xs text-zinc-500 dark:text-zinc-400">Shiny</span>
-								</label>
-								<label class="flex items-center gap-1.5 cursor-pointer select-none">
-									<input
-										type="checkbox"
 										checked={row.hundo}
-										onchange={(e) => toggleTracker(row.pokemonId, 'hundo', e.currentTarget.checked)}
-										disabled={saving.has(row.pokemonId)}
+										onchange={(e) => toggleTracker(row.pokemonId, row.form, 'hundo', e.currentTarget.checked)}
+										disabled={saving.has(trackerKey(row.pokemonId, row.form))}
 										class="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
 									/>
 									<span class="text-xs text-zinc-500 dark:text-zinc-400">Hundo</span>
@@ -197,13 +182,11 @@
 				<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
 					{#each shinies as row}
 						{@const poke = getMasterPokemon(row.pokemonId)}
+						{@const fl = formLabel(row.pokemonId, row.form)}
 						<div class="flex items-center gap-3 px-5 py-3">
-							<TrackedPokemonImg pokemonId={row.pokemonId} src={sprite(row.pokemonId)} class="w-10 h-10 object-contain" />
-							<a
-								href="/pokedex/{row.pokemonId}"
-								class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
-							>
-								{poke?.name ?? `#${row.pokemonId}`}
+							<TrackedPokemonImg pokemonId={row.pokemonId} form={row.form} src={sprite(row.pokemonId, row.form)} class="w-10 h-10 object-contain" />
+							<a href={formHref(row.pokemonId, row.form)} class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+								{poke?.name ?? `#${row.pokemonId}`}{#if fl}<span class="ml-1 text-zinc-500 dark:text-zinc-400">({fl})</span>{/if}
 								<span class="ml-1 text-xs text-zinc-400 dark:text-zinc-600">#{String(row.pokemonId).padStart(4, '0')}</span>
 							</a>
 							<div class="flex items-center gap-4 flex-shrink-0">
@@ -211,21 +194,11 @@
 									<input
 										type="checkbox"
 										checked={row.shiny}
-										onchange={(e) => toggleTracker(row.pokemonId, 'shiny', e.currentTarget.checked)}
-										disabled={saving.has(row.pokemonId)}
+										onchange={(e) => toggleTracker(row.pokemonId, row.form, 'shiny', e.currentTarget.checked)}
+										disabled={saving.has(trackerKey(row.pokemonId, row.form))}
 										class="w-4 h-4 rounded accent-yellow-400 cursor-pointer"
 									/>
 									<span class="text-xs text-zinc-500 dark:text-zinc-400">Shiny</span>
-								</label>
-								<label class="flex items-center gap-1.5 cursor-pointer select-none">
-									<input
-										type="checkbox"
-										checked={row.hundo}
-										onchange={(e) => toggleTracker(row.pokemonId, 'hundo', e.currentTarget.checked)}
-										disabled={saving.has(row.pokemonId)}
-										class="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
-									/>
-									<span class="text-xs text-zinc-500 dark:text-zinc-400">Hundo</span>
 								</label>
 							</div>
 						</div>
@@ -245,13 +218,11 @@
 				<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
 					{#each nundos as row}
 						{@const poke = getMasterPokemon(row.pokemonId)}
+						{@const fl = formLabel(row.pokemonId, row.form)}
 						<div class="flex items-center gap-3 px-5 py-3">
-							<TrackedPokemonImg pokemonId={row.pokemonId} src={sprite(row.pokemonId)} class="w-10 h-10 object-contain" />
-							<a
-								href="/pokedex/{row.pokemonId}"
-								class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
-							>
-								{poke?.name ?? `#${row.pokemonId}`}
+							<TrackedPokemonImg pokemonId={row.pokemonId} form={row.form} src={sprite(row.pokemonId, row.form)} class="w-10 h-10 object-contain" />
+							<a href={formHref(row.pokemonId, row.form)} class="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+								{poke?.name ?? `#${row.pokemonId}`}{#if fl}<span class="ml-1 text-zinc-500 dark:text-zinc-400">({fl})</span>{/if}
 								<span class="ml-1 text-xs text-zinc-400 dark:text-zinc-600">#{String(row.pokemonId).padStart(4, '0')}</span>
 							</a>
 							<div class="flex items-center gap-4 flex-shrink-0">
@@ -259,8 +230,8 @@
 									<input
 										type="checkbox"
 										checked={row.nundo}
-										onchange={(e) => toggleTracker(row.pokemonId, 'nundo', e.currentTarget.checked)}
-										disabled={saving.has(row.pokemonId)}
+										onchange={(e) => toggleTracker(row.pokemonId, row.form, 'nundo', e.currentTarget.checked)}
+										disabled={saving.has(trackerKey(row.pokemonId, row.form))}
 										class="w-4 h-4 rounded accent-red-500 cursor-pointer"
 									/>
 									<span class="text-xs text-zinc-500 dark:text-zinc-400">Nundo</span>

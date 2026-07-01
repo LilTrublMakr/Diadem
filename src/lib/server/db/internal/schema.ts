@@ -106,6 +106,7 @@ export const pokemonTracker = mysqlTable(
 			.notNull()
 			.references(() => user.id, { onDelete: "cascade" }),
 		pokemonId: int("pokemon_id").notNull(),
+		form: int("form").default(0).notNull(),
 		shiny: boolean("shiny").default(false).notNull(),
 		hundo: boolean("hundo").default(false).notNull(),
 		nundo: boolean("nundo").default(false).notNull(),
@@ -113,9 +114,10 @@ export const pokemonTracker = mysqlTable(
 		updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
 	},
 	(table) => ({
-		userPokemonUnique: uniqueIndex("pokemon_tracker_user_pokemon_unique").on(
+		userPokemonFormUnique: uniqueIndex("pokemon_tracker_user_pokemon_form_unique").on(
 			table.userId,
-			table.pokemonId
+			table.pokemonId,
+			table.form
 		)
 	})
 );

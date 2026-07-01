@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { getTrackers } from '$lib/features/trackerState.svelte';
+	import { getTrackers, trackerKey } from '$lib/features/trackerState.svelte';
 
 	let {
 		pokemonId,
+		form = 0,
 		src,
 		alt = '',
 		class: className = 'w-8 h-8 object-contain',
@@ -10,6 +11,7 @@
 		onerror: onErrorProp = undefined
 	}: {
 		pokemonId: number;
+		form?: number;
 		src: string;
 		alt?: string;
 		class?: string;
@@ -18,10 +20,17 @@
 	} = $props();
 
 	let visible = $state(true);
-	let hasShiny = $derived((getTrackers()[pokemonId]?.shiny) ?? false);
-	let hasHundo = $derived((getTrackers()[pokemonId]?.hundo) ?? false);
-	let hasNundo = $derived((getTrackers()[pokemonId]?.nundo) ?? false);
-	let hasShundo = $derived((getTrackers()[pokemonId]?.shundo) ?? false);
+
+	$effect(() => {
+		src;
+		visible = true;
+	});
+
+	let entry = $derived(getTrackers()[trackerKey(pokemonId, form)]);
+	let hasShiny = $derived(entry?.shiny ?? false);
+	let hasHundo = $derived(entry?.hundo ?? false);
+	let hasNundo = $derived(entry?.nundo ?? false);
+	let hasShundo = $derived(entry?.shundo ?? false);
 </script>
 
 {#if visible}

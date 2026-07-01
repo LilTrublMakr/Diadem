@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ShinyStat } from '../../api/custom/shiny/+server';
-	import { getIconPokemon } from '$lib/services/uicons.svelte';
+	import { getIconPokemon, initAllIconSets } from '$lib/services/uicons.svelte';
 	import TrackedPokemonImg from '@/components/custom/TrackedPokemonImg.svelte';
 
 	type PeriodKey = '1d' | '1w' | '1m' | '3m' | 'all';
@@ -44,11 +44,15 @@
 		return (p + z * z / (2 * n) - z * Math.sqrt((p * (1 - p) + z * z / (4 * n)) / n)) / (1 + z * z / n);
 	}
 
+	function pogoFallbackUrl(id: number): string {
+		return `https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_${String(id).padStart(3, '0')}_00.png`;
+	}
+
 	function shinySprite(pokemonId: number, form: number): string {
 		try {
-			return getIconPokemon({ pokemon_id: pokemonId, form, shiny: true });
+			return getIconPokemon({ pokemon_id: pokemonId, form, shiny: true }) || pogoFallbackUrl(pokemonId);
 		} catch {
-			return '';
+			return pogoFallbackUrl(pokemonId);
 		}
 	}
 
@@ -65,7 +69,7 @@
 		loading = true;
 		fetchError = null;
 		try {
-			const res = await fetch('/api/custom/shiny');
+			const [res] = await Promise.all([fetch('/api/custom/shiny'), initAllIconSets()]);
 			if (!res.ok) throw new Error(`Server returned ${res.status}`);
 			stats = await res.json();
 		} catch (e) {
@@ -172,7 +176,7 @@
 							<td class="px-4 py-2.5 text-zinc-300 dark:text-zinc-700 text-xs">{i + 1}</td>
 							<td class="px-4 py-2.5">
 								<a href="/pokedex/{s.pokemon_id}" class="flex items-center gap-2.5 group">
-									<TrackedPokemonImg pokemonId={s.pokemon_id} src={shinySprite(s.pokemon_id, s.form)} alt={s.name} class="w-8 h-8 object-contain" />
+									<TrackedPokemonImg pokemonId={s.pokemon_id} form={s.form} src={shinySprite(s.pokemon_id, s.form)} alt={s.name} class="w-8 h-8 object-contain" />
 									<span class="text-zinc-800 dark:text-zinc-200 font-medium group-hover:underline">{s.name}</span>
 								</a>
 							</td>

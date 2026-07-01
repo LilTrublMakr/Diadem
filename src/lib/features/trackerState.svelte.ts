@@ -1,11 +1,15 @@
-type TrackerEntry = { shiny: boolean; hundo: boolean; nundo: boolean; shundo: boolean };
+export type TrackerEntry = { pokemonId: number; form: number; shiny: boolean; hundo: boolean; nundo: boolean; shundo: boolean };
 
-const EMPTY: TrackerEntry = { shiny: false, hundo: false, nundo: false, shundo: false };
+const EMPTY_FLAGS = { shiny: false, hundo: false, nundo: false, shundo: false };
 
-let trackers = $state<Record<number, TrackerEntry>>({});
+export function trackerKey(pokemonId: number, form: number): string {
+	return `${pokemonId}-${form}`;
+}
+
+let trackers = $state<Record<string, TrackerEntry>>({});
 let loaded = $state(false);
 
-export function getTrackers(): Record<number, TrackerEntry> {
+export function getTrackers(): Record<string, TrackerEntry> {
 	return trackers;
 }
 
@@ -16,18 +20,28 @@ export function isTrackerLoaded(): boolean {
 export async function loadTrackers(): Promise<void> {
 	const res = await fetch('/api/custom/tracker');
 	if (!res.ok) { loaded = true; return; }
-	const data: { pokemonId: number; shiny: boolean; hundo: boolean; nundo: boolean; shundo: boolean }[] = await res.json();
-	const record: Record<number, TrackerEntry> = {};
+	const data: { pokemonId: number; form: number; shiny: boolean; hundo: boolean; nundo: boolean; shundo: boolean }[] = await res.json();
+	const record: Record<string, TrackerEntry> = {};
 	for (const row of data) {
-		record[row.pokemonId] = { shiny: row.shiny, hundo: row.hundo, nundo: row.nundo, shundo: row.shundo };
+		record[trackerKey(row.pokemonId, row.form)] = { pokemonId: row.pokemonId, form: row.form, shiny: row.shiny, hundo: row.hundo, nundo: row.nundo, shundo: row.shundo };
 	}
 	trackers = record;
 	loaded = true;
 }
 
-export function setTrackerEntry(pokemonId: number, data: Partial<TrackerEntry>): void {
+export function setTrackerEntry(pokemonId: number, form: number, data: Partial<Omit<TrackerEntry, 'pokemonId' | 'form'>>): void {
+	const key = trackerKey(pokemonId, form);
+	const existing = trackers[key];
 	trackers = {
 		...trackers,
-		[pokemonId]: { ...(trackers[pokemonId] ?? { ...EMPTY }), ...data }
+		[key]: {
+			pokemonId,
+			form,
+			shiny: existing?.shiny ?? false,
+			hundo: existing?.hundo ?? false,
+			nundo: existing?.nundo ?? false,
+			shundo: existing?.shundo ?? false,
+			...data
+		}
 	};
 }

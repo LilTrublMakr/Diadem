@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { replaceState } from '$app/navigation';
 	import { getMasterPokemon, getMasterFile, loadMasterFile } from '$lib/services/masterfile';
 	import { getIconPokemon, initAllIconSets } from '$lib/services/uicons.svelte';
 	import { getUserDetails } from '$lib/services/user/userDetails.svelte';
-	import { getTrackers, setTrackerEntry } from '$lib/features/trackerState.svelte';
+	import { getTrackers, setTrackerEntry, trackerKey } from '$lib/features/trackerState.svelte';
 	import TrackedPokemonImg from '@/components/custom/TrackedPokemonImg.svelte';
 	import type { MasterEvolution, MasterPokemon } from '$lib/types/masterfile';
 	type PokemonDetailResponse = {
@@ -53,23 +54,24 @@
 	let showShadow = $state(false);
 
 	let loggedIn = $derived(!!getUserDetails().details);
-	let trackerData = $derived(getTrackers()[pokemonId] ?? { shiny: false, hundo: false, nundo: false, shundo: false });
+	let trackerData = $derived(getTrackers()[trackerKey(pokemonId, activeForm)] ?? { shiny: false, hundo: false, nundo: false, shundo: false });
 	let trackerSaving = $state(false);
 
 	async function toggleTracker(field: 'shiny' | 'hundo' | 'nundo' | 'shundo', value: boolean) {
-		const prev = getTrackers()[pokemonId] ?? { shiny: false, hundo: false, nundo: false, shundo: false };
-		setTrackerEntry(pokemonId, { [field]: value });
+		const form = activeForm;
+		const prev = getTrackers()[trackerKey(pokemonId, form)] ?? { shiny: false, hundo: false, nundo: false, shundo: false };
+		setTrackerEntry(pokemonId, form, { [field]: value });
 		trackerSaving = true;
 		try {
 			const res = await fetch(`/api/custom/tracker/${pokemonId}`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ [field]: value })
+				body: JSON.stringify({ form, [field]: value })
 			});
-			if (res.ok) setTrackerEntry(pokemonId, await res.json());
-			else setTrackerEntry(pokemonId, prev);
+			if (res.ok) setTrackerEntry(pokemonId, form, await res.json());
+			else setTrackerEntry(pokemonId, form, prev);
 		} catch {
-			setTrackerEntry(pokemonId, prev);
+			setTrackerEntry(pokemonId, form, prev);
 		} finally {
 			trackerSaving = false;
 		}
@@ -110,6 +112,36 @@
 		return options;
 	});
 
+	function slugify(s: string): string {
+		return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+	}
+
+	function formToHash(opt: { form: number; label: string }): string {
+		if (opt.form === 0) return '';
+		return slugify(opt.label) || String(opt.form);
+	}
+
+	// Sync activeForm from URL hash whenever formOptions or pokemonId changes.
+	// Uses window.location.hash directly because page.url.hash doesn't react to
+	// hash-only replaceState calls in SvelteKit.
+	$effect(() => {
+		pokemonId; // reset on pokemon change
+		if (formOptions.length === 0) { activeForm = 0; return; }
+		const hash = window.location.hash.slice(1);
+		if (!hash) { activeForm = 0; return; }
+		const num = parseInt(hash);
+		if (!isNaN(num) && formOptions.some((o) => o.form === num)) { activeForm = num; return; }
+		activeForm = formOptions.find((o) => slugify(o.label) === hash)?.form ?? 0;
+	});
+
+	function setForm(form: number) {
+		activeForm = form;
+		const opt = formOptions.find((o) => o.form === form);
+		if (!opt) return;
+		const hash = formToHash(opt);
+		replaceState(hash ? `#${hash}` : page.url.pathname, {});
+	}
+
 	let activePokemon = $derived.by((): MasterPokemon | null => {
 		if (!pokemon) return null;
 		if (activeForm === 0) return pokemon;
@@ -149,8 +181,48 @@
 		return root.children.length > 0 ? root : null;
 	});
 
-	function evoSprite(id: number): string {
-		try { return getIconPokemon({ pokemon_id: id, form: 0 }); } catch { return ''; }
+	// Maps each family member's pokemon ID → which form to display in the evo tree,
+	// derived from the active form's evolution chain (forward + backward).
+	let evoFormMap = $derived.by((): Map<number, number> => {
+		const map = new Map<number, number>();
+		if (!pokemon || !masterReady || activeForm === 0) return map;
+
+		map.set(pokemonId, activeForm);
+
+		// Forward: evolutions of the active form
+		const formData = pokemon.forms[activeForm.toString()];
+		for (const evo of (formData?.evolutions ?? [])) {
+			if (evo.form !== 0) map.set(evo.pokemonId, evo.form);
+		}
+
+		// Backward: find family members whose specific form evolves into current pokemon at activeForm
+		const mf = getMasterFile();
+		if (mf) {
+			for (const [idStr, p] of Object.entries(mf.pokemon)) {
+				if (p.family !== pokemon.family) continue;
+				const pId = parseInt(idStr);
+				if (map.has(pId)) continue;
+				for (const [fid, f] of Object.entries(p.forms)) {
+					const fNum = parseInt(fid);
+					if (fNum === 0) continue;
+					for (const evo of f.evolutions) {
+						if (evo.pokemonId === pokemonId && evo.form === activeForm) {
+							map.set(pId, fNum);
+							break;
+						}
+					}
+					if (map.has(pId)) break;
+				}
+			}
+		}
+
+		return map;
+	});
+
+	function evoSpriteFor(id: number, form: number): string {
+		try {
+			return getIconPokemon({ pokemon_id: id, form }) || pogoHeroUrl(id, 0);
+		} catch { return pogoHeroUrl(id, 0); }
 	}
 
 	function buildReqLabel(evo: MasterEvolution): string {
@@ -174,15 +246,15 @@
 	let connColor = $derived(isDark ? '#52525b' : '#d4d4d8');
 
 	function sprite(form: number, shadow = false): string {
+		const isTempEvo = form !== 0 && !!pokemon?.tempEvos[form.toString()];
 		try {
-			const isTempEvo = form !== 0 && !!pokemon?.tempEvos[form.toString()];
 			return getIconPokemon({
 				pokemon_id: pokemonId,
 				form: isTempEvo ? 0 : form,
 				temp_evolution_id: isTempEvo ? form : undefined,
 				alignment: shadow ? 1 : undefined,
-			});
-		} catch { return ''; }
+			}) || pogoHeroUrl(pokemonId, 0);
+		} catch { return pogoHeroUrl(pokemonId, 0); }
 	}
 
 	function pogoHeroUrl(id: number, form: number): string {
@@ -320,8 +392,9 @@
 	});
 
 	function megaSprite(pId: number, tempEvoId: number): string {
-		try { return getIconPokemon({ pokemon_id: pId, form: 0, temp_evolution_id: tempEvoId }); }
-		catch { return ''; }
+		try {
+			return getIconPokemon({ pokemon_id: pId, form: 0, temp_evolution_id: tempEvoId }) || pogoHeroUrl(pId, 0);
+		} catch { return pogoHeroUrl(pId, 0); }  // temp_evolution_id form indices don't match GitHub naming
 	}
 
 	let sortedIds = $derived.by(() => {
@@ -363,7 +436,7 @@
 					class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
 				>
 					<span>←</span>
-					<TrackedPokemonImg pokemonId={prevId} src={evoSprite(prevId)} class="w-6 h-6 object-contain" />
+					<TrackedPokemonImg pokemonId={prevId} src={evoSpriteFor(prevId, 0)} class="w-6 h-6 object-contain" />
 					<span class="font-medium">{prevPoke?.name ?? `#${prevId}`}</span>
 					<span class="text-xs text-zinc-400 dark:text-zinc-600">#{String(prevId).padStart(4, '0')}</span>
 				</a>
@@ -378,7 +451,7 @@
 				>
 					<span class="text-xs text-zinc-400 dark:text-zinc-600">#{String(nextId).padStart(4, '0')}</span>
 					<span class="font-medium">{nextPoke?.name ?? `#${nextId}`}</span>
-					<TrackedPokemonImg pokemonId={nextId} src={evoSprite(nextId)} class="w-6 h-6 object-contain" />
+					<TrackedPokemonImg pokemonId={nextId} src={evoSpriteFor(nextId, 0)} class="w-6 h-6 object-contain" />
 					<span>→</span>
 				</a>
 			{:else}
@@ -413,7 +486,7 @@
 				<!-- Left: sprite + type pills -->
 				<div class="flex flex-col items-center justify-start gap-3 flex-shrink-0">
 					<div class="flex items-center justify-center">
-						<TrackedPokemonImg pokemonId={pokemonId} src={heroSrc} alt={activePokemon?.name ?? ''} class="max-w-48 object-contain" badgeClass="text-2xl" onerror={() => { heroImgFailed = true; }} />
+						<TrackedPokemonImg pokemonId={pokemonId} form={activeForm} src={heroSrc} alt={activePokemon?.name ?? ''} class="max-w-48 object-contain" badgeClass="text-2xl" onerror={() => { heroImgFailed = true; }} />
 					</div>
 					<button
 						onclick={() => (showShadow = !showShadow)}
@@ -672,12 +745,12 @@
 				<div class="flex flex-wrap gap-3">
 					{#each formOptions as opt}
 						<button
-							onclick={() => (activeForm = opt.form)}
+							onclick={() => setForm(opt.form)}
 							class="flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors {activeForm === opt.form
 								? 'bg-zinc-900 dark:bg-zinc-100'
 								: 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700'}"
 						>
-							<TrackedPokemonImg pokemonId={pokemonId} src={sprite(opt.form)} alt={opt.label} class="w-14 h-14 object-contain" />
+							<TrackedPokemonImg pokemonId={pokemonId} form={opt.form} src={sprite(opt.form)} alt={opt.label} class="w-14 h-14 object-contain" />
 							<span class="text-xs font-medium {activeForm === opt.form ? 'text-white dark:text-zinc-900' : 'text-zinc-600 dark:text-zinc-400'}">
 								{opt.label}
 							</span>
@@ -689,6 +762,7 @@
 
 		{#snippet evoCardSnip(id: number)}
 			{@const isCurrent = id === pokemonId}
+			{@const evoForm = evoFormMap.get(id) ?? 0}
 			<a
 				href="/pokedex/{id}"
 				style="
@@ -699,7 +773,7 @@
 					border:1px solid {isCurrent ? (isDark ? '#d4d4d8' : '#27272a') : (isDark ? '#3f3f46' : '#e4e4e7')};
 				"
 			>
-				<TrackedPokemonImg pokemonId={id} src={evoSprite(id)} class="w-12 h-12 object-contain" />
+				<TrackedPokemonImg pokemonId={id} form={evoForm} src={evoSpriteFor(id, evoForm)} class="w-12 h-12 object-contain" />
 				<span style="font-size:0.75rem; font-weight:500; text-align:center; line-height:1.25; color:{isCurrent ? (isDark ? '#18181b' : '#ffffff') : (isDark ? '#d4d4d8' : '#3f3f46')};">
 					{getMasterPokemon(id)?.name ?? `#${id}`}
 				</span>
