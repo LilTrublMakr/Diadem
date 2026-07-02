@@ -1,4 +1,3 @@
-import { PERMISSION_UPDATE_INTERVAL } from "@/lib/constants";
 import { locales, serverAsyncLocalStorage } from "@/lib/paraglide/runtime";
 import { paraglideMiddleware } from "@/lib/paraglide/server";
 import { getUserByDiscordId } from "@/lib/server/auth/auth";
@@ -9,15 +8,13 @@ import {
 	getDiscordAccessToken,
 	isAuthEnabled
 } from "@/lib/server/auth/betterAuth";
-import { getEveryonePerms, updatePermissions } from "@/lib/server/auth/permissions";
-import type { User } from "@/lib/server/db/internal/schema";
+import { permissionCache, updatePermissionsLocked } from "@/lib/server/auth/permissionCache";
+import { getEveryonePerms } from "@/lib/server/auth/permissions";
 import { getServerLogger } from "@/lib/server/logging";
 import { setConfig } from "@/lib/services/config/config";
 import { getClientConfig } from "@/lib/services/config/config.server";
 import { getDisallowedPaths } from "@/lib/utils/disallowedPaths";
-import type { Perms } from "@/lib/utils/features";
 import { setServerLoggerFactory } from "@/lib/utils/logger";
-import TTLCache from "@isaacs/ttlcache";
 import type { Handle, ServerInit } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
 
@@ -43,22 +40,7 @@ const paraglideHandle: Handle = ({ event, resolve }) =>
 		});
 	});
 
-const permissionCache: TTLCache<string, Perms> = new TTLCache({
-	ttl: PERMISSION_UPDATE_INTERVAL * 1000
-});
 const authLog = getServerLogger("auth");
-const permissionUpdateInFlight = new Map<string, Promise<Perms>>();
-
-function updatePermissionsLocked(user: User, accessToken: string, thisFetch: typeof fetch) {
-	let updatePromise = permissionUpdateInFlight.get(user.id);
-	if (!updatePromise) {
-		updatePromise = updatePermissions(user, accessToken, thisFetch).finally(() => {
-			permissionUpdateInFlight.delete(user.id);
-		});
-		permissionUpdateInFlight.set(user.id, updatePromise);
-	}
-	return updatePromise;
-}
 
 const handleAuth: Handle = async ({ event, resolve }) => {
 	if (auth && event.url.pathname.startsWith(`${AUTH_BASE_PATH}/`)) {
@@ -80,13 +62,15 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 
 	const discordId = authSession.user.discordId;
 	if (!discordId) {
-		authLog.warning("Authenticated user has no discordId in Better Auth session");
+		authLog.warning(
+			`Authenticated user (${authSession.user.name}) has no discordId in Better Auth session`
+		);
 		return resolve(event);
 	}
 
 	const user = await getUserByDiscordId(discordId);
 	if (!user) {
-		authLog.warning(`No user row found for Discord id ${discordId}`);
+		authLog.warning(`No user row found for Discord id ${discordId} (${authSession.user.name})`);
 		return resolve(event);
 	}
 
@@ -97,7 +81,7 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 			perms = await updatePermissionsLocked(user, accessToken ?? "", event.fetch);
 			permissionCache.set(user.id, perms);
 		} catch (error) {
-			authLog.warning(`Failed to update permissions for user ${user.id}: ${error}`);
+			authLog.warning(`Failed to update permissions for user ${user.id} (${user.name}): ${error}`);
 			perms = event.locals.perms;
 		}
 	}

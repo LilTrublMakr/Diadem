@@ -97,13 +97,13 @@ export async function updatePermissions(user: User, accessToken: string, thisFet
 				let guild = guildCache[rule.guildId];
 				if (!guild) {
 					const lookup = await getGuildMemberInfo(rule.guildId, accessToken);
-					if (!lookup) {
+					if (!lookup.found) {
 						log.warning(
-							`discord guild lookup failed for user ${user.id}; treating guild ${rule.guildId} as non-member`
+							`discord guild lookup failed for user ${user.id} (${user.name}); treating guild ${rule.guildId} as non-member; discord responded ${lookup.status}`
 						);
 						guild = { roles: [] };
 					} else {
-						guild = lookup;
+						guild = lookup.data;
 					}
 					guildCache[rule.guildId] = guild;
 				}

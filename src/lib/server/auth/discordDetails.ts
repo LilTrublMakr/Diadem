@@ -51,23 +51,30 @@ export async function getUserInfoResult(accessToken: string): Promise<DiscordUse
 	};
 }
 
-export async function getGuildMemberInfo(guildId: string, accessToken: string) {
+export type GuildMemberLookup =
+	| { found: true; data: DiscordGuildData }
+	| { found: false; status: number };
+
+export async function getGuildMemberInfo(
+	guildId: string,
+	accessToken: string
+): Promise<GuildMemberLookup> {
 	const response = await fetch(
 		`${endpoint}/guilds/${guildId}/member`,
 		getFetchOptions(accessToken)
 	);
 	if (response.status === 404) {
-		return { roles: [] } as DiscordGuildData;
+		return { found: true, data: { roles: [] } };
 	}
 	if (!response.ok) {
-		return undefined;
+		return { found: false, status: response.status };
 	}
 	const guildMember: DiscordGuildData = await response.json();
-	return guildMember;
+	return { found: true, data: guildMember };
 }
 
 export async function isGuildMember(guildId: string, accessToken: string) {
-	const guildMember = await getGuildMemberInfo(guildId, accessToken);
-	if (!guildMember) return;
-	return !!guildMember.user;
+	const lookup = await getGuildMemberInfo(guildId, accessToken);
+	if (!lookup.found) return;
+	return !!lookup.data.user;
 }
