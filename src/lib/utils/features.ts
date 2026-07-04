@@ -123,4 +123,6 @@ export type PermArea = {
 export type Perms = {
 	everywhere: FeaturesKey[];
 	areas: PermArea[];
+	// User scan-area worker allotment: undefined/0 = feature off, -1 = unlimited
+	scanWorkers?: number;
 };

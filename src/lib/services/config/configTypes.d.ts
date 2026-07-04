@@ -91,6 +91,7 @@ export type Permissions = {
 	roleId?: string;
 	areas?: string[];
 	features?: FeaturesKey[];
+	scanWorkers?: number; // user scan-area worker allotment; -1 = unlimited
 };
 
 export type Log = {
@@ -208,6 +209,10 @@ export type ServerConfig = {
 	};
 	log: Log;
 	internalDb: DbCreds;
+	scanAreas?: {
+		maxAreaKm2?: number;
+		recommendedAreaKm2?: number;
+	};
 	auth: Auth;
 	permissions?: Permissions[];
 	staticMap?: StaticMap;

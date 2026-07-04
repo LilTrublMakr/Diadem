@@ -23,6 +23,11 @@ function addFeatures(featureArray: FeaturesKey[], features: FeaturesKey[] | unde
 }
 
 function handleRule(rule: ConfigRule, perms: Perms, geofences: KojiFeatures | undefined) {
+	if (rule.scanWorkers !== undefined) {
+		if (rule.scanWorkers === -1 || perms.scanWorkers === -1) perms.scanWorkers = -1;
+		else perms.scanWorkers = Math.max(perms.scanWorkers ?? 0, rule.scanWorkers);
+	}
+
 	if (rule.areas && !geofences) return;
 
 	if (rule.areas) {

@@ -216,7 +216,14 @@ All custom code lives in paths that Diadem treats as extension points:
 | `src/components/custom/TrackedPokemonImg.svelte` | Drop-in `<img>` wrapper — badge positions: ✨ top-left, 🌟 top-right, 0️⃣ bottom-left, 💯 bottom-right |
 | `src/lib/server/db/stats.ts` | Stats DB connection (`queryStats<T>()`) — reads `STATS_DB_*` via `$env/static/private` |
 | `src/lib/server/api/dragoniteStatus.ts` | Dragonite admin API client — calls `/status/` and scout queue |
+| `src/lib/server/api/dragoniteAreas.ts` | Dragonite v2 area CRUD client — `POST/PATCH/DELETE v2/areas/`, quest start/stop, route recalc, reload; exports shared `dragoniteFetch`/`throwProblem` |
+| `src/lib/server/api/dragoniteScheduler.ts` | Dragonite scheduler client — create/delete/list schedule docs (`scheduler/schedules`) |
 | `src/lib/server/db/dragonite.ts` | Dragonite DB connection for historical `stats_workers` data (future use) |
+| `src/lib/server/scanAreas/` | Scan-area server logic — `service.ts` (lifecycle + allotment + per-user mutex + reconciliation), `validation.ts` (zod + turf), `allotment.ts`, `constants.ts`, `endpointUtils.ts` |
+| `src/routes/api/custom/scan-areas/` | Scan-area REST API — GET/POST list+create, `[id]` PATCH/DELETE, `[id]/activate`, `[id]/deactivate`, `[id]/quest` |
+| `src/routes/(custom)/areas/+page.svelte` | User scan-area page at `/areas` — draw polygons (terra-draw), worker steppers, active toggles, allotment meter |
+| `src/lib/features/scanAreas/` | Client state (`scanAreasState.svelte.ts`), shared DTO types (`types.ts`), schedule types (`scheduleTypes.ts`), overlap validator (`scheduleOverlap.ts` — pure, shared server+client) |
+| `src/components/custom/scanAreas/` | `ScanAreaMap.svelte` (local MapLibre + terra-draw), `ScanAreaCard.svelte` (mode switch + toggle + workers), `ScheduleEditor.svelte` (weekly/dated windows, live conflict pre-check), `AllotmentMeter.svelte` |
 
 ---
 
@@ -276,6 +283,8 @@ For charts/history using `stats_workers`, a direct MariaDB connection is availab
 - [x] Personal shiny/hundo tracker — per-user DB table, checkboxes on pokemon detail page and map popup, badges on all pokemon images, profile page at `/profile`
 - [x] Nundo (0% IV) + shundo (shiny 100% IV) tracker — extends tracker with nundo/shundo booleans; badges on pokemon images; DB columns `nundo`/`shundo` on `pokemon_tracker`
 - [x] NavBar username → dropdown with avatar, Profile link, Logout
+- [x] User scan areas (`/areas`) — per-user drawn geofences, worker allotment per Discord role (`scanWorkers` on permission sets, -1/admin = unlimited), mirror-all lifecycle against Dragonite v2 area API, 5 km² hard / 2.5 km² recommended size limits
+- [x] Per-area schedules — Dragonite scheduler engine; manual|scheduled mode per area; weekly windows + one-off dates in the user's browser tz; overlap-aware allotment (sum of workers at any instant ≤ allotment; manual-active counts 24/7)
 - [ ] Worker history charts — using `stats_workers` from Dragonite DB
 
 ---
@@ -313,6 +322,15 @@ You might be able to use the Svelte MCP server, where you have access to compreh
 - `TrackedPokemonImg` replaces bare `<img>` tags wherever pokemon images appear — import from `@/components/custom/TrackedPokemonImg.svelte`; pass `pokemonId`, `src`, optional `alt` and `class`; badges: ✨ top-left, 🌟 top-right, 0️⃣ bottom-left, 💯 bottom-right
 - Tracker `toggleTracker` type is `'shiny' | 'hundo' | 'nundo' | 'shundo'`; button/section order everywhere: shundo → hundo → shiny → nundo
 - `pokemon_tracker` DB migration (run manually if columns missing): `ALTER TABLE pokemon_tracker ADD nundo boolean DEFAULT false NOT NULL; ALTER TABLE pokemon_tracker ADD shundo boolean DEFAULT false NOT NULL;`
+- **`pnpm db:push` is dangerous on this DB** — drizzle-kit sees drift on pre-existing tables (wants to TRUNCATE `user`/`session`/`pokemon_tracker`). Never confirm its prompt; create new tables with raw SQL instead (see docs guide `scan-areas.md` for the `scan_area` DDL)
+- Dragonite v2 API: core `:7272` (no auth) serves `/v2/areas/` CRUD; admin proxy `:7273` needs `X-Dragonite-Admin-Secret` and prefixes `/api`. Client pattern: `new URL('v2/areas/', adminUrl ?? url)` — relative paths, same as `dragoniteStatus.ts`
+- Scan-area lifecycle is **mirror-all**: every `scan_area` row has a permanent Dragonite area (`vtscan_{dbId}_{slug}`, `SCAN_AREA_PREFIX` in `src/lib/server/scanAreas/constants.ts`); occupancy = `pokemon_mode.workers` (manual-active → N, else 0); `quest_mode.workers` stays N always (a cap, NOT scalable — Dragonite rejects `scale: quest` actions)
+- Scan-area schedules: Dragonite docs named `vtsched_{dbId}_r` (recurring, priority 100) / `vtsched_{dbId}_d{n}` (dated, priority 501+n — equal-priority same-target docs are rejected even across disjoint dates); rebuild-don't-patch on any change; renames must rebuild (targets are by area NAME); dated docs DO honor doc-level `windows` (truly windowed, not full-day)
+- After creating a Dragonite area: `reload → recalculate?bootstrap=true → reload` — the second reload registers the route with the scheduler (schedules report `no_capable_target` without it)
+- Reconciliation on server start (`hooks.server.ts` init): deletes vtscan_/vtsched_ orphans, creates missing Dragonite areas for all rows (migrates old create-on-activate installs), rebuilds missing schedule docs
+- Overlap validation (`src/lib/features/scanAreas/scheduleOverlap.ts`, pure/shared): weekly sweep-line on minutes [0,10080) ET + per-date 2-day pass for dated windows; per-area union first; half-open intervals (back-to-back windows OK); tz via Intl offset math; manual-active areas occupy 24/7
+- `Perms.scanWorkers` (number, -1 unlimited) accumulated in `handleRule()` (`permissions.ts`) as max across matching rules; admins (Features.ALL) get -1 via `getScanWorkerAllotment()`
+- Custom pages/components hardcode English strings (no paraglide) — scan-area UI follows that convention
 - `getBestRank` in `pokemonUtils.ts` casts `data.pvp` to `Record<string, PvpStats[] | undefined>` because `League.MASTER` is not in the typed pvp object — do not remove the cast
 - Diadem upstream strategy: do NOT run `git merge diadem/main` (250 file conflicts from native mobile app + duplicate cherry-picks). Use surgical `git cherry-pick <hash>` per commit. Tier order: security → bug fixes → features. After each pick run `pnpm run check`.
 - TypeScript cannot import types from parameterized route files (e.g. `../../api/custom/pokemon/[id]/+server`) — inline the type in the consuming file instead

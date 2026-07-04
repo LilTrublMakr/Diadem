@@ -110,6 +110,10 @@ export const init: ServerInit = async () => {
 
 	const { initDiadem } = await import("@/lib/server/init");
 	await initDiadem();
+
+	// fire-and-forget: clean up scan-area drift between the internal DB and Dragonite
+	const { reconcileScanAreas } = await import("@/lib/server/scanAreas/service");
+	void reconcileScanAreas();
 };
 
 const handleSeo: Handle = async ({ event, resolve }) => {

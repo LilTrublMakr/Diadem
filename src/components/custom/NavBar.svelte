@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { getUserDetails, updateUserDetails } from '$lib/services/user/userDetails.svelte';
+	import { Features } from '$lib/utils/features';
 	import { getUserSettings } from '$lib/services/userSettings.svelte';
 	import { setThemeMode } from '$lib/services/themeMode';
 	import { Sun, Moon, Menu, X, ChevronDown } from 'lucide-svelte';
@@ -15,13 +16,17 @@
 	];
 
 	let user = $derived(getUserDetails().details);
+	let canScan = $derived.by(() => {
+		const perms = getUserDetails().permissions;
+		return (perms.scanWorkers ?? 0) !== 0 || perms.everywhere.includes(Features.ALL);
+	});
 	let isDark = $derived(getUserSettings().themeMode !== 'light');
 	let menuOpen = $state(false);
 	let dropdownOpen = $state(false);
 
 	async function logout() {
 		dropdownOpen = false;
-		await fetch('/logout');
+		await fetch('/logout', { method: 'POST' });
 		await updateUserDetails();
 	}
 
@@ -97,6 +102,15 @@
 							>
 								My Collection
 							</a>
+							{#if canScan}
+								<a
+									href="/areas"
+									onclick={() => (dropdownOpen = false)}
+									class="block px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+								>
+									My Areas
+								</a>
+							{/if}
 							<button
 								onclick={logout}
 								class="w-full text-left px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
@@ -173,6 +187,15 @@
 					>
 						My Collection
 					</a>
+					{#if canScan}
+						<a
+							href="/areas"
+							onclick={closeMenu}
+							class="py-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+						>
+							My Areas
+						</a>
+					{/if}
 					<button
 						onclick={() => { logout(); closeMenu(); }}
 						class="text-left py-1.5 text-zinc-400 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"

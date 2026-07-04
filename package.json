@@ -70,6 +70,8 @@
 		"sharp": "^0.34.5",
 		"svelte-maplibre": "1.2.5",
 		"tailwind-merge": "^2.5.5",
+		"terra-draw": "^1.31.2",
+		"terra-draw-maplibre-gl-adapter": "^1.4.1",
 		"toml": "^3.0.0",
 		"uicons.js": "^2.2.0",
 		"winston": "^3.18.3",

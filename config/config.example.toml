@@ -111,6 +111,19 @@ features = ["*"]
 #areas = ["Tokyo"]
 #features = ["*"]
 
+# scanWorkers grants a user scan-area worker allotment (see /areas page).
+# The highest value across all matching permission sets wins; -1 = unlimited.
+# Users with the "*" feature (admins) are always unlimited.
+#[[server.permissions]]
+#guildId = "1359028304128245934"
+#roleId = "1483326963558653982"
+#scanWorkers = 2
+
+# Optional limits for user-created scan areas (values in km²)
+#[server.scanAreas]
+#maxAreaKm2 = 5.0
+#recommendedAreaKm2 = 2.5
+
 # Rate limits can be used to limit the data clients can fetch from your server
 # Abuse may be rare, but can happen. If you notice abuse, you can enable rate limits.
 #

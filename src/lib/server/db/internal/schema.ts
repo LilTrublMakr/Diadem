@@ -123,3 +123,38 @@ export const pokemonTracker = mysqlTable(
 );
 
 export type PokemonTracker = typeof pokemonTracker.$inferSelect;
+
+export const scanArea = mysqlTable(
+	"scan_area",
+	{
+		id: int("id").autoincrement().primaryKey(),
+		userId: varchar("user_id", { length: 255 })
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		name: varchar("name", { length: 64 }).notNull(),
+		geofence: json("geofence").$type<import("geojson").Polygon>().notNull(),
+		areaSqM: int("area_sq_m").notNull(),
+		workers: int("workers").default(1).notNull(),
+		// Manual occupancy flag; only meaningful when mode === "manual"
+		active: boolean("active").default(false).notNull(),
+		mode: varchar("mode", { length: 16 })
+			.$type<import("@/lib/features/scanAreas/scheduleTypes").ScanAreaMode>()
+			.default("manual")
+			.notNull(),
+		schedule:
+			json("schedule").$type<import("@/lib/features/scanAreas/scheduleTypes").AreaSchedule>(),
+		// vtsched_ doc ids currently in Dragonite for this area
+		dragoniteScheduleIds: json("dragonite_schedule_ids").$type<number[]>(),
+		// Dragonite area id — mirror-all lifecycle: non-null after creation, null only
+		// briefly when the create failed (reconciliation heals it)
+		dragoniteAreaId: int("dragonite_area_id"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
+	},
+	(table) => ({
+		userNameUnique: uniqueIndex("scan_area_user_name_unique").on(table.userId, table.name),
+		userIdIdx: index("scan_area_user_id_idx").on(table.userId)
+	})
+);
+
+export type ScanArea = typeof scanArea.$inferSelect;
