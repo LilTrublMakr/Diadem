@@ -19,7 +19,8 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src")
-		}
+		},
+		conditions: ["svelte", "browser", "module", "node", "development|production"]
 	},
 	build: {
 		cssMinify: "esbuild"
