@@ -352,6 +352,7 @@ id = "positron"
 name = "Positron"
 url = "https://.../style.json"
 # default = "light"
+# theme = "light"
 ```
 
 Supported keys:
@@ -360,6 +361,7 @@ Supported keys:
 - `name`: display name
 - `url`: style URL
 - `default`: optional `light` or `dark`
+- `theme`: optional `light`, `dark`, or `satellite`
 
 ## `client.uiconSets`
 

@@ -2,7 +2,7 @@
 	import Button from "@/components/ui/input/Button.svelte";
 	import { getLoginLink } from "@/lib/services/user/login";
 	import DiscordIcon from "@/components/icons/DiscordIcon.svelte";
-	import { X } from "lucide-svelte";
+	import { X } from "@lucide/svelte";
 	import * as m from "@/lib/paraglide/messages";
 	import { hasLoadedFeature, LoadedFeature } from "@/lib/services/initialLoad.svelte";
 	import { isSupportedFeature } from "@/lib/services/supportedFeatures";
@@ -23,7 +23,7 @@
 		tag="a"
 		href={getLoginLink()}
 	>
-		<DiscordIcon class="w-4 fill-foreground shrink-0" />
+		<DiscordIcon class="w-4 shrink-0" />
 		<p class="">
 			{m.signin_prompt_part_1()}
 			<a href={getLoginLink()} class="font-semibold underline">

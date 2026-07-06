@@ -289,6 +289,11 @@ For charts/history using `stats_workers`, a direct MariaDB connection is availab
 
 ---
 
+### Code Preference
+
+- Avoid writing functions that are only used once
+- Use inline js in Svelte HTML blocks for one-off callbacks or to generate parameters. Svelte supports "this {variable} string formatting"
+
 ## Svelte MCP
 
 You might be able to use the Svelte MCP server, where you have access to comprehensive Svelte 5 and SvelteKit documentation. Here's how to use the available tools effectively:

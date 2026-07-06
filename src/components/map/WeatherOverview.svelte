@@ -7,7 +7,7 @@
 	} from "@/lib/mapObjects/weather.svelte.js";
 	import Button from "@/components/ui/input/Button.svelte";
 	import { getMap } from "@/lib/map/map.svelte";
-	import { ArrowBigUpDash, Clock } from "lucide-svelte";
+	import { ArrowBigUpDash, Clock } from "@lucide/svelte";
 	import IconValue from "@/components/ui/popups/common/IconValue.svelte";
 	import * as m from "@/lib/paraglide/messages";
 	import { getWeatherIcon } from "@/lib/utils/weatherIcons.js";
@@ -23,7 +23,6 @@
 	import { hasLoadedFeature, LoadedFeature } from "@/lib/services/initialLoad.svelte.js";
 	import { timestampToLocalTime } from "@/lib/utils/timestampToLocalTime";
 	import { currentTimestamp } from "@/lib/utils/currentTimestamp";
-	import { isMenuSidebar, isUiLeft } from "@/lib/utils/device";
 	import { isSearchViewActive } from "@/lib/features/activeSearch.svelte";
 
 	let ignoreWatch = false;
@@ -77,12 +76,7 @@
 </script>
 
 {#if getCurrentWeather() && isWeatherUpdated(getCurrentWeather()) && hasLoadedFeature(LoadedFeature.REMOTE_LOCALE, LoadedFeature.ICON_SETS) && !isSearchViewActive()}
-	<div
-		class="pointer-events-none fixed top-2 z-10"
-		class:right-2={!isUiLeft() || isMenuSidebar()}
-		class:left-2={isUiLeft() && !isMenuSidebar()}
-		transition:fade={{ duration: 90 }}
-	>
+	<div class="pointer-events-none" transition:fade={{ duration: 90 }}>
 		<Button
 			variant="ghost"
 			size=""
