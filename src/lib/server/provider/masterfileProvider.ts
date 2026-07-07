@@ -3,6 +3,8 @@ import { BaseDataProvider } from "@/lib/server/provider/dataProvider";
 import { overwriteMasterfile } from "@/lib/services/masterfile";
 import type { MasterFile, MasterMove, MasterPokemon } from "@/lib/types/masterfile";
 import { getLogger } from "@/lib/utils/logger";
+import type { MasterStats } from "$lib/server/api/queryStats";
+import { setMasterStats } from "$lib/features/masterStats.svelte";
 
 type RawMove = { moveId: number; moveName: string; proto: string; type: number; power: number };
 type RawEvolution = {
@@ -204,9 +206,11 @@ export class MasterfileProvider extends BaseDataProvider<MasterFile> {
 			};
 		}
 
-		overwriteMasterfile(masterFile);
-
 		return masterFile;
+	}
+
+	protected setData(data: MasterFile) {
+		overwriteMasterfile(data);
 	}
 }
 
