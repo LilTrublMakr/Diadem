@@ -42,7 +42,47 @@ export class StationQuery extends DbMapObjectQuery<StationData, FilterStation> {
 
 	protected getFilterWhere(filter: FilterStation | undefined): { sql: string; values: unknown[] } {
 		if (filter && !filter.stationPlain.enabled && filter.maxBattle.enabled) {
-			return { sql: "end_time > UNIX_TIMESTAMP()", values: [] };
+			const filters = filter.maxBattle.filters.filter((f) => f.enabled);
+			const clauses: string[] = [];
+			const values: unknown[] = [];
+
+			for (const filterset of filters) {
+				if (filterset.isActive) {
+					clauses.push(
+						"is_inactive = false AND is_battle_available = true AND start_time < UNIX_TIMESTAMP() AND end_time > UNIX_TIMESTAMP()"
+					);
+					continue;
+				}
+
+				if (filterset.hasGmax) {
+					clauses.push("total_stationed_gmax > 0");
+					continue;
+				}
+
+				for (const boss of filterset.bosses ?? []) {
+					const bossClauses = ["battle_pokemon_id = ?", "battle_pokemon_form = ?"];
+					values.push(boss.pokemon_id, boss.form);
+
+					if (boss.bread_mode !== undefined) {
+						bossClauses.push("battle_pokemon_bread_mode = ?");
+						values.push(boss.bread_mode);
+					}
+
+					clauses.push(`(${bossClauses.join(" AND ")})`);
+				}
+			}
+
+			if (clauses.length) {
+				return {
+					sql: `is_inactive = false AND is_battle_available = true AND end_time > UNIX_TIMESTAMP() AND (${clauses.join(" OR ")})`,
+					values
+				};
+			}
+
+			return {
+				sql: "is_inactive = false AND is_battle_available = true AND end_time > UNIX_TIMESTAMP()",
+				values: []
+			};
 		}
 		return { sql: "", values: [] };
 	}
