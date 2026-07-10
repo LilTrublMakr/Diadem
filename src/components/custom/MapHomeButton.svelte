@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Heart } from 'lucide-svelte';
+	import { Heart } from '@lucide/svelte';
 	import { hasFeatureAnywhere } from '@/lib/services/user/checkPerm';
 	import { Features } from '@/lib/utils/features';
 	import { getUserDetails } from '@/lib/services/user/userDetails.svelte';

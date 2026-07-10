@@ -535,7 +535,7 @@
 	"filter_visual_hint": "Click the map above to change the appearance of this filter on the map.",
 	"notifications": "Notifications",
 	"browser_notifications": "Browser notifications",
-	"notifications_blocked": "Notifications are blocked by your browser. Enable them in browser settings."
+	"notifications_blocked": "Notifications are blocked by your browser. Enable them in browser settings.",
 	"connecting": "Connecting",
 	"connect": "Connect",
 	"error_retry": "Retry",
@@ -661,5 +661,13 @@
 	"lost": "Lost",
 	"fed": "Fed",
 	"catchable": "Catchable",
-	"find_wild_name": "Find wild {name}"
+	"find_wild_name": "Find wild {name}",
+	"distance": "Distance",
+	"duration": "Duration",
+	"my_collection": "My Collection",
+	"click_to_toggle": "Click to toggle",
+	"tracker_shundo": "Shundo",
+	"tracker_hundo": "Hundo",
+	"tracker_shiny": "Shiny",
+	"tracker_nundo": "Nundo"
 }

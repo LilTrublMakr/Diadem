@@ -15,6 +15,7 @@
 	import { getPopupPropsSpawnpoint } from "@/components/ui/popups/spawnpoint/SpawnpointPopup.svelte";
 	import { getPopupPropsStation } from "@/components/ui/popups/station/StationPopup.svelte";
 	import { getPopupPropsGym } from "@/components/ui/popups/gym/GymPopup.svelte";
+	import { getPopupPropsRoute } from "@/components/ui/popups/route/RoutePopup.svelte";
 	import { isAllowedTwoSidebars } from "$lib/utils/device";
 	import { closeMenu } from "$lib/ui/menus.svelte";
 	import { isSearchViewActive } from "$lib/features/activeSearch.svelte";
@@ -32,7 +33,8 @@
 		[MapObjectType.TAPPABLE]: getPopupPropsTappable,
 		[MapObjectType.SPAWNPOINT]: getPopupPropsSpawnpoint,
 		[MapObjectType.GYM]: getPopupPropsGym,
-		[MapObjectType.STATION]: getPopupPropsStation
+		[MapObjectType.STATION]: getPopupPropsStation,
+		[MapObjectType.ROUTE]: getPopupPropsRoute
 	};
 
 	let data = $derived(getCurrentSelectedData());

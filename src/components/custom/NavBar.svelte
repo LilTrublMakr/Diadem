@@ -4,7 +4,7 @@
 	import { Features } from '$lib/utils/features';
 	import { getUserSettings } from '$lib/services/userSettings.svelte';
 	import { setThemeMode } from '$lib/services/themeMode';
-	import { Sun, Moon, Menu, X, ChevronDown } from 'lucide-svelte';
+	import { Sun, Moon, Menu, X, ChevronDown } from '@lucide/svelte';
 	import PokedexSearch from './PokedexSearch.svelte';
 
 	const navLinks = [

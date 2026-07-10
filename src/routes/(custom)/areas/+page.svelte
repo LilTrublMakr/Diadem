@@ -13,7 +13,7 @@
 	import type { ScanAreaDto } from "@/lib/features/scanAreas/types";
 	import { getUserDetails } from "@/lib/services/user/userDetails.svelte";
 	import type { Polygon } from "geojson";
-	import { Loader2, MapPinPlus, X } from "lucide-svelte";
+	import { Loader2, MapPinPlus, X } from "@lucide/svelte";
 
 	const scanState = getScanAreasState();
 

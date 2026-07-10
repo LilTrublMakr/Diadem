@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { Search, X } from 'lucide-svelte';
+	import { Search, X } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { createFuzzySearch } from '$lib/services/search.svelte';
 	import { getAllPokemon, getMasterPokemon, loadMasterFile } from '$lib/services/masterfile';

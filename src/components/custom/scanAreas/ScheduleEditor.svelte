@@ -12,7 +12,7 @@
 		type ScanAreaMode
 	} from "@/lib/features/scanAreas/scheduleTypes";
 	import type { ScanAreaDto } from "@/lib/features/scanAreas/types";
-	import { CalendarPlus, Plus, X } from "lucide-svelte";
+	import { CalendarPlus, Plus, X } from "@lucide/svelte";
 
 	let {
 		area,

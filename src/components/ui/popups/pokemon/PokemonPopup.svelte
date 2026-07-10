@@ -6,7 +6,6 @@
 	import { MapObjectType } from "$lib/mapObjects/mapObjectTypes";
 	import Button from "@/components/ui/input/Button.svelte";
 	import ImagePopup from "@/components/ui/popups/common/ImagePopup.svelte";
-	import Countdown from "@/components/utils/Countdown.svelte";
 	import BasicMainCard from "@/components/ui/popups/common/BasicMainCard.svelte";
 	import OverviewCard from "@/components/ui/popups/common/OverviewCard.svelte";
 	import TitledMainSection from "@/components/ui/popups/common/TitledMainSection.svelte";
@@ -16,7 +15,11 @@
 	import UpdatedTimes from "@/components/ui/popups/common/UpdatedTimes.svelte";
 	import MainAccessMap from "@/components/ui/popups/common/MainAccessMap.svelte";
 	import { getIconItem, getIconPokemon } from "$lib/services/uicons.svelte";
-	import { getPokemonStats as getMasterPokemonStats, type PokemonStats } from "$lib/features/masterStats.svelte";
+	import { getTrackers, setTrackerEntry, trackerKey } from "$lib/features/trackerState.svelte";
+	import {
+		getPokemonStats as getMasterPokemonStats,
+		type PokemonStats
+	} from "$lib/features/masterStats.svelte";
 	import type { PokemonData, PvpStats } from "$lib/types/mapObjectData/pokemon";
 	import { isPointInAllowedArea } from "$lib/services/user/checkPerm";
 	import { getUserDetails } from "$lib/services/user/userDetails.svelte";
@@ -47,25 +50,29 @@
 		ChevronDown,
 		CircleDot,
 		CircleSmall,
+		CloudSun,
 		Expand,
 		Goal,
 		Info,
 		Mars,
+		Percent,
 		Ruler,
 		RulerDimensionLine,
+		ShieldHalf,
 		Shrink,
 		SlidersHorizontal,
+		Sparkles,
 		Spotlight,
-		SquareChartGantt,
 		Swords,
 		Trash2,
+		TrendingUp,
 		Venus
 	} from "@lucide/svelte";
 	import FiltersetIcon from "$lib/features/filters/FiltersetIcon.svelte";
 	import PokemonStatsCard from "@/components/ui/popups/common/PokemonStatsCard.svelte";
 	import BigCountdown from "@/components/ui/popups/common/BigCountdown.svelte";
-	import { mLeague } from "$lib/services/ingameLocale.ts";
-	import { getIconLeague } from "$lib/services/uicons.svelte.ts";
+	import { mLeague } from "$lib/services/ingameLocale";
+	import { getIconLeague } from "$lib/services/uicons.svelte";
 
 	export { image, overview, main };
 
@@ -156,7 +163,34 @@
 				return a.cap - b.cap;
 			});
 	}
+
+	async function toggleTracker(
+		pokemonId: number,
+		form: number,
+		field: "shiny" | "hundo" | "nundo" | "shundo"
+	) {
+		const prev = getTrackers()[trackerKey(pokemonId, form)] ?? {
+			shiny: false,
+			hundo: false,
+			nundo: false,
+			shundo: false
+		};
+		const newVal = !prev[field];
+		setTrackerEntry(pokemonId, form, { [field]: newVal });
+		try {
+			const res = await fetch(`/api/custom/tracker/${pokemonId}`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ form, [field]: newVal })
+			});
+			if (res.ok) setTrackerEntry(pokemonId, form, await res.json());
+			else setTrackerEntry(pokemonId, form, prev);
+		} catch {
+			setTrackerEntry(pokemonId, form, prev);
+		}
+	}
 </script>
+
 <script>
 	import IconValue from "@/components/ui/popups/common/IconValue.svelte";
 </script>
@@ -170,20 +204,6 @@
 
 {#snippet overview(d: MapData)}
 	{@const data = d as PokemonData}
-
-	<OverviewCard title={hasTimer(data) ? m.popup_despawns() : m.popup_found()}>
-		{#snippet value()}
-			<Countdown expireTime={hasTimer(data) ? data.expire_timestamp : data.first_seen_timestamp} />
-		{/snippet}
-	</OverviewCard>
-
-	{#if data.iv != null}
-		<OverviewCard title={m.pogo_ivs()}>
-			{#snippet value()}
-				{@render coloredIvs(data?.iv ?? -1, 1)}
-			{/snippet}
-		</OverviewCard>
-	{/if}
 
 	{#if showLittle(data)}
 		<OverviewCard title={m.little_league()}>
@@ -212,14 +232,6 @@
 	{#if data.size && [1, 5].includes(data.size)}
 		<OverviewCard title={m.pokemon_size()} value={getPokemonSize(data?.size ?? 3)} />
 	{/if}
-
-	{#if data.cp != null}
-		<OverviewCard title={m.cp()} value={data.cp} />
-	{/if}
-
-	{#if data.level != null}
-		<OverviewCard title={m.level()} value={data.level} />
-	{/if}
 {/snippet}
 
 {#snippet main(d: MapData)}
@@ -228,6 +240,52 @@
 	{@const statsEntry = stats?.entry}
 	{@const WeatherIcon = getWeatherIcon(data.weather)}
 	{@const pvpNotice = getPvpNotice(data)}
+	{@const tracker = getTrackers()[trackerKey(data.pokemon_id, data.form ?? 0)] ?? {
+		shiny: false,
+		hundo: false,
+		nundo: false,
+		shundo: false
+	}}
+
+	{#if getUserDetails().details}
+		<TitledMainSection Icon={Sparkles} title={m.my_collection()}>
+			{#snippet rightPart()}
+				<p class="text-sm text-muted-foreground">{m.click_to_toggle()}</p>
+			{/snippet}
+			<BasicMainCard>
+				<div class="flex justify-center gap-1.5">
+					<button
+						class="px-2 py-1 rounded-md border text-xs font-medium transition-colors cursor-pointer whitespace-nowrap grow basis-0 {tracker.shundo
+							? 'bg-amber-400/20 border-amber-400/60 text-amber-600 dark:text-amber-400'
+							: 'border-border text-muted-foreground hover:border-amber-400/60 hover:text-amber-600 dark:hover:text-amber-400'}"
+						onclick={() => toggleTracker(data.pokemon_id, data.form ?? 0, "shundo")}
+						title="Toggle shiny 100% IV caught">🌟 {m.tracker_shundo()}</button
+					>
+					<button
+						class="px-2 py-1 rounded-md border text-xs font-medium transition-colors cursor-pointer whitespace-nowrap grow basis-0 {tracker.hundo
+							? 'bg-indigo-400/20 border-indigo-400/60 text-indigo-600 dark:text-indigo-400'
+							: 'border-border text-muted-foreground hover:border-indigo-400/60 hover:text-indigo-600 dark:hover:text-indigo-400'}"
+						onclick={() => toggleTracker(data.pokemon_id, data.form ?? 0, "hundo")}
+						title="Toggle 100% IV caught">💯 {m.tracker_hundo()}</button
+					>
+					<button
+						class="px-2 py-1 rounded-md border text-xs font-medium transition-colors cursor-pointer whitespace-nowrap grow basis-0 {tracker.shiny
+							? 'bg-yellow-400/20 border-yellow-400/60 text-yellow-600 dark:text-yellow-400'
+							: 'border-border text-muted-foreground hover:border-yellow-400/60 hover:text-yellow-600 dark:hover:text-yellow-400'}"
+						onclick={() => toggleTracker(data.pokemon_id, data.form ?? 0, "shiny")}
+						title="Toggle shiny caught">✨ {m.tracker_shiny()}</button
+					>
+					<button
+						class="px-2 py-1 rounded-md border text-xs font-medium transition-colors cursor-pointer whitespace-nowrap grow basis-0 {tracker.nundo
+							? 'bg-red-400/20 border-red-400/60 text-red-600 dark:text-red-400'
+							: 'border-border text-muted-foreground hover:border-red-400/60 hover:text-red-600 dark:hover:text-red-400'}"
+						onclick={() => toggleTracker(data.pokemon_id, data.form ?? 0, "nundo")}
+						title="Toggle 0% IV caught">0️⃣ {m.tracker_nundo()}</button
+					>
+				</div>
+			</BasicMainCard>
+		</TitledMainSection>
+	{/if}
 
 	<BigCountdown
 		expire={data.expire_timestamp ?? 0}
@@ -237,6 +295,9 @@
 		fallbackExplanation={data.seen_type?.includes("nearby")
 			? m.unknown_spawnpoint_notice_nearby()
 			: m.unknown_spawnpoint_notice()}
+		rightPart={Math.abs((data.changed ?? 0) - (data.updated ?? data.changed ?? 0)) > 10
+			? speciesChangedNotice
+			: undefined}
 	/>
 
 	<div class="space-y-2">
@@ -343,68 +404,7 @@
 				})}
 			</BasicMainCard>
 		{/if}
-
-		{#if Math.abs((data.changed ?? 0) - (data.updated ?? data.changed ?? 0)) > 10}
-			<BasicMainCard class="flex gap-2 items-center justify-center">
-				<ArrowLeftRight class="size-4" />
-				{m.popup_species_changed()}
-			</BasicMainCard>
-		{/if}
 	</div>
-
-	{#if data.iv != null || data.cp != null || data.level != null}
-		<TitledMainSection Icon={SquareChartGantt} title={m.values()}>
-			<StatsMainCard>
-				{#if data.iv != null}
-					<div>
-						<Button
-							variant=""
-							size=""
-							class="flex text-base! font-normal! justify-between! w-full"
-							onclick={() => (showIvBreakdown = !showIvBreakdown)}
-						>
-							<p class="text-muted-foreground">
-								{m.iv_product_label_long()}
-							</p>
-							<div class="flex items-center">
-								<ChevronDown
-									class="size-3.5 mr-2 text-muted-foreground transition-transform"
-									style="rotate: {showIvBreakdown ? '180deg' : '0deg'}"
-								/>
-								{@render coloredIvs(data.iv, 2)}
-							</div>
-						</Button>
-						{#if showIvBreakdown}
-							<div class="mt-4 mb-5 space-y-1" transition:slide={{ duration: 110 }}>
-								<IvBreakdown name={m.attack()} value={data.atk_iv ?? 0} />
-								<IvBreakdown name={m.defense()} value={data.def_iv ?? 0} />
-								<IvBreakdown name={m.stamina()} value={data.sta_iv ?? 0} />
-							</div>
-						{/if}
-					</div>
-				{/if}
-
-				{#if data.cp}
-					<StatsMainCardEntry name={m.cp()} value={data.cp} />
-				{/if}
-				{#if data.level}
-					<StatsMainCardEntry name={m.level()} value={data.level} />
-				{/if}
-				<StatsMainCardEntry name={m.weather_boost()}>
-					{#snippet value()}
-						{#if data.weather}
-							<div class="flex items-center gap-1.5">
-								<WeatherIcon class="size-4" />
-								{mWeather(data.weather)}
-							</div>
-						{:else}
-							{m.modifier_none()}
-						{/if}
-					{/snippet}
-				</StatsMainCardEntry>
-			</StatsMainCard>
-		</TitledMainSection>
-	{/if}
 
 	{#if showGreat(data) || showUltra(data) || showLittle(data)}
 		<TitledMainSection Icon={Swords} title={m.pvp_performance()}>
@@ -441,13 +441,9 @@
 										value={mLeague(pokemon.league)}
 									/>
 
-									<StatsMainCardEntry
-										Icon={ChartColumn}
-										name={m.performance()}
-									>
+									<StatsMainCardEntry Icon={ChartColumn} name={m.performance()}>
 										{#snippet value()}
 											<p>
-
 												<span class="text-muted-foreground">
 													{formatPercentage(pokemon.percentage, {
 														minDecimals: 0,
@@ -468,12 +464,11 @@
 													{m.pogo_level({ level: formatNumber(pokemon.level) })} ·
 												</span>
 												<span>
-													{ m.pogo_cp({ cp: pokemon.cp })}
+													{m.pogo_cp({ cp: pokemon.cp })}
 												</span>
 											</p>
 										{/snippet}
 									</StatsMainCardEntry>
-
 								</div>
 
 								<IconValue Icon={Info} class="text-muted-foreground mt-3">
@@ -488,6 +483,105 @@
 	{/if}
 
 	<PokemonStatsCard {data} />
+
+	<TitledMainSection Icon={Info} title={m.about_this_pokemon({ name: speciesName(data) })}>
+		<StatsMainCard class="text-sm">
+			{#if data.iv != null}
+				<div>
+					<Button
+						variant=""
+						size=""
+						class="flex text-sm! font-normal! justify-between! w-full"
+						onclick={() => (showIvBreakdown = !showIvBreakdown)}
+					>
+						<p class="flex items-center gap-1.5 text-muted-foreground">
+							<Percent class="size-3.5" />
+							{m.iv_product_label_long()}
+						</p>
+						<div class="flex items-center">
+							<ChevronDown
+								class="size-3.5 mr-2 text-muted-foreground transition-transform"
+								style="rotate: {showIvBreakdown ? '180deg' : '0deg'}"
+							/>
+							{@render coloredIvs(data.iv, 2)}
+						</div>
+					</Button>
+					{#if showIvBreakdown}
+						<div class="mt-4 mb-5 space-y-1" transition:slide={{ duration: 110 }}>
+							<IvBreakdown name={m.attack()} value={data.atk_iv ?? 0} />
+							<IvBreakdown name={m.defense()} value={data.def_iv ?? 0} />
+							<IvBreakdown name={m.stamina()} value={data.sta_iv ?? 0} />
+						</div>
+					{/if}
+				</div>
+			{/if}
+
+			{#if data.cp}
+				<StatsMainCardEntry Icon={ShieldHalf} name={m.cp()} value={data.cp} />
+			{/if}
+			{#if data.level}
+				<StatsMainCardEntry Icon={TrendingUp} name={m.level()} value={data.level} />
+			{/if}
+			<StatsMainCardEntry Icon={CloudSun} name={m.weather_boost()}>
+				{#snippet value()}
+					{#if data.weather}
+						<div class="flex items-center gap-1.5">
+							<WeatherIcon class="size-4" />
+							{mWeather(data.weather)}
+						</div>
+					{:else}
+						{m.modifier_none()}
+					{/if}
+				{/snippet}
+			</StatsMainCardEntry>
+
+			<StatsMainCardEntry
+				Icon={data.gender === 1 ? Mars : data.gender === 2 ? Venus : CircleSmall}
+				name={m.pokemon_gender()}
+			>
+				{#snippet value()}
+					{#if data.gender != null}
+						{#if data.gender === 1}
+							{m.pokemon_gender_male()}
+						{:else if data.gender === 2}
+							{m.pokemon_gender_female()}
+						{:else}
+							{m.pokemon_gender_neutral()}
+						{/if}
+					{:else}
+						<span class="text-muted-foreground">
+							{m.unknown()}
+						</span>
+					{/if}
+				{/snippet}
+			</StatsMainCardEntry>
+			<StatsMainCardEntry
+				Icon={Ruler}
+				name={m.pokemon_size()}
+				value={data.size != null ? getPokemonSize(data.size) : m.unknown()}
+			/>
+			<StatsMainCardEntry Icon={Swords} name={m.popup_pokemon_moves()}>
+				{#snippet value()}
+					<p class="flex gap-2">
+						{#if data.move_1 && data.move_2}
+							<span>{mMove(data.move_1)}</span>
+							<span>·</span>
+							<span>{mMove(data.move_2)}</span>
+						{:else}
+							{m.unknown()}
+						{/if}
+					</p>
+				{/snippet}
+			</StatsMainCardEntry>
+
+			<UpdatedTimes
+				firstSeen={data.first_seen_timestamp}
+				updated={Math.abs((data?.first_seen_timestamp ?? 0) - (data?.updated ?? 0)) > 5
+					? data.updated
+					: undefined}
+			/>
+		</StatsMainCard>
+	</TitledMainSection>
 
 	{#if !data.seen_type?.includes("nearby")}
 		<TitledMainSection Icon={CircleDot} title={m.access_this_pokemon({ name: speciesName(data) })}>
@@ -542,56 +636,13 @@
 			</BasicMainCard>
 		</TitledMainSection>
 	{/if}
+{/snippet}
 
-	<TitledMainSection Icon={Info} title={m.about_this_pokemon({ name: speciesName(data) })}>
-		<StatsMainCard>
-			<StatsMainCardEntry
-				Icon={data.gender === 1 ? Mars : data.gender === 2 ? Venus : CircleSmall}
-				name={m.pokemon_gender()}
-			>
-				{#snippet value()}
-					{#if data.gender != null}
-						{#if data.gender === 1}
-							{m.pokemon_gender_male()}
-						{:else if data.gender === 2}
-							{m.pokemon_gender_female()}
-						{:else}
-							{m.pokemon_gender_neutral()}
-						{/if}
-					{:else}
-						<span class="text-muted-foreground">
-							{m.unknown()}
-						</span>
-					{/if}
-				{/snippet}
-			</StatsMainCardEntry>
-			<StatsMainCardEntry
-				Icon={Ruler}
-				name={m.pokemon_size()}
-				value={data.size != null ? getPokemonSize(data.size) : m.unknown()}
-			/>
-			<StatsMainCardEntry Icon={Swords} name={m.popup_pokemon_moves()}>
-				{#snippet value()}
-					<p class="flex gap-2">
-						{#if data.move_1 && data.move_2}
-							<span>{mMove(data.move_1)}</span>
-							<span>·</span>
-							<span>{mMove(data.move_2)}</span>
-						{:else}
-							{m.unknown()}
-						{/if}
-					</p>
-				{/snippet}
-			</StatsMainCardEntry>
-
-			<UpdatedTimes
-				firstSeen={data.first_seen_timestamp}
-				updated={Math.abs((data?.first_seen_timestamp ?? 0) - (data?.updated ?? 0)) > 5
-					? data.updated
-					: undefined}
-			/>
-		</StatsMainCard>
-	</TitledMainSection>
+{#snippet speciesChangedNotice()}
+	<p class="flex items-center gap-1 text-sm text-muted-foreground">
+		<ArrowLeftRight class="size-3.5" />
+		{m.popup_species_changed()}
+	</p>
 {/snippet}
 
 {#snippet coloredIvs(iv: number, decimals: number)}
