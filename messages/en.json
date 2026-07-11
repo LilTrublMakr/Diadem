@@ -670,4 +670,12 @@
 	"tracker_hundo": "Hundo",
 	"tracker_shiny": "Shiny",
 	"tracker_nundo": "Nundo"
+	"filters_dont_match_gym": "None of your filters match this Gym",
+	"super_mega_raid": "Super Mega Raid",
+	"super_mega_raids": "Super Mega Raids",
+	"legendary_super_mega_raid": "Legendary Super Mega Raid",
+	"legendary_super_mega_raids": "Legendary Super Mega Raids",
+	"unity_raid": "Unity Raid",
+	"unity_raids": "Unity Raids",
+	"filter_template_levels_super_mega": "Super Mega {kind}"
 }
