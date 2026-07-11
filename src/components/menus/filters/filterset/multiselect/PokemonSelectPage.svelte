@@ -14,11 +14,13 @@
 	let {
 		data,
 		attribute,
-		pokemonList
+		pokemonList,
+		selectedPokemonList
 	}: {
 		data: Data;
 		attribute: PokemonKey & string;
 		pokemonList: PokemonVisual[];
+		selectedPokemonList?: PokemonVisual[];
 	} = $props();
 
 	let query: string = $state("");
@@ -29,6 +31,7 @@
 			? pokemonList
 			: pokemonList.filter((p) => getGeneration(p.pokemon_id)?.gen === selectedGen)
 	);
+	let selected = $derived(selectedPokemonList ?? data[attribute] ?? []);
 
 	function onselect(pokemon: PokemonVisual, isSelected: boolean) {
 		if (!isSelected) {
@@ -75,8 +78,8 @@
 	{#if !query && data[attribute]}
 		<div transition:slide={{ duration: 90 }}>
 			<PokemonSelect
-				pokemonList={data[attribute] ?? []}
-				selected={data[attribute] ?? []}
+				pokemonList={selected}
+				{selected}
 				{onselect}
 				title={m.pokemon_picker_selected()}
 			/>
@@ -85,7 +88,7 @@
 
 	<PokemonSelect
 		pokemonList={filteredList}
-		selected={data[attribute] ?? []}
+		{selected}
 		{onselect}
 		{query}
 		title={m.pokemon_picker_available()}
