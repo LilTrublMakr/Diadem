@@ -158,3 +158,94 @@ export const scanArea = mysqlTable(
 );
 
 export type ScanArea = typeof scanArea.$inferSelect;
+
+export const notificationTemplate = mysqlTable(
+	"notification_template",
+	{
+		id: int("id").autoincrement().primaryKey(),
+		userId: varchar("user_id", { length: 255 })
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		name: varchar("name", { length: 64 }).notNull(),
+		type: varchar("type", { length: 32 })
+			.$type<import("@/lib/features/notifications/types").NotificationType>()
+			.notNull(),
+		embed: json("embed")
+			.$type<import("@/lib/features/notifications/types").EmbedTemplate>()
+			.notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
+	},
+	(table) => ({
+		userTypeNameUnique: uniqueIndex("notification_template_user_type_name_unique").on(
+			table.userId,
+			table.type,
+			table.name
+		)
+	})
+);
+
+export type NotificationTemplate = typeof notificationTemplate.$inferSelect;
+
+export const notificationSubscription = mysqlTable(
+	"notification_subscription",
+	{
+		id: int("id").autoincrement().primaryKey(),
+		userId: varchar("user_id", { length: 255 })
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		type: varchar("type", { length: 32 })
+			.$type<import("@/lib/features/notifications/types").NotificationType>()
+			.notNull(),
+		templateId: int("template_id").references(() => notificationTemplate.id, {
+			onDelete: "set null"
+		}),
+		name: varchar("name", { length: 64 }).notNull(),
+		enabled: boolean("enabled").default(true).notNull(),
+		filters: json("filters")
+			.$type<import("@/lib/features/notifications/types").PokemonSubscriptionFilters>()
+			.notNull(),
+		// "manual" = active whenever enabled; "scheduled" = active only within schedule's windows.
+		// Unlike scan_area, there's no allotment to protect, so schedules aren't conflict-checked.
+		mode: varchar("mode", { length: 16 })
+			.$type<import("@/lib/features/notifications/scheduleTypes").SubscriptionMode>()
+			.default("manual")
+			.notNull(),
+		schedule:
+			json("schedule").$type<
+				import("@/lib/features/notifications/scheduleTypes").NotificationSchedule
+			>(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
+	},
+	(table) => ({
+		userIdIdx: index("notification_subscription_user_id_idx").on(table.userId),
+		typeIdx: index("notification_subscription_type_idx").on(table.type)
+	})
+);
+
+export type NotificationSubscription = typeof notificationSubscription.$inferSelect;
+
+// A user-drawn polygon scoped to notifications only — separate from scan_area (which exists to
+// drive Dragonite worker scanning/allotment). No workers/mode/schedule/Dragonite mirroring here,
+// just a named geofence a subscription's `areaId`/`areaSource: "notificationArea"` can point at.
+export const notificationArea = mysqlTable(
+	"notification_area",
+	{
+		id: int("id").autoincrement().primaryKey(),
+		userId: varchar("user_id", { length: 255 })
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		name: varchar("name", { length: 64 }).notNull(),
+		geofence: json("geofence").$type<import("geojson").Polygon>().notNull(),
+		areaSqM: int("area_sq_m").notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
+	},
+	(table) => ({
+		userNameUnique: uniqueIndex("notification_area_user_name_unique").on(table.userId, table.name),
+		userIdIdx: index("notification_area_user_id_idx").on(table.userId)
+	})
+);
+
+export type NotificationArea = typeof notificationArea.$inferSelect;

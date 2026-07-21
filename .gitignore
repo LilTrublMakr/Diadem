@@ -34,3 +34,6 @@ config/config.dev.toml
 
 # VSCode stuff
 /.vscode
+
+#icons
+uicons

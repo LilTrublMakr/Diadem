@@ -57,6 +57,7 @@
 		"clsx": "^2.1.1",
 		"drizzle-orm": "^0.40.0",
 		"emojilib": "^4.0.2",
+		"handlebars": "^4.7.8",
 		"maplibre-gl": "^5.14.0",
 		"mermaid": "^11.15.0",
 		"mode-watcher": "^1.1.0",
@@ -81,7 +82,11 @@
 		"node": "^22"
 	},
 	"pnpm": {
-		"onlyBuiltDependencies": ["esbuild", "sharp", "workerd"]
+		"onlyBuiltDependencies": [
+			"esbuild",
+			"sharp",
+			"workerd"
+		]
 	},
 	"patchedDependencies": {
 		"drizzle-kit@0.30.5": "patches/drizzle-kit@0.30.5.patch"

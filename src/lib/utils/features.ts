@@ -28,6 +28,7 @@ enum ExtraFeature {
 	COVERAGE_MAP = "coverage_map",
 	WAYFARER_MAP = "wayfarer_map",
 	SEARCH = "search",
+	NOTIFICATIONS = "notifications",
 
 	MAP_OBJECT_ALL = "map_object*",
 	MINOR_MAP_OBJECT_ALL = "minor_map_object*",

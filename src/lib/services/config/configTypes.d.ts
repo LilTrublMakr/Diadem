@@ -77,6 +77,10 @@ type Auth = {
 type AuthDiscord = {
 	clientId: string;
 	clientSecret: string;
+	// Personal Discord DM notifications (see /notifications page) — same Discord
+	// Application as the OAuth client above, with a Bot user enabled.
+	botToken?: string;
+	webhookSecret?: string;
 };
 
 type ClientDiscord = {
