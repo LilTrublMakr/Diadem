@@ -226,6 +226,9 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 
 	const secret = request.headers.get("x-diadem-secret");
 	if (secret !== discordConfig.webhookSecret) {
+		log.warning(
+			`Rejected webhook POST: X-Diadem-Secret header ${secret ? "didn't match" : "was missing"}`
+		);
 		return json({ error: "unauthorized" }, { status: 401 });
 	}
 
@@ -233,9 +236,21 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 	try {
 		envelopes = await request.json();
 	} catch {
+		log.warning("Rejected webhook POST: body wasn't valid JSON");
 		return json({ error: "invalid_request" }, { status: 400 });
 	}
-	if (!Array.isArray(envelopes)) return json({ error: "invalid_request" }, { status: 400 });
+	if (!Array.isArray(envelopes)) {
+		log.warning("Rejected webhook POST: body wasn't a JSON array");
+		return json({ error: "invalid_request" }, { status: 400 });
+	}
+
+	const counts = new Map<string, number>();
+	for (const envelope of envelopes) {
+		counts.set(envelope.type, (counts.get(envelope.type) ?? 0) + 1);
+	}
+	log.info(
+		`Received ${envelopes.length} webhook event(s): ${[...counts.entries()].map(([type, n]) => `${type}=${n}`).join(", ") || "(empty)"}`
+	);
 
 	for (const envelope of envelopes) {
 		if (envelope.type !== "pokemon") continue; // Phase 2: other Golbat event types
