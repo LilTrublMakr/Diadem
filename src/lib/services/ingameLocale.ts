@@ -37,7 +37,7 @@ function getIngameLocale() {
 	if (!locale) {
 		const allRemoteLocales = Object.values(remoteLocales);
 
-		if (allRemoteLocales) {
+		if (allRemoteLocales.length > 0) {
 			locale = allRemoteLocales[0];
 		} else {
 			return {};
@@ -268,7 +268,7 @@ export function mCharacter(
 	}
 
 	if (characterId === Character.DECOY_FEMALE || characterId === Character.DECOY_MALE) {
-		character = m.decoy()
+		character = m.decoy();
 	}
 
 	return options?.plural ? m.character_grunts({ character }) : m.character_grunt({ character });

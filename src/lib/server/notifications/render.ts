@@ -1,5 +1,5 @@
 import { getPokemonSize, typeIdToText } from "@/lib/utils/pokemonUtils";
-import { mMove, mPokemon, mWeather } from "@/lib/services/ingameLocale";
+import { loadRemoteLocale, mMove, mPokemon, mWeather } from "@/lib/services/ingameLocale";
 import { getMasterPokemon } from "@/lib/services/masterfile";
 import type { MasterMove } from "@/lib/types/masterfile";
 import { getClientConfig } from "@/lib/services/config/config.server";
@@ -76,6 +76,13 @@ export async function buildPokemonContext(
 	message: GolbatPokemonMessage,
 	thisFetch: typeof fetch = fetch
 ): Promise<PokemonTemplateContext> {
+	const clientConfig = getClientConfig();
+
+	// mIngame()'s translated strings (mPokemon/mMove/mWeather below) come from an ambient
+	// cache normally primed by a page load — this route has no page load, so it must load it
+	// itself (same pattern as thumbnail.png/+server.ts and the share-link pages).
+	await loadRemoteLocale(clientConfig.general.defaultLocale, thisFetch);
+
 	const iv =
 		message.individual_attack != null &&
 		message.individual_defense != null &&
@@ -106,7 +113,7 @@ export async function buildPokemonContext(
 	const shiny = !!message.shiny;
 	const { hundo, nundo, shundo } = computeIvBadges(atk, def, sta, shiny);
 
-	const diademBaseUrl = getClientConfig().general.url;
+	const diademBaseUrl = clientConfig.general.url;
 
 	let pokemonImageUrl = "";
 	if (diademBaseUrl) {
