@@ -9,7 +9,10 @@ import { sendDirectMessage } from "@/lib/server/notifications/bot";
 import { getPokemonSubscriptionCandidates } from "@/lib/server/notifications/matchCache";
 import { isScheduleActiveNow } from "@/lib/features/notifications/scheduleActive";
 import { getKojiAreaById } from "@/lib/server/notifications/kojiAreaCache";
-import { generatePokemonMapImage } from "@/lib/server/notifications/mapImage";
+import {
+	generatePokemonMapImage,
+	generatePokemonSpriteImage
+} from "@/lib/server/notifications/mapImage";
 import { buildPokemonContext, renderEmbed } from "@/lib/server/notifications/render";
 import { getNotificationTemplate } from "@/lib/server/db/internal/repository";
 import type {
@@ -155,11 +158,13 @@ async function matchesArea(
 }
 
 const MAP_IMAGE_TAG = "attachment://map.png";
+const POKEMON_IMAGE_TAG = "attachment://pokemon.png";
 
 async function deliver(
 	subscription: NotificationSubscription,
 	context: PokemonTemplateContext,
 	getMapImage: () => Promise<Buffer | null>,
+	getSpriteImage: () => Promise<Buffer | null>,
 	thisFetch: typeof fetch
 ) {
 	if (!(await matchesArea(subscription, context, thisFetch))) return;
@@ -176,7 +181,7 @@ async function deliver(
 					title: "{{pokemonName}}",
 					description: "IV: {{iv}}% CP: {{cp}} Level: {{level}}",
 					color: "3447003",
-					thumbnailUrl: "",
+					thumbnailUrl: "{{{pokemonImageUrl}}}",
 					imageUrl: "{{{mapImageUrl}}}",
 					footerText: "Despawns at {{despawnTime}} ({{minutesLeft}}m left)",
 					url: "{{{googleMapsUrl}}}",
@@ -186,7 +191,12 @@ async function deliver(
 			);
 
 	const usesMapImage = embed.imageUrl === MAP_IMAGE_TAG || embed.thumbnailUrl === MAP_IMAGE_TAG;
-	const mapImage = usesMapImage ? await getMapImage() : null;
+	const usesSpriteImage =
+		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
+	const [mapImage, spriteImage] = await Promise.all([
+		usesMapImage ? getMapImage() : Promise.resolve(null),
+		usesSpriteImage ? getSpriteImage() : Promise.resolve(null)
+	]);
 
 	// subscription.userId is our internal app user id, not a Discord snowflake —
 	// sendDirectMessage needs the real Discord user id.
@@ -196,7 +206,13 @@ async function deliver(
 		return;
 	}
 
-	await sendDirectMessage(discordId, { embed, mapImage });
+	await sendDirectMessage(discordId, {
+		embed,
+		attachments: [
+			mapImage ? { filename: "map.png", data: mapImage } : null,
+			spriteImage ? { filename: "pokemon.png", data: spriteImage } : null
+		]
+	});
 }
 
 async function handlePokemon(message: GolbatPokemonMessage, thisFetch: typeof fetch) {
@@ -214,8 +230,16 @@ async function handlePokemon(message: GolbatPokemonMessage, thisFetch: typeof fe
 		if (mapImage === undefined) mapImage = await generatePokemonMapImage(message, thisFetch);
 		return mapImage;
 	};
+	let spriteImage: Buffer | null | undefined;
+	const getSpriteImage = async () => {
+		if (spriteImage === undefined)
+			spriteImage = await generatePokemonSpriteImage(message, thisFetch);
+		return spriteImage;
+	};
 
-	await Promise.all(matches.map((sub) => deliver(sub, context, getMapImage, thisFetch)));
+	await Promise.all(
+		matches.map((sub) => deliver(sub, context, getMapImage, getSpriteImage, thisFetch))
+	);
 }
 
 export const POST: RequestHandler = async ({ request, fetch }) => {

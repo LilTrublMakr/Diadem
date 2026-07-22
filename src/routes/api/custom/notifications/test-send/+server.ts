@@ -1,5 +1,8 @@
 import { getApplicationEmojiIds, sendDirectMessage } from "@/lib/server/notifications/bot";
-import { generatePokemonMapImage } from "@/lib/server/notifications/mapImage";
+import {
+	generatePokemonMapImage,
+	generatePokemonSpriteImage
+} from "@/lib/server/notifications/mapImage";
 import { renderEmbed } from "@/lib/server/notifications/render";
 import { guardNotificationRequest } from "@/lib/server/notifications/endpointUtils";
 import { embedTemplateSchema } from "@/lib/server/notifications/validation";
@@ -14,6 +17,7 @@ import type { RequestHandler } from "./$types";
 const log = getLogger("discordNotifications");
 
 const MAP_IMAGE_TAG = "attachment://map.png";
+const POKEMON_IMAGE_TAG = "attachment://pokemon.png";
 
 // Loosely validated — this only ever renders into a DM sent back to the requesting
 // user's own Discord account, so a malformed/adversarial context can't affect anyone else.
@@ -50,8 +54,12 @@ export const POST: RequestHandler = async ({ locals, request, fetch }) => {
 
 		const usesMapImage =
 			rendered.imageUrl === MAP_IMAGE_TAG || rendered.thumbnailUrl === MAP_IMAGE_TAG;
+		const usesSpriteImage =
+			rendered.imageUrl === POKEMON_IMAGE_TAG || rendered.thumbnailUrl === POKEMON_IMAGE_TAG;
+
 		let mapImage: Buffer | null = null;
-		if (usesMapImage) {
+		let spriteImage: Buffer | null = null;
+		if (usesMapImage || usesSpriteImage) {
 			const nowSeconds = Math.floor(Date.now() / 1000);
 			const syntheticMessage: GolbatPokemonMessage = {
 				encounter_id: `test-${nowSeconds}`,
@@ -68,10 +76,21 @@ export const POST: RequestHandler = async ({ locals, request, fetch }) => {
 				shiny: context.shiny,
 				seen_type: "test"
 			};
-			mapImage = await generatePokemonMapImage(syntheticMessage, fetch);
+			[mapImage, spriteImage] = await Promise.all([
+				usesMapImage ? generatePokemonMapImage(syntheticMessage, fetch) : Promise.resolve(null),
+				usesSpriteImage
+					? generatePokemonSpriteImage(syntheticMessage, fetch)
+					: Promise.resolve(null)
+			]);
 		}
 
-		await sendDirectMessage(discordId, { embed: rendered, mapImage });
+		await sendDirectMessage(discordId, {
+			embed: rendered,
+			attachments: [
+				mapImage ? { filename: "map.png", data: mapImage } : null,
+				spriteImage ? { filename: "pokemon.png", data: spriteImage } : null
+			]
+		});
 
 		const emojiText = [
 			rendered.title,

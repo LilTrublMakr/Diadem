@@ -3,9 +3,6 @@ import { loadRemoteLocale, mMove, mPokemon, mWeather } from "@/lib/services/inga
 import { getMasterPokemon } from "@/lib/services/masterfile";
 import type { MasterMove } from "@/lib/types/masterfile";
 import { getClientConfig } from "@/lib/services/config/config.server";
-import { MapObjectType } from "@/lib/mapObjects/mapObjectTypes";
-import { getIconPokemon, initAllIconSets } from "@/lib/services/uicons.svelte";
-import { getDefaultIconSet } from "@/lib/services/userSettings.svelte";
 import { discordEmojiTag } from "@/lib/features/notifications/discordEmoji";
 import { computeIvBadges } from "@/lib/features/notifications/ivBadges";
 import { isMapImageConfigured } from "@/lib/server/notifications/mapImage";
@@ -115,27 +112,6 @@ export async function buildPokemonContext(
 
 	const diademBaseUrl = clientConfig.general.url;
 
-	let pokemonImageUrl = "";
-	if (diademBaseUrl) {
-		try {
-			await initAllIconSets(thisFetch);
-			const iconSetId = getDefaultIconSet(MapObjectType.POKEMON).id;
-			const iconPath = getIconPokemon(
-				{
-					pokemon_id: message.pokemon_id,
-					form: message.form,
-					costume: message.costume,
-					gender: message.gender,
-					shiny: message.shiny
-				},
-				iconSetId
-			);
-			pokemonImageUrl = `${diademBaseUrl}${iconPath}`;
-		} catch {
-			pokemonImageUrl = "";
-		}
-	}
-
 	return {
 		pokemonName: mPokemon({
 			pokemon_id: message.pokemon_id,
@@ -205,7 +181,11 @@ export async function buildPokemonContext(
 		pokestopName: message.pokestop_name ?? "",
 		username: message.username ?? "",
 		evolutions,
-		pokemonImageUrl
+		// Fetched as bytes and sent as a Discord file attachment (see mapImage.ts's
+		// generatePokemonSpriteImage + bot.ts), not a public URL — same reasoning as
+		// mapImageUrl above: the sprite is served through this app's own /assets proxy,
+		// which the operator may not expose publicly.
+		pokemonImageUrl: "attachment://pokemon.png"
 	};
 }
 

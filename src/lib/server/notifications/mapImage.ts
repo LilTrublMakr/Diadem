@@ -75,3 +75,43 @@ export async function generatePokemonMapImage(
 		return null;
 	}
 }
+
+/**
+ * Fetches the pokemon's sprite as bytes (for upload as a Discord file attachment) instead of
+ * handing Discord a public URL — this app's own /assets icon proxy isn't necessarily reachable
+ * from the public internet, same reasoning as the static map image above. `thisFetch` resolves
+ * the relative /assets/... path internally (same mechanism initAllIconSets already relies on),
+ * so this works whether or not the app is actually public-facing.
+ */
+export async function generatePokemonSpriteImage(
+	message: GolbatPokemonMessage,
+	thisFetch: typeof fetch = fetch
+): Promise<Buffer | null> {
+	try {
+		await initAllIconSets(thisFetch);
+		const iconSetId = getDefaultIconSet(MapObjectType.POKEMON).id;
+		const iconPath = getIconPokemon(
+			{
+				pokemon_id: message.pokemon_id,
+				form: message.form,
+				costume: message.costume,
+				gender: message.gender,
+				shiny: message.shiny
+			},
+			iconSetId
+		);
+
+		const response = await thisFetch(resize(iconPath, { width: 64 }), {
+			signal: AbortSignal.timeout(10_000)
+		});
+		if (!response.ok) {
+			log.warning(`Sprite image request failed: ${response.status}`);
+			return null;
+		}
+		return Buffer.from(await response.arrayBuffer());
+	} catch (error) {
+		const cause = error instanceof Error && error.cause ? ` (${error.cause})` : "";
+		log.warning(`Failed to generate sprite image: ${error}${cause}`);
+		return null;
+	}
+}

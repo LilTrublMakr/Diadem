@@ -111,13 +111,15 @@ async function getDmChannelId(discordId: string): Promise<string | null> {
 	return data.id;
 }
 
+export type DiscordAttachment = { filename: string; data: Buffer };
+
 /**
  * Send a Discord DM to a user. Never throws — delivery failures (DMs closed,
  * bot not sharing a guild, unknown user) are logged and swallowed.
  */
 export async function sendDirectMessage(
 	discordId: string,
-	payload: { content?: string; embed?: EmbedTemplate; mapImage?: Buffer | null }
+	payload: { content?: string; embed?: EmbedTemplate; attachments?: (DiscordAttachment | null)[] }
 ): Promise<void> {
 	const task = sendQueue.then(async () => {
 		try {
@@ -128,11 +130,19 @@ export async function sendDirectMessage(
 			if (payload.content) body.content = payload.content;
 			if (payload.embed) body.embeds = [buildDiscordEmbed(payload.embed)];
 
+			const attachments = (payload.attachments ?? []).filter((a): a is DiscordAttachment => !!a);
+
 			let requestInit: RequestInit;
-			if (payload.mapImage) {
+			if (attachments.length > 0) {
 				const form = new FormData();
 				form.append("payload_json", JSON.stringify(body));
-				form.append("files[0]", new Blob([payload.mapImage], { type: "image/png" }), "map.png");
+				attachments.forEach((attachment, i) => {
+					form.append(
+						`files[${i}]`,
+						new Blob([attachment.data], { type: "image/png" }),
+						attachment.filename
+					);
+				});
 				requestInit = { method: "POST", body: form };
 			} else {
 				requestInit = { method: "POST", body: JSON.stringify(body) };
