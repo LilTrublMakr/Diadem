@@ -14,6 +14,7 @@
 	"exclude": [
 		"src/lib/diadem-vaul-svelte/src/index.test.ts",
 		"src/lib/diadem-vaul-svelte/vite.config.ts",
-		"src/lib/diadem-vaul-svelte/playwright.config.ts"
+		"src/lib/diadem-vaul-svelte/playwright.config.ts",
+		"src/lib/server/queryMapObjects/invasionRewards.test.ts"
 	]
 }
