@@ -77,7 +77,7 @@ export const pokemonFiltersSchema = z.object({
 	gender: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
 	pvpLeague: z.enum(["little", "great", "ultra"]).optional(),
 	pvpMaxRank: z.number().int().min(1).max(4096).optional(),
-	areaSource: z.enum(["own", "koji"]).optional(),
+	areaSource: z.enum(["own", "koji", "notificationArea"]).optional(),
 	areaId: z.number().int().positive().optional()
 });
 

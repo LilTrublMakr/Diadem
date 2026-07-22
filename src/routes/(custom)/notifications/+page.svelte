@@ -38,9 +38,16 @@
 	} from "@/lib/features/notifications/notificationAreasState.svelte";
 	import type { NotificationAreaDto } from "@/lib/features/notifications/types";
 	import type { Polygon } from "geojson";
+	import {
+		exportNotificationsBackup,
+		importNotificationsBackup,
+		isBackupApiError,
+		type BackupSection
+	} from "@/lib/features/notifications/backupState";
+	import type { BackupImportSummary } from "@/lib/features/notifications/backupTypes";
 	import CloseButton from "@/components/ui/CloseButton.svelte";
 	import { Dialog } from "bits-ui";
-	import { Loader2, Pencil, Plus, Trash2, X } from "@lucide/svelte";
+	import { Download, Loader2, Pencil, Plus, Trash2, Upload, X } from "@lucide/svelte";
 
 	type NumericFilterKey =
 		| "minIv"
@@ -351,6 +358,42 @@
 		const area = areaLabel(filters);
 		if (area) parts.push(`in ${area}`);
 		return parts.join(" · ");
+	}
+
+	// --- Backup / restore ---
+	let exportingSection = $state<BackupSection | "all" | null>(null);
+	let importing = $state(false);
+	let importSummary = $state<BackupImportSummary | null>(null);
+	let importFileInput = $state<HTMLInputElement>();
+
+	async function runExport(section: BackupSection | "all") {
+		exportingSection = section;
+		try {
+			const result = await exportNotificationsBackup(section === "all" ? undefined : [section]);
+			if (result) showError(result.message);
+		} finally {
+			exportingSection = null;
+		}
+	}
+
+	async function onImportFileChosen(e: Event) {
+		const file = (e.currentTarget as HTMLInputElement).files?.[0];
+		if (!file) return;
+		importing = true;
+		importSummary = null;
+		try {
+			const result = await importNotificationsBackup(file);
+			if (isBackupApiError(result)) {
+				showError(result.message);
+				return;
+			}
+			importSummary = result;
+			// Refresh whatever the import may have created.
+			await Promise.all([loadNotifications(), loadNotificationAreas()]);
+		} finally {
+			importing = false;
+			if (importFileInput) importFileInput.value = "";
+		}
 	}
 </script>
 
@@ -841,6 +884,90 @@
 						</div>
 					{/each}
 				</div>
+			</section>
+
+			<!-- Backup & Restore -->
+			<section class="flex flex-col gap-3">
+				<h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Backup & Restore</h2>
+				<p class="text-sm text-zinc-500 dark:text-zinc-400">
+					Export your areas, templates, and subscriptions to a file, or restore from one. Existing
+					items are never overwritten — name collisions on import are skipped.
+				</p>
+
+				<div class="flex flex-wrap gap-2">
+					<button
+						class="flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-600 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+						disabled={exportingSection !== null}
+						onclick={() => runExport("areas")}
+					>
+						<Download size={14} />
+						{exportingSection === "areas" ? "Exporting…" : "Export areas"}
+					</button>
+					<button
+						class="flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-600 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+						disabled={exportingSection !== null}
+						onclick={() => runExport("templates")}
+					>
+						<Download size={14} />
+						{exportingSection === "templates" ? "Exporting…" : "Export templates"}
+					</button>
+					<button
+						class="flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-600 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+						disabled={exportingSection !== null}
+						onclick={() => runExport("subscriptions")}
+					>
+						<Download size={14} />
+						{exportingSection === "subscriptions" ? "Exporting…" : "Export subscriptions"}
+					</button>
+					<button
+						class="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed"
+						disabled={exportingSection !== null}
+						onclick={() => runExport("all")}
+					>
+						<Download size={14} />
+						{exportingSection === "all" ? "Exporting…" : "Export everything"}
+					</button>
+				</div>
+
+				<div class="flex items-center gap-2">
+					<input
+						bind:this={importFileInput}
+						type="file"
+						accept="application/json,.json"
+						disabled={importing}
+						onchange={onImportFileChosen}
+						class="text-sm text-zinc-600 dark:text-zinc-300 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-200 dark:file:bg-zinc-700 file:px-3 file:py-1.5 file:text-sm file:text-zinc-700 dark:file:text-zinc-200"
+					/>
+					{#if importing}
+						<Loader2 size={16} class="animate-spin text-zinc-500" />
+					{:else}
+						<Upload size={14} class="text-zinc-500" />
+					{/if}
+				</div>
+
+				{#if importSummary}
+					<div
+						class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-sm text-zinc-700 dark:text-zinc-200"
+					>
+						<p class="font-medium">Import complete</p>
+						<ul class="mt-1 list-inside list-disc">
+							<li>
+								Areas: {importSummary.areas.created} created, {importSummary.areas.skipped} skipped (already
+								existed)
+							</li>
+							<li>
+								Templates: {importSummary.templates.created} created, {importSummary.templates
+									.skipped} skipped (already existed)
+							</li>
+							<li>
+								Subscriptions: {importSummary.subscriptions.created} created, {importSummary
+									.subscriptions.skipped} skipped (already existed){#if importSummary.subscriptions.unresolvedRefs > 0},
+									{importSummary.subscriptions.unresolvedRefs} with an area/template reference that couldn't
+									be resolved{/if}
+							</li>
+						</ul>
+					</div>
+				{/if}
 			</section>
 		</div>
 	{/if}

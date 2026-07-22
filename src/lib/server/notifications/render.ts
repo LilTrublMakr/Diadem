@@ -1,4 +1,4 @@
-import { getPokemonSize, typeIdToText } from "@/lib/utils/pokemonUtils";
+import { getNormalizedForm, getPokemonSize, typeIdToText } from "@/lib/utils/pokemonUtils";
 import { loadRemoteLocale, mMove, mPokemon, mWeather } from "@/lib/services/ingameLocale";
 import { getMasterPokemon } from "@/lib/services/masterfile";
 import type { MasterMove } from "@/lib/types/masterfile";
@@ -62,7 +62,7 @@ function buildPvpEntries(entries: GolbatPvpEntry[] | undefined): PvpEntryContext
 		.filter((e) => Number.isInteger(e.rank) && e.rank > 0)
 		.sort((a, b) => a.rank - b.rank)
 		.map((e) => ({
-			fullName: mPokemon({ pokemon_id: e.pokemon, form: e.form }),
+			fullName: mPokemon({ pokemon_id: e.pokemon, form: getNormalizedForm(e.pokemon, e.form) }),
 			rank: e.rank,
 			cp: e.cp,
 			levelWithCap: e.capped ? `${e.level}*` : `${e.level}`
@@ -95,12 +95,17 @@ export async function buildPokemonContext(
 	const minutesLeft = Math.max(0, Math.round((message.disappear_time * 1000 - Date.now()) / 60000));
 	const firstSeen = message.first_seen ? new Date(message.first_seen * 1000) : null;
 
-	const master = getMasterPokemon(message.pokemon_id, message.form);
-	const formName = message.form ? (master?.name ?? "") : "";
+	// Golbat's raw form id often IS the species' "default"/"Normal" form rather than 0 — every
+	// other query in this app normalizes before using form for display (queryPokemon.ts etc.),
+	// otherwise mPokemon() appends a redundant "(Normal)" suffix to species with no real
+	// alternate forms.
+	const form = getNormalizedForm(message.pokemon_id, message.form ?? 0);
+	const master = getMasterPokemon(message.pokemon_id, form);
+	const formName = form ? (master?.name ?? "") : "";
 	const type1 = typeIdToText(master?.types?.[0]);
 	const type2 = master?.types?.[1] ? typeIdToText(master.types[1]) : "";
 	const evolutions = (master?.evolutions ?? []).map((e) => ({
-		fullName: mPokemon({ pokemon_id: e.pokemonId, form: e.form }),
+		fullName: mPokemon({ pokemon_id: e.pokemonId, form: getNormalizedForm(e.pokemonId, e.form) }),
 		pokemonId: e.pokemonId
 	}));
 
@@ -115,11 +120,11 @@ export async function buildPokemonContext(
 	return {
 		pokemonName: mPokemon({
 			pokemon_id: message.pokemon_id,
-			form: message.form,
+			form,
 			shiny: message.shiny
 		}),
 		pokemonId: message.pokemon_id,
-		form: message.form ?? 0,
+		form,
 		formName,
 		costume: message.costume ?? 0,
 		gender: genderLabel(message.gender),
