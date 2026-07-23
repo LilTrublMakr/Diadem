@@ -31,4 +31,12 @@ export function registerNotificationHelpers(handlebars: typeof Handlebars) {
 		args.pop(); // trailing Handlebars options object
 		return args.includes(value);
 	});
+	// {{#with (filterRank pvpGreat 25) as |ranked|}} — pvpLittle/pvpGreat/pvpUltra entries are
+	// unfiltered (Golbat can report ranks in the thousands), so templates need a way to only
+	// show the ones actually worth a Discord alert.
+	handlebars.registerHelper("filterRank", (entries: unknown, maxRank: number) =>
+		Array.isArray(entries)
+			? entries.filter((e) => typeof e?.rank === "number" && e.rank <= maxRank)
+			: []
+	);
 }

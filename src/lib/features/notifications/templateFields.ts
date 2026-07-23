@@ -231,22 +231,22 @@ export const PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 		raw: true
 	},
 	{
-		tag: "{{#if pvpLittle.length}}**Little League:**\n{{#each pvpLittle}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}{{/if}}",
-		label: "Little League rankings",
+		tag: "{{#with (filterRank pvpLittle 25) as |ranked|}}{{#if ranked.length}}**Little League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}{{/if}}{{/with}}",
+		label: "Little League rankings (rank 25 or better)",
 		category: "Presets",
 		sample: "",
 		raw: true
 	},
 	{
-		tag: "{{#if pvpGreat.length}}**Great League:**\n{{#each pvpGreat}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}{{/if}}",
-		label: "Great League rankings",
+		tag: "{{#with (filterRank pvpGreat 25) as |ranked|}}{{#if ranked.length}}**Great League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}{{/if}}{{/with}}",
+		label: "Great League rankings (rank 25 or better)",
 		category: "Presets",
 		sample: "",
 		raw: true
 	},
 	{
-		tag: "{{#if pvpUltra.length}}**Ultra League:**\n{{#each pvpUltra}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}{{/if}}",
-		label: "Ultra League rankings",
+		tag: "{{#with (filterRank pvpUltra 25) as |ranked|}}{{#if ranked.length}}**Ultra League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}{{/if}}{{/with}}",
+		label: "Ultra League rankings (rank 25 or better)",
 		category: "Presets",
 		sample: "",
 		raw: true

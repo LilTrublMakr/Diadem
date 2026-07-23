@@ -280,6 +280,15 @@
 		subscriptionMode = "idle";
 	}
 
+	function togglePvpLeague(league: "little" | "great" | "ultra", checked: boolean) {
+		const leagues = new Set(subFilters.pvpLeagues ?? []);
+		if (checked) leagues.add(league);
+		else leagues.delete(league);
+		subFilters.pvpLeagues = leagues.size > 0 ? [...leagues] : undefined;
+		if (leagues.size > 0) subFilters.pvpMaxRank ??= 25;
+		else subFilters.pvpMaxRank = undefined;
+	}
+
 	async function saveSubscription() {
 		const name = subName.trim();
 		if (!name) {
@@ -354,7 +363,8 @@
 		if (filters.minCp !== undefined || filters.maxCp !== undefined) {
 			parts.push(`CP ${filters.minCp ?? 0}–${filters.maxCp ?? "∞"}`);
 		}
-		if (filters.pvpLeague) parts.push(`${filters.pvpLeague} rank ≤ ${filters.pvpMaxRank ?? "?"}`);
+		if (filters.pvpLeagues && filters.pvpLeagues.length > 0)
+			parts.push(`${filters.pvpLeagues.join("/")} rank ≤ ${filters.pvpMaxRank ?? "?"}`);
 		const area = areaLabel(filters);
 		if (area) parts.push(`in ${area}`);
 		return parts.join(" · ");
@@ -551,6 +561,46 @@
 									<option value="2">Female</option>
 									<option value="3">Genderless</option>
 								</select>
+							</label>
+
+							<label class="flex flex-col gap-1 text-sm">
+								<span class="text-zinc-500 dark:text-zinc-400">PVP League (optional)</span>
+								<div class="flex items-center gap-3 flex-wrap">
+									{#each [["little", "Little Cup"], ["great", "Great League"], ["ultra", "Ultra League"]] as [value, label] (value)}
+										<label class="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+											<input
+												type="checkbox"
+												checked={subFilters.pvpLeagues?.includes(
+													value as "little" | "great" | "ultra"
+												) ?? false}
+												onchange={(e) =>
+													togglePvpLeague(
+														value as "little" | "great" | "ultra",
+														e.currentTarget.checked
+													)}
+											/>
+											{label}
+										</label>
+									{/each}
+								</div>
+								{#if subFilters.pvpLeagues && subFilters.pvpLeagues.length > 0}
+									<div class="flex items-center gap-2 mt-1">
+										<input
+											type="number"
+											min="1"
+											placeholder="Max rank"
+											value={subFilters.pvpMaxRank ?? 25}
+											oninput={(e) => {
+												const v = e.currentTarget.value;
+												subFilters.pvpMaxRank = v ? Number(v) : undefined;
+											}}
+											class="w-24 rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
+										/>
+										<span class="text-xs text-zinc-400 shrink-0"
+											>rank or better in any checked league</span
+										>
+									</div>
+								{/if}
 							</label>
 
 							<label class="flex flex-col gap-1 text-sm">

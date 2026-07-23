@@ -75,7 +75,10 @@ export const pokemonFiltersSchema = z.object({
 	minSize: z.number().int().min(1).max(5).optional(),
 	maxSize: z.number().int().min(1).max(5).optional(),
 	gender: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
-	pvpLeague: z.enum(["little", "great", "ultra"]).optional(),
+	pvpLeagues: z
+		.array(z.enum(["little", "great", "ultra"]))
+		.max(3)
+		.optional(),
 	pvpMaxRank: z.number().int().min(1).max(4096).optional(),
 	areaSource: z.enum(["own", "koji", "notificationArea"]).optional(),
 	areaId: z.number().int().positive().optional()

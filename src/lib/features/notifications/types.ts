@@ -63,7 +63,9 @@ export type PokemonSubscriptionFilters = {
 	gender?: 1 | 2 | 3; // Male, Female, Genderless (matches PokemonData.gender)
 	// No shinyOnly filter — shiny is per scanner-account, not the same catch for every player,
 	// so it's not a valid "notify me" signal (unlike hundo, which is universal).
-	pvpLeague?: PvpLeagueFilter;
+	// Empty/absent = no PVP filter. Multiple leagues = OR match (notify if it ranks within
+	// pvpMaxRank in ANY of these leagues) — one shared rank threshold across all of them.
+	pvpLeagues?: PvpLeagueFilter[];
 	pvpMaxRank?: number;
 	// Optional area scope: "own" (default) = one of the user's own scan_area rows;
 	// "koji" = a named Koji geofence ("coverage map" area); "notificationArea" = one of the

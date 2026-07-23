@@ -117,15 +117,18 @@ function matchesFilters(context: PokemonTemplateContext, filters: PokemonSubscri
 		return false;
 	if (filters.gender !== undefined && context.genderValue !== filters.gender) return false;
 
-	if (filters.pvpLeague) {
-		const rank =
-			filters.pvpLeague === "great"
-				? context.pvpGreatRank
-				: filters.pvpLeague === "ultra"
-					? context.pvpUltraRank
-					: context.pvpLittleRank;
-		if (rank === null) return false;
-		if (filters.pvpMaxRank !== undefined && rank > filters.pvpMaxRank) return false;
+	if (filters.pvpLeagues && filters.pvpLeagues.length > 0) {
+		const qualifies = filters.pvpLeagues.some((league) => {
+			const rank =
+				league === "great"
+					? context.pvpGreatRank
+					: league === "ultra"
+						? context.pvpUltraRank
+						: context.pvpLittleRank;
+			if (rank === null) return false;
+			return filters.pvpMaxRank === undefined || rank <= filters.pvpMaxRank;
+		});
+		if (!qualifies) return false;
 	}
 
 	return true;
