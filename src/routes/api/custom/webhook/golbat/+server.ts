@@ -1,6 +1,7 @@
 import {
 	getNotificationArea,
 	getScanArea,
+	getTracker,
 	getUserDiscordId
 } from "@/lib/server/db/internal/repository";
 import type { NotificationSubscription } from "@/lib/server/db/internal/schema";
@@ -13,7 +14,11 @@ import {
 	generatePokemonMapImage,
 	generatePokemonSpriteImage
 } from "@/lib/server/notifications/mapImage";
-import { buildPokemonContext, renderEmbed } from "@/lib/server/notifications/render";
+import {
+	applyTrackedBadges,
+	buildPokemonContext,
+	renderEmbed
+} from "@/lib/server/notifications/render";
 import { getNotificationTemplate } from "@/lib/server/db/internal/repository";
 import type {
 	GolbatPokemonMessage,
@@ -169,13 +174,18 @@ async function deliver(
 ) {
 	if (!(await matchesArea(subscription, context, thisFetch))) return;
 
+	// Tracked-collection badges are per-recipient, not a fact about the event — resolve this
+	// user's own pokemon_tracker row before rendering (see applyTrackedBadges' docs).
+	const tracker = await getTracker(subscription.userId, context.pokemonId, context.form);
+	const userContext = applyTrackedBadges(context, tracker);
+
 	const template = subscription.templateId
 		? await getNotificationTemplate(subscription.userId, subscription.templateId)
 		: null;
 	if (!template && subscription.templateId) return; // template was deleted, skip silently
 
 	const embed = template
-		? renderEmbed(template.embed, context)
+		? renderEmbed(template.embed, userContext)
 		: renderEmbed(
 				{
 					title: "{{pokemonName}}",
@@ -187,7 +197,7 @@ async function deliver(
 					url: "{{{googleMapsUrl}}}",
 					fields: []
 				},
-				context
+				userContext
 			);
 
 	const usesMapImage = embed.imageUrl === MAP_IMAGE_TAG || embed.thumbnailUrl === MAP_IMAGE_TAG;

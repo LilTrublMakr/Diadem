@@ -1,5 +1,4 @@
 import { discordEmojiTag } from "@/lib/features/notifications/discordEmoji";
-import { computeIvBadges } from "@/lib/features/notifications/ivBadges";
 import type { PokemonTemplateContext } from "@/lib/features/notifications/types";
 
 export type TestScenario = {
@@ -20,17 +19,18 @@ const base: PokemonTemplateContext = {
 	gender: "Male",
 	genderValue: 1,
 	shiny: false,
-	shinyYesNo: "No",
-	shinyEmoji: "",
-	hundo: false,
-	hundoYesNo: "No",
-	hundoEmoji: "",
-	nundo: false,
-	nundoYesNo: "No",
-	nundoEmoji: "",
-	shundo: false,
-	shundoYesNo: "No",
-	shundoEmoji: "",
+	trackedShiny: false,
+	trackedShinyYesNo: "No",
+	trackedShinyEmoji: "",
+	trackedHundo: false,
+	trackedHundoYesNo: "No",
+	trackedHundoEmoji: "",
+	trackedNundo: false,
+	trackedNundoYesNo: "No",
+	trackedNundoEmoji: "",
+	trackedShundo: false,
+	trackedShundoYesNo: "No",
+	trackedShundoEmoji: "",
 	size: "M",
 	sizeValue: 3,
 	type1: "Dragon",
@@ -126,6 +126,18 @@ export const TEST_SCENARIOS: TestScenario[] = [
 			pvpLittle: [],
 			pvpGreat: [{ fullName: "Azumarill", rank: 1, cp: 1499, levelWithCap: "23" }],
 			pvpUltra: []
+		}
+	},
+	{
+		id: "already-tracked",
+		label: "Already tracked (this catch isn't a hundo)",
+		// Demonstrates the distinction the "Have:" preset depends on: this catch is a boring
+		// 65% IV roll, but the user has previously tracked a hundo of this species.
+		context: {
+			...base,
+			trackedHundo: true,
+			trackedHundoYesNo: "Yes",
+			trackedHundoEmoji: "💯"
 		}
 	},
 	{
@@ -406,8 +418,8 @@ export function randomizePokemonContext(): PokemonTemplateContext {
 	// weather is coherent with the species' actual type (or "None" half the time) —
 	// never an unrelated condition like Snow-boosted Machop
 	const weather = Math.random() < 0.5 ? NO_WEATHER : species.boostWeather;
-	// Biased toward hundo/nundo sometimes so a template's badge tags actually have
-	// something to preview — true 15/15/15 or 0/0/0 rolls are 1-in-4096 organically.
+	// Biased toward 15/15/15 or 0/0/0 sometimes so `iv`/`atk`/`def`/`sta` previews show a
+	// realistic hundo/nundo roll — true 15/15/15 or 0/0/0 rolls are 1-in-4096 organically.
 	const forceHundo = Math.random() < 0.15;
 	const forceNundo = !forceHundo && Math.random() < 0.1;
 	const atk = forceHundo ? 15 : forceNundo ? 0 : randomInt(0, 15);
@@ -415,7 +427,12 @@ export function randomizePokemonContext(): PokemonTemplateContext {
 	const sta = forceHundo ? 15 : forceNundo ? 0 : randomInt(0, 15);
 	const level = randomInt(1, 40);
 	const shiny = Math.random() < 0.1;
-	const { hundo, nundo, shundo } = computeIvBadges(atk, def, sta, shiny);
+	// Tracked-collection status is per-user history, not a fact about this roll — randomized
+	// independently so previews actually exercise the distinction (see applyTrackedBadges).
+	const trackedHundo = Math.random() < 0.3;
+	const trackedNundo = !trackedHundo && Math.random() < 0.15;
+	const trackedShiny = Math.random() < 0.2;
+	const trackedShundo = trackedHundo && trackedShiny;
 	const pvpLittle = randomPvpEntries(species.name, "little");
 	const pvpGreat = randomPvpEntries(species.name, "great");
 	const pvpUltra = randomPvpEntries(species.name, "ultra");
@@ -436,17 +453,18 @@ export function randomizePokemonContext(): PokemonTemplateContext {
 		gender: genderValue === 1 ? "Male" : genderValue === 2 ? "Female" : "Genderless",
 		genderValue,
 		shiny,
-		shinyYesNo: shiny ? "Yes" : "No",
-		shinyEmoji: shiny ? "✨" : "",
-		hundo,
-		hundoYesNo: hundo ? "Yes" : "No",
-		hundoEmoji: hundo ? "💯" : "",
-		nundo,
-		nundoYesNo: nundo ? "Yes" : "No",
-		nundoEmoji: nundo ? "0️⃣" : "",
-		shundo,
-		shundoYesNo: shundo ? "Yes" : "No",
-		shundoEmoji: shundo ? "🌟" : "",
+		trackedShiny,
+		trackedShinyYesNo: trackedShiny ? "Yes" : "No",
+		trackedShinyEmoji: trackedShiny ? "✨" : "",
+		trackedHundo,
+		trackedHundoYesNo: trackedHundo ? "Yes" : "No",
+		trackedHundoEmoji: trackedHundo ? "💯" : "",
+		trackedNundo,
+		trackedNundoYesNo: trackedNundo ? "Yes" : "No",
+		trackedNundoEmoji: trackedNundo ? "0️⃣" : "",
+		trackedShundo,
+		trackedShundoYesNo: trackedShundo ? "Yes" : "No",
+		trackedShundoEmoji: trackedShundo ? "🌟" : "",
 		size: SIZE_LABELS[sizeValue - 1],
 		sizeValue,
 		type1: species.type1,

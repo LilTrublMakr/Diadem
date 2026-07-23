@@ -32,17 +32,53 @@ export const POKEMON_TEMPLATE_FIELDS: TemplateField[] = [
 		unescaped: true
 	},
 
-	{ tag: "shinyYesNo", label: "Shiny (Yes/No)", category: "Badges", sample: "No" },
-	{ tag: "shinyEmoji", label: "Shiny Emoji", category: "Badges", sample: "✨" },
-	{ tag: "hundo", label: "Hundo (true/false)", category: "Badges", sample: "false" },
-	{ tag: "hundoYesNo", label: "Hundo (Yes/No)", category: "Badges", sample: "No" },
-	{ tag: "hundoEmoji", label: "Hundo Emoji", category: "Badges", sample: "💯" },
-	{ tag: "nundo", label: "Nundo (true/false)", category: "Badges", sample: "false" },
-	{ tag: "nundoYesNo", label: "Nundo (Yes/No)", category: "Badges", sample: "No" },
-	{ tag: "nundoEmoji", label: "Nundo Emoji", category: "Badges", sample: "0️⃣" },
-	{ tag: "shundo", label: "Shundo (true/false)", category: "Badges", sample: "false" },
-	{ tag: "shundoYesNo", label: "Shundo (Yes/No)", category: "Badges", sample: "No" },
-	{ tag: "shundoEmoji", label: "Shundo Emoji", category: "Badges", sample: "🌟" },
+	{
+		tag: "trackedShiny",
+		label: "Shiny (true/false)",
+		category: "Your Collection",
+		sample: "false"
+	},
+	{ tag: "trackedShinyYesNo", label: "Shiny (Yes/No)", category: "Your Collection", sample: "No" },
+	{ tag: "trackedShinyEmoji", label: "Shiny Emoji", category: "Your Collection", sample: "✨" },
+	{
+		tag: "trackedHundo",
+		label: "Hundo (true/false)",
+		category: "Your Collection",
+		sample: "false"
+	},
+	{
+		tag: "trackedHundoYesNo",
+		label: "Hundo (Yes/No)",
+		category: "Your Collection",
+		sample: "No"
+	},
+	{ tag: "trackedHundoEmoji", label: "Hundo Emoji", category: "Your Collection", sample: "💯" },
+	{
+		tag: "trackedNundo",
+		label: "Nundo (true/false)",
+		category: "Your Collection",
+		sample: "false"
+	},
+	{
+		tag: "trackedNundoYesNo",
+		label: "Nundo (Yes/No)",
+		category: "Your Collection",
+		sample: "No"
+	},
+	{ tag: "trackedNundoEmoji", label: "Nundo Emoji", category: "Your Collection", sample: "0️⃣" },
+	{
+		tag: "trackedShundo",
+		label: "Shundo (true/false)",
+		category: "Your Collection",
+		sample: "false"
+	},
+	{
+		tag: "trackedShundoYesNo",
+		label: "Shundo (Yes/No)",
+		category: "Your Collection",
+		sample: "No"
+	},
+	{ tag: "trackedShundoEmoji", label: "Shundo Emoji", category: "Your Collection", sample: "🌟" },
 
 	{ tag: "iv", label: "IV %", category: "Stats", sample: "100" },
 	{ tag: "atk", label: "Attack IV", category: "Stats", sample: "15" },
@@ -216,8 +252,8 @@ export const PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 		raw: true
 	},
 	{
-		tag: "{{#if (or shundo hundo shiny nundo)}}Have:{{#if shundoEmoji}} {{shundoEmoji}}{{/if}}{{#if hundoEmoji}} {{hundoEmoji}}{{/if}}{{#if shinyEmoji}} {{shinyEmoji}}{{/if}}{{#if nundoEmoji}} {{nundoEmoji}}{{/if}}{{/if}}",
-		label: "Shundo/Hundo/Shiny/Nundo badges",
+		tag: "{{#if (or trackedShundo trackedHundo trackedShiny trackedNundo)}}Have:{{#if trackedShundoEmoji}} {{trackedShundoEmoji}}{{/if}}{{#if trackedHundoEmoji}} {{trackedHundoEmoji}}{{/if}}{{#if trackedShinyEmoji}} {{trackedShinyEmoji}}{{/if}}{{#if trackedNundoEmoji}} {{trackedNundoEmoji}}{{/if}}{{/if}}",
+		label: "Have: badges (your collection)",
 		category: "Presets",
 		sample: "",
 		raw: true

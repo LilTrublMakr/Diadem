@@ -3,7 +3,8 @@ import {
 	generatePokemonMapImage,
 	generatePokemonSpriteImage
 } from "@/lib/server/notifications/mapImage";
-import { renderEmbed } from "@/lib/server/notifications/render";
+import { applyTrackedBadges, renderEmbed } from "@/lib/server/notifications/render";
+import { getTracker } from "@/lib/server/db/internal/repository";
 import { guardNotificationRequest } from "@/lib/server/notifications/endpointUtils";
 import { embedTemplateSchema } from "@/lib/server/notifications/validation";
 import type { GolbatPokemonMessage } from "@/lib/server/notifications/golbatTypes";
@@ -48,7 +49,11 @@ export const POST: RequestHandler = async ({ locals, request, fetch }) => {
 	}
 
 	try {
-		const context = parsed.data.context as unknown as PokemonTemplateContext;
+		const rawContext = parsed.data.context as unknown as PokemonTemplateContext;
+		// Real tracked-collection status for the requesting user, not whatever the client's
+		// preview state happened to fake — a test send should match what a real DM would show.
+		const tracker = await getTracker(guard.userId, rawContext.pokemonId, rawContext.form);
+		const context = applyTrackedBadges(rawContext, tracker);
 		const rendered = renderEmbed(parsed.data.embed, context);
 		rendered.title = `🧪 TEST — ${rendered.title}`.trim();
 

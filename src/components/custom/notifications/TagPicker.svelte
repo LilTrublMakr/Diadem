@@ -103,6 +103,13 @@
 					>
 					— comparison helpers go inside <code>if</code>/<code>unless</code>'s parens.
 				</p>
+			{:else if category === "Your Collection"}
+				<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+					Manage what you've tracked on your <a
+						href="/profile"
+						class="text-blue-600 dark:text-blue-400 hover:underline">profile page</a
+					>.
+				</p>
 			{/if}
 		</div>
 	{/each}

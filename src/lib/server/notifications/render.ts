@@ -4,7 +4,6 @@ import { getMasterPokemon } from "@/lib/services/masterfile";
 import type { MasterMove } from "@/lib/types/masterfile";
 import { getClientConfig } from "@/lib/services/config/config.server";
 import { discordEmojiTag } from "@/lib/features/notifications/discordEmoji";
-import { computeIvBadges } from "@/lib/features/notifications/ivBadges";
 import { isMapImageConfigured } from "@/lib/server/notifications/mapImage";
 import { registerNotificationHelpers } from "@/lib/features/notifications/handlebarsHelpers";
 import type { GolbatPokemonMessage, GolbatPvpEntry } from "@/lib/server/notifications/golbatTypes";
@@ -113,7 +112,6 @@ export async function buildPokemonContext(
 	const def = message.individual_defense ?? null;
 	const sta = message.individual_stamina ?? null;
 	const shiny = !!message.shiny;
-	const { hundo, nundo, shundo } = computeIvBadges(atk, def, sta, shiny);
 
 	const diademBaseUrl = clientConfig.general.url;
 
@@ -130,17 +128,6 @@ export async function buildPokemonContext(
 		gender: genderLabel(message.gender),
 		genderValue: normalizeGenderValue(message.gender),
 		shiny,
-		shinyYesNo: shiny ? "Yes" : "No",
-		shinyEmoji: shiny ? "✨" : "",
-		hundo,
-		hundoYesNo: hundo ? "Yes" : "No",
-		hundoEmoji: hundo ? "💯" : "",
-		nundo,
-		nundoYesNo: nundo ? "Yes" : "No",
-		nundoEmoji: nundo ? "0️⃣" : "",
-		shundo,
-		shundoYesNo: shundo ? "Yes" : "No",
-		shundoEmoji: shundo ? "🌟" : "",
 		size: message.size != null ? getPokemonSize(message.size) : "?",
 		sizeValue: message.size ?? null,
 		type1,
@@ -190,7 +177,51 @@ export async function buildPokemonContext(
 		// generatePokemonSpriteImage + bot.ts), not a public URL — same reasoning as
 		// mapImageUrl above: the sprite is served through this app's own /assets proxy,
 		// which the operator may not expose publicly.
-		pokemonImageUrl: "attachment://pokemon.png"
+		pokemonImageUrl: "attachment://pokemon.png",
+		// Filled in per-recipient by applyTrackedBadges — this shared context has no
+		// single user to resolve a tracker row against yet.
+		trackedShiny: false,
+		trackedShinyYesNo: "No",
+		trackedShinyEmoji: "",
+		trackedHundo: false,
+		trackedHundoYesNo: "No",
+		trackedHundoEmoji: "",
+		trackedNundo: false,
+		trackedNundoYesNo: "No",
+		trackedNundoEmoji: "",
+		trackedShundo: false,
+		trackedShundoYesNo: "No",
+		trackedShundoEmoji: ""
+	};
+}
+
+export type TrackedStatus = { shiny: boolean; hundo: boolean; nundo: boolean; shundo: boolean };
+
+/**
+ * Overlays the delivering user's own pokemon_tracker status (did THEY mark this species as
+ * shiny/hundo/nundo/shundo in their collection) onto a shared event context. Must be called
+ * per-recipient, right before rendering — unlike every other field, tracked status isn't a fact
+ * about the encounter itself.
+ */
+export function applyTrackedBadges(
+	context: PokemonTemplateContext,
+	tracker: TrackedStatus | null
+): PokemonTemplateContext {
+	const t = tracker ?? { shiny: false, hundo: false, nundo: false, shundo: false };
+	return {
+		...context,
+		trackedShiny: t.shiny,
+		trackedShinyYesNo: t.shiny ? "Yes" : "No",
+		trackedShinyEmoji: t.shiny ? "✨" : "",
+		trackedHundo: t.hundo,
+		trackedHundoYesNo: t.hundo ? "Yes" : "No",
+		trackedHundoEmoji: t.hundo ? "💯" : "",
+		trackedNundo: t.nundo,
+		trackedNundoYesNo: t.nundo ? "Yes" : "No",
+		trackedNundoEmoji: t.nundo ? "0️⃣" : "",
+		trackedShundo: t.shundo,
+		trackedShundoYesNo: t.shundo ? "Yes" : "No",
+		trackedShundoEmoji: t.shundo ? "🌟" : ""
 	};
 }
 

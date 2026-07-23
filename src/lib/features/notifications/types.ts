@@ -125,18 +125,22 @@ export type PokemonTemplateContext = {
 	costume: number;
 	gender: string;
 	genderValue: 1 | 2 | 3 | null; // raw Male/Female/Genderless value behind the `gender` label
-	shiny: boolean;
-	shinyYesNo: string; // "Yes"/"No" — {{shiny}} alone already renders "true"/"false"
-	shinyEmoji: string; // "✨" or "" — matches TrackedPokemonImg's badge convention
-	hundo: boolean; // 100% IV (atk15/def15/sta15) — {{hundo}} renders "true"/"false"
-	hundoYesNo: string;
-	hundoEmoji: string; // "💯" or ""
-	nundo: boolean; // 0% IV (atk0/def0/sta0)
-	nundoYesNo: string;
-	nundoEmoji: string; // "0️⃣" or ""
-	shundo: boolean; // shiny + hundo
-	shundoYesNo: string;
-	shundoEmoji: string; // "🌟" or ""
+	shiny: boolean; // this encounter's own shiny status — {{shiny}} renders "true"/"false"
+	// Whether the RECEIVING user has already tracked a shiny/hundo/nundo/shundo of this species
+	// in their personal collection (pokemon_tracker) — not a fact about this encounter. Resolved
+	// per-recipient (see applyTrackedBadges in render.ts), not shared context.
+	trackedShiny: boolean;
+	trackedShinyYesNo: string;
+	trackedShinyEmoji: string;
+	trackedHundo: boolean;
+	trackedHundoYesNo: string;
+	trackedHundoEmoji: string;
+	trackedNundo: boolean;
+	trackedNundoYesNo: string;
+	trackedNundoEmoji: string;
+	trackedShundo: boolean;
+	trackedShundoYesNo: string;
+	trackedShundoEmoji: string;
 	size: string;
 	sizeValue: number | null; // raw 1-5 scale behind the `size` label — for filter matching
 	type1: string;
