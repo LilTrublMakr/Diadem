@@ -142,7 +142,11 @@ export async function buildPokemonContext(
 		level: message.pokemon_level ?? null,
 		weight: message.weight ?? null,
 		height: message.height ?? null,
-		weather: mWeather(message.weather),
+		// Golbat sends weather: 0 for "no boost" — mWeather(0) falls through to its generic
+		// "Unknown Weather" fallback (meant for an unrecognized id, not "none"), which broke the
+		// `{{#if (isnt weather "None")}}` weather-boost preset (always true, since "Unknown
+		// Weather" never equals "None"). "None" here is the literal templates check against.
+		weather: message.weather ? mWeather(message.weather) : "None",
 		weatherEmoji:
 			message.weather && WEATHER_SLUGS[message.weather]
 				? discordEmojiTag(`weather_${WEATHER_SLUGS[message.weather]}`)
