@@ -1,6 +1,6 @@
 import { getNormalizedForm, getPokemonSize, typeIdToText } from "@/lib/utils/pokemonUtils";
 import { loadRemoteLocale, mMove, mPokemon, mWeather } from "@/lib/services/ingameLocale";
-import { getMasterPokemon } from "@/lib/services/masterfile";
+import { getMasterFile, getMasterPokemon } from "@/lib/services/masterfile";
 import type { MasterMove } from "@/lib/types/masterfile";
 import { getClientConfig } from "@/lib/services/config/config.server";
 import { discordEmojiTag } from "@/lib/features/notifications/discordEmoji";
@@ -70,6 +70,48 @@ function buildPvpEntries(entries: GolbatPvpEntry[] | undefined): PvpEntryContext
 		}));
 }
 
+// Every other family member (pre-evolutions AND post-evolutions), not just the immediate next
+// stage — e.g. catching Dratini lists Dragonair AND Dragonite, catching Dragonair lists both
+// Dratini and Dragonite. Ordered root-first via the same family-grouping + evolution-chain walk
+// src/routes/(custom)/pokedex/[id]/+page.svelte uses for its "Evolution Family" section.
+function buildEvolutionFamily(pokemonId: number): { fullName: string; pokemonId: number }[] {
+	const mf = getMasterFile();
+	const base = mf?.pokemon[String(pokemonId)];
+	if (!mf || !base) return [];
+
+	const members = new Map<number, { evolutions?: { pokemonId: number }[] }>();
+	for (const [idStr, p] of Object.entries(mf.pokemon)) {
+		if (p.family === base.family) members.set(Number(idStr), p);
+	}
+	if (members.size <= 1) return [];
+
+	const allEvoTargets = new Set<number>();
+	for (const p of members.values()) {
+		for (const evo of p.evolutions ?? []) allEvoTargets.add(evo.pokemonId);
+	}
+	const rootId = [...members.keys()].find((id) => !allEvoTargets.has(id)) ?? pokemonId;
+
+	const order: number[] = [];
+	const seen = new Set<number>();
+	function walk(id: number) {
+		if (seen.has(id)) return;
+		seen.add(id);
+		order.push(id);
+		for (const evo of members.get(id)?.evolutions ?? []) {
+			if (members.has(evo.pokemonId)) walk(evo.pokemonId);
+		}
+	}
+	walk(rootId);
+	for (const id of members.keys()) walk(id); // stragglers not reached from root, just in case
+
+	return order
+		.filter((id) => id !== pokemonId)
+		.map((id) => ({
+			fullName: mPokemon({ pokemon_id: id, form: getNormalizedForm(id, 0) }),
+			pokemonId: id
+		}));
+}
+
 export async function buildPokemonContext(
 	message: GolbatPokemonMessage,
 	thisFetch: typeof fetch = fetch
@@ -105,10 +147,7 @@ export async function buildPokemonContext(
 	const formName = form ? (master?.name ?? "") : "";
 	const type1 = typeIdToText(master?.types?.[0]);
 	const type2 = master?.types?.[1] ? typeIdToText(master.types[1]) : "";
-	const evolutions = (master?.evolutions ?? []).map((e) => ({
-		fullName: mPokemon({ pokemon_id: e.pokemonId, form: getNormalizedForm(e.pokemonId, e.form) }),
-		pokemonId: e.pokemonId
-	}));
+	const evolutions = buildEvolutionFamily(message.pokemon_id);
 
 	const atk = message.individual_attack ?? null;
 	const def = message.individual_defense ?? null;

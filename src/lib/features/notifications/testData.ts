@@ -89,7 +89,11 @@ const base: PokemonTemplateContext = {
 	pokestopId: "",
 	pokestopName: "",
 	username: "scanner01",
-	evolutions: [{ fullName: "Dragonair", pokemonId: 148 }],
+	// The whole family besides Dratini itself — demonstrates it's not just the next stage.
+	evolutions: [
+		{ fullName: "Dragonair", pokemonId: 148 },
+		{ fullName: "Dragonite", pokemonId: 149 }
+	],
 	pokemonImageUrl: "https://pogovt.com/assets/DEFAULT/pokemon/147.png"
 };
 

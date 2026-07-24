@@ -243,8 +243,8 @@ export const PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 		raw: true
 	},
 	{
-		tag: "{{#if evolutions.length}}Can evolve into: {{#each evolutions}}{{fullName}}{{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}",
-		label: "Evolutions list",
+		tag: "{{#if evolutions.length}}Evolution family: {{#each evolutions}}{{fullName}}{{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}",
+		label: "Evolution family list",
 		category: "Presets",
 		sample: "",
 		raw: true
