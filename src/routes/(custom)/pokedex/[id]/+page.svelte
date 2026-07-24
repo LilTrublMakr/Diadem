@@ -54,12 +54,12 @@
 	let showShadow = $state(false);
 
 	let loggedIn = $derived(!!getUserDetails().details);
-	let trackerData = $derived(getTrackers()[trackerKey(pokemonId, activeForm)] ?? { shiny: false, hundo: false, nundo: false, shundo: false });
+	let trackerData = $derived(getTrackers()[trackerKey(pokemonId, activeForm)] ?? { shiny: false, hundo: false, nundo: false, shundo: false, legacyMoves: [] as string[] });
 	let trackerSaving = $state(false);
 
 	async function toggleTracker(field: 'shiny' | 'hundo' | 'nundo' | 'shundo', value: boolean) {
 		const form = activeForm;
-		const prev = getTrackers()[trackerKey(pokemonId, form)] ?? { shiny: false, hundo: false, nundo: false, shundo: false };
+		const prev = getTrackers()[trackerKey(pokemonId, form)] ?? { shiny: false, hundo: false, nundo: false, shundo: false, legacyMoves: [] as string[] };
 		setTrackerEntry(pokemonId, form, { [field]: value });
 		trackerSaving = true;
 		try {
@@ -67,6 +67,28 @@
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ form, [field]: value })
+			});
+			if (res.ok) setTrackerEntry(pokemonId, form, await res.json());
+			else setTrackerEntry(pokemonId, form, prev);
+		} catch {
+			setTrackerEntry(pokemonId, form, prev);
+		} finally {
+			trackerSaving = false;
+		}
+	}
+
+	async function toggleLegacyMove(proto: string) {
+		const form = activeForm;
+		const prev = getTrackers()[trackerKey(pokemonId, form)] ?? { shiny: false, hundo: false, nundo: false, shundo: false, legacyMoves: [] as string[] };
+		const current = prev.legacyMoves ?? [];
+		const newMoves = current.includes(proto) ? current.filter(p => p !== proto) : [...current, proto];
+		setTrackerEntry(pokemonId, form, { legacyMoves: newMoves });
+		trackerSaving = true;
+		try {
+			const res = await fetch(`/api/custom/tracker/${pokemonId}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ form, legacyMoves: newMoves })
 			});
 			if (res.ok) setTrackerEntry(pokemonId, form, await res.json());
 			else setTrackerEntry(pokemonId, form, prev);
@@ -911,6 +933,18 @@
 										<span class="text-sm text-zinc-800 dark:text-zinc-200">{move.name}</span>
 										{#if move.isLegacy}
 											<span class="text-xs text-zinc-400 dark:text-zinc-500">Legacy</span>
+											{#if loggedIn}
+												{@const hasMove = trackerData.legacyMoves.includes(move.proto)}
+												<button
+													onclick={() => toggleLegacyMove(move.proto)}
+													disabled={trackerSaving}
+													title={hasMove ? 'Remove from tracker' : 'Track this move'}
+													class="text-xs px-1.5 py-0.5 rounded border transition-colors cursor-pointer disabled:opacity-50
+														   {hasMove
+														       ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-zinc-900 dark:border-zinc-100'
+														       : 'border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:border-zinc-500 dark:hover:border-zinc-400'}"
+												>{hasMove ? '✓' : '+'}</button>
+											{/if}
 										{/if}
 									</div>
 									<div class="flex items-center gap-2 flex-shrink-0">

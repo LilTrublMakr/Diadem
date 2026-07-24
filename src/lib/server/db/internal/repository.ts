@@ -4,6 +4,7 @@ import type {
 	NotificationArea,
 	NotificationSubscription,
 	NotificationTemplate,
+	PokemonTracker,
 	ScanArea
 } from "@/lib/server/db/internal/schema";
 import type {
@@ -38,7 +39,33 @@ export async function getUserSettings(userId: string): Promise<undefined | strin
 	return result?.user?.userSettings as string | undefined;
 }
 
-export async function getTracker(userId: string, pokemonId: number, form = 0) {
+export type ParsedTracker = {
+	pokemonId: number;
+	form: number;
+	shiny: boolean;
+	hundo: boolean;
+	nundo: boolean;
+	shundo: boolean;
+	legacyMoves: string[];
+};
+
+function parseTrackerRow(row: PokemonTracker): ParsedTracker {
+	return {
+		pokemonId: row.pokemonId,
+		form: row.form,
+		shiny: row.shiny,
+		hundo: row.hundo,
+		nundo: row.nundo,
+		shundo: row.shundo,
+		legacyMoves: typeof row.legacyMoves === "string" ? JSON.parse(row.legacyMoves || "[]") : []
+	};
+}
+
+export async function getTracker(
+	userId: string,
+	pokemonId: number,
+	form = 0
+): Promise<ParsedTracker | null> {
 	const [result] = await db
 		.select()
 		.from(table.pokemonTracker)
@@ -49,19 +76,30 @@ export async function getTracker(userId: string, pokemonId: number, form = 0) {
 				eq(table.pokemonTracker.form, form)
 			)
 		);
-	return result ?? null;
+	return result ? parseTrackerRow(result) : null;
 }
 
-export async function getAllTrackers(userId: string) {
-	return db.select().from(table.pokemonTracker).where(eq(table.pokemonTracker.userId, userId));
+export async function getAllTrackers(userId: string): Promise<ParsedTracker[]> {
+	const rows = await db
+		.select()
+		.from(table.pokemonTracker)
+		.where(eq(table.pokemonTracker.userId, userId));
+	return rows.map(parseTrackerRow);
 }
 
 export async function upsertTracker(
 	userId: string,
 	pokemonId: number,
 	form: number,
-	data: { shiny?: boolean; hundo?: boolean; nundo?: boolean; shundo?: boolean }
-) {
+	data: { shiny?: boolean; hundo?: boolean; nundo?: boolean; shundo?: boolean; legacyMoves?: string[] }
+): Promise<ParsedTracker | null> {
+	const updateSet: { shiny?: boolean; hundo?: boolean; nundo?: boolean; shundo?: boolean; legacyMoves?: string } = {};
+	if (data.shiny !== undefined) updateSet.shiny = data.shiny;
+	if (data.hundo !== undefined) updateSet.hundo = data.hundo;
+	if (data.nundo !== undefined) updateSet.nundo = data.nundo;
+	if (data.shundo !== undefined) updateSet.shundo = data.shundo;
+	if (data.legacyMoves !== undefined) updateSet.legacyMoves = JSON.stringify(data.legacyMoves);
+
 	await db
 		.insert(table.pokemonTracker)
 		.values({
@@ -71,9 +109,10 @@ export async function upsertTracker(
 			shiny: data.shiny ?? false,
 			hundo: data.hundo ?? false,
 			nundo: data.nundo ?? false,
-			shundo: data.shundo ?? false
+			shundo: data.shundo ?? false,
+			legacyMoves: JSON.stringify(data.legacyMoves ?? [])
 		})
-		.onDuplicateKeyUpdate({ set: data });
+		.onDuplicateKeyUpdate({ set: updateSet });
 	return getTracker(userId, pokemonId, form);
 }
 

@@ -111,6 +111,7 @@ export const pokemonTracker = mysqlTable(
 		hundo: boolean("hundo").default(false).notNull(),
 		nundo: boolean("nundo").default(false).notNull(),
 		shundo: boolean("shundo").default(false).notNull(),
+		legacyMoves: text("legacy_moves").default("[]").notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
 	},
 	(table) => ({

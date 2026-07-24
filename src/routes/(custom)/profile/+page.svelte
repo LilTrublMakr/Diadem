@@ -57,6 +57,14 @@
 		return options;
 	}
 
+	function legacyMoveNames(pokemonId: number, form: number, protos: string[]): string[] {
+		if (!protos.length) return [];
+		const base = getMasterPokemon(pokemonId);
+		const p = (form !== 0 ? base?.forms[form.toString()] : null) ?? base;
+		const all = [...(p?.quickMoves ?? []), ...(p?.chargedMoves ?? [])];
+		return protos.map(proto => all.find(m => m.proto === proto)?.name ?? proto);
+	}
+
 	function pogoFallbackUrl(id: number): string {
 		return `https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_${String(id).padStart(3, '0')}_00.png`;
 	}
@@ -75,7 +83,7 @@
 
 	async function toggleTracker(pokemonId: number, form: number, field: 'shiny' | 'hundo' | 'nundo' | 'shundo', value: boolean) {
 		const key = trackerKey(pokemonId, form);
-		const prev = getTrackers()[key] ?? { shiny: false, hundo: false, nundo: false, shundo: false };
+		const prev = getTrackers()[key] ?? { shiny: false, hundo: false, nundo: false, shundo: false, legacyMoves: [] as string[] };
 		setTrackerEntry(pokemonId, form, { [field]: value });
 		saving = new Set([...saving, key]);
 		try {
@@ -126,8 +134,9 @@
 			{#each allPokemon as [id, poke]}
 				{@const selectedForm = selectedForms[id] ?? 0}
 				{@const formOpts = getFormOptions(poke)}
-				{@const entry = getTrackers()[trackerKey(id, selectedForm)] ?? { shiny: false, hundo: false, nundo: false, shundo: false }}
+				{@const entry = getTrackers()[trackerKey(id, selectedForm)] ?? { shiny: false, hundo: false, nundo: false, shundo: false, legacyMoves: [] as string[] }}
 				{@const key = trackerKey(id, selectedForm)}
+				{@const legacyNames = legacyMoveNames(id, selectedForm, entry.legacyMoves ?? [])}
 
 				<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 flex flex-col gap-2">
 					<!-- Header -->
@@ -176,6 +185,13 @@
 							>{emoji}</button>
 						{/each}
 					</div>
+
+					<!-- Legacy move indicator -->
+					{#if legacyNames.length > 0}
+						<div class="text-[10px] text-zinc-500 dark:text-zinc-400 leading-tight truncate" title={legacyNames.join(', ')}>
+							⚔️ {legacyNames.join(', ')}
+						</div>
+					{/if}
 				</div>
 			{/each}
 		</div>
