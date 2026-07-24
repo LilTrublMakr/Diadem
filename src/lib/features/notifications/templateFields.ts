@@ -80,6 +80,25 @@ export const POKEMON_TEMPLATE_FIELDS: TemplateField[] = [
 	},
 	{ tag: "trackedShundoEmoji", label: "Shundo Emoji", category: "Your Collection", sample: "🌟" },
 
+	{
+		tag: "shinyRatePercent",
+		label: "All-Time Shiny Rate (%)",
+		category: "Shiny Stats",
+		sample: "4.8%"
+	},
+	{
+		tag: "shinyRateFraction",
+		label: "All-Time Shiny Rate (full fraction)",
+		category: "Shiny Stats",
+		sample: "8/166"
+	},
+	{
+		tag: "shinyRateReduced",
+		label: "All-Time Shiny Rate (reduced, ~1 in N)",
+		category: "Shiny Stats",
+		sample: "~1 in 21"
+	},
+
 	{ tag: "iv", label: "IV %", category: "Stats", sample: "100" },
 	{ tag: "atk", label: "Attack IV", category: "Stats", sample: "15" },
 	{ tag: "def", label: "Defense IV", category: "Stats", sample: "15" },

@@ -4,7 +4,9 @@ import { getMasterPokemon } from "@/lib/services/masterfile";
 import type { MasterMove } from "@/lib/types/masterfile";
 import { getClientConfig } from "@/lib/services/config/config.server";
 import { discordEmojiTag } from "@/lib/features/notifications/discordEmoji";
+import { formatShinyRate } from "@/lib/features/notifications/shinyRateFormat";
 import { isMapImageConfigured } from "@/lib/server/notifications/mapImage";
+import { getShinyRate } from "@/lib/server/provider/shinyRateProvider";
 import { registerNotificationHelpers } from "@/lib/features/notifications/handlebarsHelpers";
 import type { GolbatPokemonMessage, GolbatPvpEntry } from "@/lib/server/notifications/golbatTypes";
 import type {
@@ -112,6 +114,7 @@ export async function buildPokemonContext(
 	const def = message.individual_defense ?? null;
 	const sta = message.individual_stamina ?? null;
 	const shiny = !!message.shiny;
+	const shinyRate = formatShinyRate(await getShinyRate(message.pokemon_id, form));
 
 	const diademBaseUrl = clientConfig.general.url;
 
@@ -128,6 +131,9 @@ export async function buildPokemonContext(
 		gender: genderLabel(message.gender),
 		genderValue: normalizeGenderValue(message.gender),
 		shiny,
+		shinyRatePercent: shinyRate.percent,
+		shinyRateFraction: shinyRate.fraction,
+		shinyRateReduced: shinyRate.reduced,
 		size: message.size != null ? getPokemonSize(message.size) : "?",
 		sizeValue: message.size ?? null,
 		type1,

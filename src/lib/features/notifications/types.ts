@@ -143,6 +143,11 @@ export type PokemonTemplateContext = {
 	trackedShundo: boolean;
 	trackedShundoYesNo: string;
 	trackedShundoEmoji: string;
+	// This species' all-time shiny rate (pokemon_summary, time_slot='all') — public scanner
+	// data, not per-user. "?" for any of these means no scan data exists yet for this species.
+	shinyRatePercent: string; // "4.8%"
+	shinyRateFraction: string; // "8/166"
+	shinyRateReduced: string; // "~1 in 21", or "—" if never recorded shiny
 	size: string;
 	sizeValue: number | null; // raw 1-5 scale behind the `size` label — for filter matching
 	type1: string;

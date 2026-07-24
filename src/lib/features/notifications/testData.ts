@@ -1,4 +1,5 @@
 import { discordEmojiTag } from "@/lib/features/notifications/discordEmoji";
+import { formatShinyRate } from "@/lib/features/notifications/shinyRateFormat";
 import type { PokemonTemplateContext } from "@/lib/features/notifications/types";
 
 export type TestScenario = {
@@ -9,6 +10,18 @@ export type TestScenario = {
 
 // Matches pokemonSizes in src/lib/utils/pokemonUtils.ts (1-indexed: XXS..XXL)
 const SIZE_LABELS = ["XXS", "XS", "M", "XL", "XXL"];
+
+function shinyRateFields(
+	shiny: number,
+	total: number
+): Pick<PokemonTemplateContext, "shinyRatePercent" | "shinyRateFraction" | "shinyRateReduced"> {
+	const rate = formatShinyRate({ shiny, total });
+	return {
+		shinyRatePercent: rate.percent,
+		shinyRateFraction: rate.fraction,
+		shinyRateReduced: rate.reduced
+	};
+}
 
 const base: PokemonTemplateContext = {
 	pokemonName: "Dratini",
@@ -31,6 +44,7 @@ const base: PokemonTemplateContext = {
 	trackedShundo: false,
 	trackedShundoYesNo: "No",
 	trackedShundoEmoji: "",
+	...shinyRateFields(8, 166),
 	size: "M",
 	sizeValue: 3,
 	type1: "Dragon",
@@ -433,6 +447,10 @@ export function randomizePokemonContext(): PokemonTemplateContext {
 	const trackedNundo = !trackedHundo && Math.random() < 0.15;
 	const trackedShiny = Math.random() < 0.2;
 	const trackedShundo = trackedHundo && trackedShiny;
+	// Species-wide historical rate — unrelated to whether THIS roll is shiny.
+	const shinyRateTotal = randomInt(50, 5000);
+	const shinyRateShiny =
+		Math.random() < 0.1 ? 0 : randomInt(1, Math.max(1, Math.round(shinyRateTotal / 20)));
 	const pvpLittle = randomPvpEntries(species.name, "little");
 	const pvpGreat = randomPvpEntries(species.name, "great");
 	const pvpUltra = randomPvpEntries(species.name, "ultra");
@@ -453,6 +471,7 @@ export function randomizePokemonContext(): PokemonTemplateContext {
 		gender: genderValue === 1 ? "Male" : genderValue === 2 ? "Female" : "Genderless",
 		genderValue,
 		shiny,
+		...shinyRateFields(shinyRateShiny, shinyRateTotal),
 		trackedShiny,
 		trackedShinyYesNo: trackedShiny ? "Yes" : "No",
 		trackedShinyEmoji: trackedShiny ? "✨" : "",
