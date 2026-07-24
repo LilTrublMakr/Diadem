@@ -4,7 +4,13 @@
 	import { mMove, mPokemon, mRaid, mTeam } from "$lib/services/ingameLocale";
 	import { type MapData, MapObjectType } from "$lib/mapObjects/mapObjectTypes";
 	import type { GymData, GymDefender } from "$lib/types/mapObjectData/gym";
-	import { getIconGym, getIconPokemon, getIconRaidEgg, getIconTeam } from "$lib/services/uicons.svelte";
+	import {
+		getIconBackground,
+		getIconGym,
+		getIconPokemon,
+		getIconRaidEgg,
+		getIconTeam
+	} from "$lib/services/uicons.svelte";
 	import { resize } from "$lib/services/assets";
 	import { timestampToLocalTime } from "$lib/utils/timestampToLocalTime";
 	import { getRaidPokemon, GYM_SLOTS, hasActiveRaid, isFortOutdated, isRaidHatched } from "$lib/utils/gymUtils";
@@ -299,11 +305,21 @@
 								{#each data.defenders as defender}
 									<div class="min-w-64 max-w-80 rounded-md bg-accent-highlight p-5">
 										<div class="flex items-center gap-3">
-											<ImagePopup
-												class="size-12 shrink-0"
-												src={getIconPokemon(defender)}
-												alt={mPokemon(defender)}
-											/>
+											<div class="size-12 shrink-0 relative">
+												<ImagePopup
+													class="absolute size-full z-10"
+													src={getIconPokemon(defender)}
+													alt={mPokemon(defender)}
+												/>
+												{#if defender.background}
+													<ImagePopup
+														class="absolute size-12 mask-[radial-gradient(circle,black_35%,transparent_70%)]"
+														src={resize(getIconBackground(defender.background), {width: 64})}
+														alt={m.background()}
+													/>
+												{/if}
+											</div>
+
 											<div class="min-w-0">
 												<p class="truncate font-semibold">
 													{mPokemon(defender)}
