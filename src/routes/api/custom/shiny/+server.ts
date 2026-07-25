@@ -38,6 +38,7 @@ export const GET: RequestHandler = async () => {
 			FROM pokemon_summary
 			WHERE time_slot IN ('1d', '1w', '1m', '3m', 'all')
 			  AND shiny_count > 0
+			  AND (time_slot != '1d' OR last_updated >= NOW() - INTERVAL 2 HOUR)
 			ORDER BY pokemon_id, form
 		`);
 	} catch (e) {

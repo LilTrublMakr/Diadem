@@ -49,14 +49,14 @@ export const GET: RequestHandler = async () => {
 			queryStats<SummaryRow[]>(`
 				SELECT pokemon_id, form, total_count
 				FROM pokemon_summary
-				WHERE time_slot = '1d'
+				WHERE time_slot = '1d' AND last_updated >= NOW() - INTERVAL 2 HOUR
 				ORDER BY total_count DESC
 				LIMIT 10
 			`),
 			queryStats<SummaryRow[]>(`
 				SELECT pokemon_id, form, total_count
 				FROM pokemon_summary
-				WHERE time_slot = '1d' AND total_count > 0
+				WHERE time_slot = '1d' AND total_count > 0 AND last_updated >= NOW() - INTERVAL 2 HOUR
 				ORDER BY total_count ASC
 				LIMIT 10
 			`)
