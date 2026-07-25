@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Button from "@/components/ui/input/Button.svelte";
-	import { Eye, EyeClosed } from "@lucide/svelte";
+	import { Eye, EyeClosed, GripVertical } from "@lucide/svelte";
 
 	import type { AnyFilterset } from "@/lib/features/filters/filtersets";
 	import { type ModalType, openModal } from "@/lib/ui/modal.svelte";
@@ -13,6 +13,7 @@
 	import { filterTitle } from "@/lib/features/filters/filtersetUtils.svelte";
 	import FiltersetIcon from "@/lib/features/filters/FiltersetIcon.svelte";
 	import type { FilterCategory } from "@/lib/features/filters/filters";
+	import * as m from "@/lib/paraglide/messages";
 
 	import { MapObjectType } from "@/lib/mapObjects/mapObjectTypes";
 
@@ -21,18 +22,26 @@
 		majorCategory,
 		subCategory,
 		filterModal,
-		mapObject
+		mapObject,
+		reorderable = false,
+		onDragHandlePointerDown = undefined,
+		isDragged = false
 	}: {
 		filter: AnyFilterset;
 		majorCategory: SelectedFiltersetData["majorCategory"];
 		subCategory?: FilterCategory;
 		filterModal: ModalType;
 		mapObject: MapObjectType;
+		reorderable?: boolean;
+		onDragHandlePointerDown?: () => void;
+		isDragged?: boolean;
 	} = $props();
 </script>
 
 <Button
-	class="pl-0! pr-1! h-fit! relative overflow-hidden group"
+	class="pl-0! pr-1! h-fit! w-full relative overflow-hidden group transition-opacity {isDragged
+		? 'opacity-50'
+		: ''}"
 	variant="outline"
 	size="lg"
 	onclick={() => {
@@ -41,6 +50,23 @@
 		openModal(filterModal);
 	}}
 >
+	{#if reorderable}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<div
+			role="button"
+			tabindex="-1"
+			class="cursor-grab touch-none text-muted-foreground shrink-0 active:cursor-grabbing"
+			onpointerdown={(e) => {
+				e.stopPropagation();
+				onDragHandlePointerDown?.();
+			}}
+			onclick={(e) => e.stopPropagation()}
+			aria-label={m.reorder_filterset()}
+		>
+			<GripVertical size="16" />
+		</div>
+	{/if}
+
 	<div
 		class="h-12 w-0.5 mr-1.5 transition-colors shrink-0"
 		class:bg-green={filter.enabled}
@@ -56,7 +82,9 @@
 		></div>
 		<FiltersetIcon filterset={$state.snapshot(filter)} size={5} />
 
-		<span class="overflow-x-hidden">{filterTitle($state.snapshot(filter))}</span>
+		<span class="truncate min-w-0 flex-1 text-left"
+			>{filterTitle($state.snapshot(filter))}</span
+		>
 	</div>
 	<!--	<Button class="flex-1 justify-start rounded-md py-2 h-12 m-0! pl-4 pr-2" size="" variant="ghost">-->
 	<!--		<span>{filter.icon}</span>-->

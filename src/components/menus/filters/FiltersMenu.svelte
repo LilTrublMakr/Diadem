@@ -18,6 +18,7 @@
 		category="pokemon"
 		mapObject={MapObjectType.POKEMON}
 		filterModal="filtersetPokemon"
+		filtersReorderable
 	/>
 
 	<FilterSection

@@ -36,6 +36,7 @@
 		mapObject,
 		filterModal = undefined,
 		isFilterable = true,
+		filtersReorderable = false,
 		subCategories = []
 	}: {
 		requiredPermission: FeaturesKey | FeaturesKey[];
@@ -44,6 +45,7 @@
 		mapObject: MapObjectType;
 		filterModal?: ModalType | undefined;
 		isFilterable?: boolean;
+		filtersReorderable?: boolean;
 		subCategories?: {
 			title: string;
 			category: FilterCategory;
@@ -106,6 +108,7 @@
 			isExpandable={subCategories.length > 0}
 			collapsibleByFiltersets={subCategories.length === 0}
 			filter={getUserSettings().filters[category]}
+			{filtersReorderable}
 			bind:expanded={subcategoriesExpanded}
 		/>
 

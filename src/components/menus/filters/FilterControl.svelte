@@ -7,6 +7,7 @@
 	import Button from "@/components/ui/input/Button.svelte";
 
 	import { slide } from "svelte/transition";
+	import { flip } from "svelte/animate";
 	import Filterset from "@/components/menus/filters/Filterset.svelte";
 	import { type ModalType, openModal } from "@/lib/ui/modal.svelte.js";
 	import {
@@ -40,6 +41,7 @@
 		isExpandable = false,
 		collapsibleByFiltersets = false,
 		isFilterable = true,
+		filtersReorderable = false,
 		expanded = $bindable(false),
 	}: {
 		majorCategory: SelectedFiltersetData["majorCategory"];
@@ -52,12 +54,63 @@
 		isExpandable?: boolean;
 		collapsibleByFiltersets?: boolean;
 		isFilterable?: boolean;
+		filtersReorderable?: boolean;
 		subCategories?: FilterCategory[];
 		expanded?: boolean;
 	} = $props();
 
+	let draggedFiltersetId: string | null = $state(null);
+	let livePreviewOrder: AnyFilterset[] | null = $state(null);
+
+	function onFiltersetDragPointerDown(id: string) {
+		draggedFiltersetId = id;
+		livePreviewOrder = filtersets ? [...filtersets] : null;
+		// The dragged row is repositioned in the DOM by the keyed #each block as the
+		// preview reorders, which breaks element-level setPointerCapture — track the
+		// drag on window instead.
+		window.addEventListener("pointermove", onFiltersetDragPointerMove);
+		window.addEventListener("pointerup", onFiltersetDragPointerUp);
+	}
+
+	function onFiltersetDragPointerMove(event: PointerEvent) {
+		if (!draggedFiltersetId || !livePreviewOrder) return;
+
+		const rows = Array.from(document.querySelectorAll<HTMLElement>("[data-filterset-id]"));
+		let toIndex = 0;
+		for (const row of rows) {
+			const rect = row.getBoundingClientRect();
+			if (event.clientY > rect.top + rect.height / 2) toIndex++;
+		}
+		toIndex = Math.min(toIndex, livePreviewOrder.length - 1);
+
+		const fromIndex = livePreviewOrder.findIndex((f) => f.id === draggedFiltersetId);
+		if (fromIndex === -1 || fromIndex === toIndex) return;
+
+		const next = [...livePreviewOrder];
+		const [moved] = next.splice(fromIndex, 1);
+		next.splice(toIndex, 0, moved);
+		livePreviewOrder = next;
+	}
+
+	function onFiltersetDragPointerUp() {
+		window.removeEventListener("pointermove", onFiltersetDragPointerMove);
+		window.removeEventListener("pointerup", onFiltersetDragPointerUp);
+
+		if (livePreviewOrder) {
+			let target = getUserSettings().filters[majorCategory];
+			// @ts-ignore
+			if (subCategory) target = target[subCategory];
+			// @ts-ignore
+			target.filters = livePreviewOrder;
+			updateUserSettings();
+		}
+		draggedFiltersetId = null;
+		livePreviewOrder = null;
+	}
+
 	let isEnabled: boolean = $derived(filter.enabled);
 	let filtersets = $derived((filter as { filters?: AnyFilterset[] }).filters);
+	let displayedFiltersets = $derived(livePreviewOrder ?? filtersets ?? []);
 	let hasAnyFilterset: boolean = $derived((filtersets?.length ?? 0) > 0);
 	let allFiltersetsDisabled: boolean = $derived(
 		hasAnyFilterset && (filtersets?.every((f) => !f.enabled) ?? false)
@@ -173,8 +226,23 @@
 	{#if isEnabled && isFilterable}
 		{#if hasAnyFilterset && filterModal && (!collapsibleByFiltersets || expanded)}
 			<div class="w-full my-1 flex flex-col gap-1 pl-2" transition:slide={{ duration: 90 }}>
-				{#each filtersets ?? [] as filterset (filterset.id)}
-					<Filterset filter={filterset} {majorCategory} {subCategory} {filterModal} {mapObject} />
+				{#each displayedFiltersets as filterset (filterset.id)}
+					<div
+						data-filterset-id={filterset.id}
+						class="w-full"
+						animate:flip={{ duration: 200 }}
+					>
+						<Filterset
+							filter={filterset}
+							{majorCategory}
+							{subCategory}
+							{filterModal}
+							{mapObject}
+							reorderable={filtersReorderable}
+							onDragHandlePointerDown={() => onFiltersetDragPointerDown(filterset.id)}
+							isDragged={draggedFiltersetId === filterset.id}
+						/>
+					</div>
 				{/each}
 			</div>
 
