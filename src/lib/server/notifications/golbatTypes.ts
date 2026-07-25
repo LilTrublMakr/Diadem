@@ -175,6 +175,25 @@ export type GolbatLureMessage = {
 	lure_id: number;
 };
 
+// Shape of a Golbat webhook envelope's `message` for type "gym"/"gym_details" — verified against
+// PoracleNG's GymWebhook struct (processor/internal/webhook/types.go:305-326). Golbat's own
+// wire format is inconsistent between the two envelope variants for the same concept (gym_id vs
+// id, team_id vs team, is_in_battle vs in_battle) — every pair is read defensively. Golbat ships
+// no last-controller field; that's derived server-side (see gymStates tracker).
+export type GolbatGymMessage = {
+	gym_id?: string;
+	id?: string;
+	name?: string;
+	url?: string;
+	latitude: number;
+	longitude: number;
+	team_id?: number;
+	team?: number;
+	slots_available: number;
+	is_in_battle?: boolean;
+	in_battle?: boolean;
+};
+
 export type GolbatWebhookEnvelope = {
 	type: string;
 	message: unknown;

@@ -676,6 +676,81 @@ export const LURE_TEMPLATE_FIELDS: TemplateField[] = [
 ];
 
 /**
+ * Field registry for the "gym" notification type — a team/slot/battle-state delta (see
+ * buildGymContext in render.ts). No IV/CP/stats, same "only tags that make sense" reasoning as
+ * the other event categories. -1 values (oldTeamId, oldSlotsAvailable, oldTrainerCount,
+ * lastControllerId) mean "unknown" — see the type's own doc comment.
+ */
+export const GYM_TEMPLATE_FIELDS: TemplateField[] = [
+	{ tag: "teamName", label: "New Controlling Team", category: "Gym", sample: "Instinct" },
+	{
+		tag: "teamEmoji",
+		label: "New Controlling Team Emoji",
+		category: "Gym",
+		sample: "<:team_instinct:...>",
+		unescaped: true
+	},
+	{
+		tag: "oldTeamName",
+		label: "Previous Controlling Team (Unknown on first sighting)",
+		category: "Gym",
+		sample: "Mystic"
+	},
+	{
+		tag: "oldTeamEmoji",
+		label: "Previous Controlling Team Emoji",
+		category: "Gym",
+		sample: "<:team_mystic:...>",
+		unescaped: true
+	},
+	{
+		tag: "lastControllerName",
+		label: "Last Non-Neutral Controller (survives Uncontested gaps)",
+		category: "Gym",
+		sample: "Valor"
+	},
+	{ tag: "teamChanged", label: "Team Changed (true/false)", category: "Gym", sample: "true" },
+	{ tag: "slotsChanged", label: "Slots Changed (true/false)", category: "Gym", sample: "false" },
+	{ tag: "slotsAvailable", label: "Open Slots", category: "Gym", sample: "4" },
+	{ tag: "oldSlotsAvailable", label: "Previous Open Slots", category: "Gym", sample: "6" },
+	{
+		tag: "trainerCount",
+		label: "Trainers Stationed (6 - open slots)",
+		category: "Gym",
+		sample: "2"
+	},
+	{ tag: "oldTrainerCount", label: "Previous Trainers Stationed", category: "Gym", sample: "0" },
+	{ tag: "inBattle", label: "In Battle (true/false)", category: "Gym", sample: "false" },
+
+	{ tag: "gymId", label: "Gym ID", category: "Location", sample: "abc123.16" },
+	{ tag: "gymName", label: "Gym Name", category: "Location", sample: "City Hall" },
+	{ tag: "gymUrl", label: "Gym Photo URL", category: "Location", sample: "", unescaped: true },
+	{ tag: "latitude", label: "Latitude", category: "Location", sample: "44.4759" },
+	{ tag: "longitude", label: "Longitude", category: "Location", sample: "-73.2121" },
+	{
+		tag: "googleMapsUrl",
+		label: "Google Maps Link",
+		category: "Location",
+		sample: "https://maps.google.com/maps?q=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "appleMapsUrl",
+		label: "Apple Maps Link",
+		category: "Location",
+		sample: "https://maps.apple.com/?ll=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "wazeMapUrl",
+		label: "Waze Link",
+		category: "Location",
+		sample: "https://waze.com/ul?ll=44.4759,-73.2121&navigate=yes",
+		unescaped: true
+	}
+];
+
+/**
  * Clickable conditional-block/helper skeletons — inserted literally (not wrapped
  * in {{ }}) via TemplateField.raw. %CURSOR% marks where the caret lands after
  * insertion so the user can fill in the condition/args immediately.
@@ -813,6 +888,17 @@ export const LURE_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 	{
 		tag: "{{lureTypeEmoji}} {{lureTypeName}} at {{pokestopName}} — expires in {{minutesLeft}}m",
 		label: "Lure summary",
+		category: "Presets",
+		sample: "",
+		raw: true
+	}
+];
+
+/** Preset snippets for the "gym" type. */
+export const GYM_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
+	{
+		tag: "{{#if teamChanged}}{{oldTeamName}} → {{teamName}}{{else}}{{teamName}} — {{trainerCount}}/6 trainers{{#if inBattle}}, in battle{{/if}}{{/if}}",
+		label: "Team-change-aware summary",
 		category: "Presets",
 		sample: "",
 		raw: true

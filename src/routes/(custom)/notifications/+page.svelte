@@ -10,6 +10,7 @@
 	import QuestFilterEditor from "@/components/custom/notifications/QuestFilterEditor.svelte";
 	import InvasionFilterEditor from "@/components/custom/notifications/InvasionFilterEditor.svelte";
 	import LureFilterEditor from "@/components/custom/notifications/LureFilterEditor.svelte";
+	import GymFilterEditor from "@/components/custom/notifications/GymFilterEditor.svelte";
 	import type {
 		NotificationSchedule,
 		SubscriptionMode
@@ -28,6 +29,7 @@
 	import type {
 		AnySubscriptionFilters,
 		EmbedTemplate,
+		GymSubscriptionFilters,
 		InvasionSubscriptionFilters,
 		LureSubscriptionFilters,
 		MaxBattleSubscriptionFilters,
@@ -196,6 +198,20 @@
 		};
 	}
 
+	function defaultGymEmbed(): EmbedTemplate {
+		return {
+			content: "{{gymName}} is now {{teamName}}",
+			title: "Gym Update",
+			description: "{{gymName}}\n{{oldTeamName}} → {{teamName}}",
+			color: "#5865F2",
+			thumbnailUrl: "",
+			imageUrl: "",
+			footerText: "{{slotsAvailable}}/6 slots open{{#if inBattle}} — In Battle!{{/if}}",
+			url: "{{{googleMapsUrl}}}",
+			fields: []
+		};
+	}
+
 	function defaultFilters(): PokemonSubscriptionFilters {
 		return { pokemonIds: [] };
 	}
@@ -220,13 +236,18 @@
 		return {};
 	}
 
+	function defaultGymFilters(): GymSubscriptionFilters {
+		return {};
+	}
+
 	const CATEGORY_LABELS: Record<NotificationType, string> = {
 		pokemon: "Pokemon",
 		raid: "Raid",
 		maxbattle: "Max Battle",
 		quest: "Quest",
 		invasion: "Invasion",
-		lure: "Lure"
+		lure: "Lure",
+		gym: "Gym"
 	};
 
 	const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -332,6 +353,7 @@
 		if (type === "quest") return defaultQuestEmbed();
 		if (type === "invasion") return defaultInvasionEmbed();
 		if (type === "lure") return defaultLureEmbed();
+		if (type === "gym") return defaultGymEmbed();
 		return defaultEmbed();
 	}
 
@@ -403,6 +425,7 @@
 	let questFilters = $state<QuestSubscriptionFilters>(defaultQuestFilters());
 	let invasionFilters = $state<InvasionSubscriptionFilters>(defaultInvasionFilters());
 	let lureFilters = $state<LureSubscriptionFilters>(defaultLureFilters());
+	let gymFilters = $state<GymSubscriptionFilters>(defaultGymFilters());
 	let subMode = $state<SubscriptionMode>("manual");
 	let subSchedule = $state<NotificationSchedule>(defaultSchedule());
 	let savingSubscription = $state(false);
@@ -419,6 +442,7 @@
 		questFilters = defaultQuestFilters();
 		invasionFilters = defaultInvasionFilters();
 		lureFilters = defaultLureFilters();
+		gymFilters = defaultGymFilters();
 		subMode = "manual";
 		subSchedule = defaultSchedule();
 	}
@@ -439,6 +463,8 @@
 			invasionFilters = { ...(sub.filters as InvasionSubscriptionFilters) };
 		} else if (sub.type === "lure") {
 			lureFilters = { ...(sub.filters as LureSubscriptionFilters) };
+		} else if (sub.type === "gym") {
+			gymFilters = { ...(sub.filters as GymSubscriptionFilters) };
 		} else {
 			const filters = sub.filters as PokemonSubscriptionFilters;
 			subFilters = { ...filters, pokemonIds: filters.pokemonIds ?? [] };
@@ -466,6 +492,7 @@
 		if (subType === "quest") return questFilters;
 		if (subType === "invasion") return invasionFilters;
 		if (subType === "lure") return lureFilters;
+		if (subType === "gym") return gymFilters;
 		return subFilters;
 	}
 
@@ -637,6 +664,15 @@
 					f.lureIds.length === 1 ? `Lure #${f.lureIds[0]}` : `${f.lureIds.length} lure types`
 				);
 			}
+		} else if (type === "gym") {
+			const f = filters as GymSubscriptionFilters;
+			if (!f.teams || f.teams.length === 0) {
+				parts.push("Any team");
+			} else {
+				parts.push(`Team ${f.teams.join("/")}`);
+			}
+			if (f.slotChanges) parts.push("+ slot changes");
+			if (f.battleChanges) parts.push("+ battles");
 		} else {
 			const f = filters as PokemonSubscriptionFilters;
 			if (!f.pokemonIds || f.pokemonIds.length === 0) {
@@ -863,6 +899,13 @@
 							{:else if subType === "lure"}
 								<LureFilterEditor
 									bind:filters={lureFilters}
+									ownAreas={scanAreasState.areas}
+									kojiAreas={kojiGeofences}
+									notificationAreas={notificationAreasState.areas}
+								/>
+							{:else if subType === "gym"}
+								<GymFilterEditor
+									bind:filters={gymFilters}
 									ownAreas={scanAreasState.areas}
 									kojiAreas={kojiGeofences}
 									notificationAreas={notificationAreasState.areas}

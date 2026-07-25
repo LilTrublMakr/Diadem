@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type {
 		EmbedTemplate,
+		GymTemplateContext,
 		InvasionTemplateContext,
 		LureTemplateContext,
 		MaxBattleTemplateContext,
@@ -25,7 +26,8 @@
 			| MaxBattleTemplateContext
 			| QuestTemplateContext
 			| InvasionTemplateContext
-			| LureTemplateContext;
+			| LureTemplateContext
+			| GymTemplateContext;
 	} = $props();
 
 	function render(source: string): string {

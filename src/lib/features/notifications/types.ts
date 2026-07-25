@@ -13,9 +13,16 @@ export type NotificationAreaDto = {
 };
 
 // Phase 1 shipped "pokemon". Phase 2 adds the rest one at a time — "raid", "maxbattle", "quest",
-// "invasion", and "lure" are done; gym and fort follow the same pattern (nests are deferred
+// "invasion", "lure", and "gym" are done; fort follows the same pattern (nests are deferred
 // indefinitely, Golbat has no live "nest changed" event to key off).
-export type NotificationType = "pokemon" | "raid" | "maxbattle" | "quest" | "invasion" | "lure";
+export type NotificationType =
+	| "pokemon"
+	| "raid"
+	| "maxbattle"
+	| "quest"
+	| "invasion"
+	| "lure"
+	| "gym";
 
 export type EmbedFieldTemplate = {
 	name: string;
@@ -153,6 +160,18 @@ export type LureSubscriptionFilters = BaseSubscriptionFilters & {
 	lureIds?: number[];
 };
 
+export type GymSubscriptionFilters = BaseSubscriptionFilters & {
+	// Gym's NEW controlling team. Empty/absent = any team. Multiple = OR match. A team change
+	// (to one of these teams) always notifies regardless of the two flags below — those two add
+	// EXTRA notifications for changes that aren't a team change (mirrors PoracleNG's own gym
+	// matcher: a team change is unconditionally interesting, slot/battle changes are opt-in).
+	teams?: RaidTeam[];
+	slotChanges?: boolean; // also notify when the open-slot count changes with no team change
+	battleChanges?: boolean; // also notify when a battle starts with no team change (rate-limited
+	// server-side to once per 5 minutes per gym while nothing else changes — see gym state tracker
+	// in webhook/golbat/+server.ts)
+};
+
 // Every notification type's filters, keyed loosely by NotificationType — not a TS discriminated
 // union (that would need every call site to narrow via a type guard for marginal safety gain);
 // callers narrow by checking subscription.type instead, matching this codebase's existing
@@ -163,7 +182,8 @@ export type AnySubscriptionFilters =
 	| MaxBattleSubscriptionFilters
 	| QuestSubscriptionFilters
 	| InvasionSubscriptionFilters
-	| LureSubscriptionFilters;
+	| LureSubscriptionFilters
+	| GymSubscriptionFilters;
 
 export type NotificationTemplateDto = {
 	id: number;
@@ -409,6 +429,41 @@ export type LureTemplateContext = {
 	lureTypeEmoji: string;
 	expireUnix: number;
 	minutesLeft: number;
+	latitude: number;
+	longitude: number;
+	googleMapsUrl: string;
+	appleMapsUrl: string;
+	wazeMapUrl: string;
+	mapImageUrl: string;
+	diademUrl: string;
+};
+
+// Rendering context for the "gym" type — a team/slot/battle-state delta at a gym, computed
+// against server-side gym state tracking (see gymStates in webhook/golbat/+server.ts, mirrors
+// PoracleNG's GymStateTracker). No IV/CP/stats, same "only tags that make sense" reasoning as the
+// other event categories. -1 sentinel values (oldTeamId, oldSlotsAvailable, lastControllerId)
+// mean "unknown" — first sighting of this gym, or (lastControllerId only) never controlled.
+export type GymTemplateContext = {
+	gymId: string;
+	gymName: string;
+	gymUrl: string;
+	teamId: RaidTeam;
+	teamName: string;
+	teamEmoji: string;
+	oldTeamId: number;
+	oldTeamName: string;
+	oldTeamEmoji: string;
+	// Most recent NON-neutral controller, carried through neutral ("Uncontested") gaps — lets a
+	// template say "X took it back from Y" even after an Uncontested period erased teamId/oldTeamId.
+	lastControllerId: number;
+	lastControllerName: string;
+	slotsAvailable: number;
+	oldSlotsAvailable: number;
+	trainerCount: number; // 6 - slotsAvailable
+	oldTrainerCount: number;
+	inBattle: boolean;
+	teamChanged: boolean;
+	slotsChanged: boolean;
 	latitude: number;
 	longitude: number;
 	googleMapsUrl: string;

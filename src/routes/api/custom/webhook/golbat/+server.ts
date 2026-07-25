@@ -19,6 +19,7 @@ import {
 } from "@/lib/server/notifications/mapImage";
 import {
 	applyTrackedBadges,
+	buildGymContext,
 	buildInvasionContext,
 	buildLureContext,
 	buildMaxBattleContext,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/server/notifications/render";
 import { getNotificationTemplate } from "@/lib/server/db/internal/repository";
 import type {
+	GolbatGymMessage,
 	GolbatInvasionMessage,
 	GolbatLureMessage,
 	GolbatMaxBattleMessage,
@@ -38,6 +40,8 @@ import type {
 	GolbatWebhookEnvelope
 } from "@/lib/server/notifications/golbatTypes";
 import type {
+	GymSubscriptionFilters,
+	GymTemplateContext,
 	InvasionSubscriptionFilters,
 	InvasionTemplateContext,
 	LureSubscriptionFilters,
@@ -49,7 +53,8 @@ import type {
 	QuestSubscriptionFilters,
 	QuestTemplateContext,
 	RaidSubscriptionFilters,
-	RaidTemplateContext
+	RaidTemplateContext,
+	RaidTeam
 } from "@/lib/features/notifications/types";
 import { getLogger } from "@/lib/utils/logger";
 import { booleanPointInPolygon, point } from "@turf/turf";
@@ -220,6 +225,57 @@ function isDuplicateLure(message: GolbatLureMessage): boolean {
 		expiresAt: message.lure_expiration * 1000
 	});
 	return existing?.fingerprint === fp;
+}
+
+// Gym is the one category with genuine cross-webhook state instead of a stateless
+// context-builder — team/slot/battle CHANGES only exist as a delta between successive webhooks
+// for the same gym. Mirrors PoracleNG's GymStateTracker, in-memory only (no disk persistence —
+// unlike Golbat, this app doesn't already have a cache-directory convention to persist into, and
+// losing this cache on a restart just means one cold-start burst of "first sighting" gym updates,
+// not a correctness issue).
+type GymState = {
+	teamId: number;
+	slotsAvailable: number;
+	inBattle: boolean;
+	lastControllerId: number; // most recent non-neutral team, carried through neutral gaps; -1 = never controlled
+	lastSeen: number;
+	battleCooldownUntil: number;
+};
+
+const gymStates = new Map<string, GymState>();
+
+/** Updates gym state and returns the previous state (null on first sighting), the just-written
+ * current state, and whether the gym was already inside its 5-minute post-battle cooldown before
+ * this webhook. */
+function updateGymState(
+	gymId: string,
+	teamId: number,
+	slotsAvailable: number,
+	inBattle: boolean,
+	now: number
+): { old: GymState | null; current: GymState; wasInCooldown: boolean } {
+	if (gymStates.size > 5000) {
+		const cutoff = now - 24 * 60 * 60 * 1000;
+		for (const [key, entry] of gymStates) {
+			if (entry.lastSeen < cutoff) gymStates.delete(key);
+		}
+	}
+
+	const old = gymStates.get(gymId) ?? null;
+	const wasInCooldown = !!old && old.battleCooldownUntil > now;
+	const lastControllerId = teamId > 0 ? teamId : (old?.lastControllerId ?? -1);
+
+	const current: GymState = {
+		teamId,
+		slotsAvailable,
+		inBattle,
+		lastControllerId,
+		lastSeen: now,
+		battleCooldownUntil: inBattle ? now + 5 * 60 * 1000 : (old?.battleCooldownUntil ?? 0)
+	};
+	gymStates.set(gymId, current);
+
+	return { old, current, wasInCooldown };
 }
 
 function matchesFilters(context: PokemonTemplateContext, filters: PokemonSubscriptionFilters) {
@@ -398,6 +454,21 @@ function matchesLureFilters(
 ): boolean {
 	if (filters.lureIds && filters.lureIds.length > 0 && !filters.lureIds.includes(context.lureId))
 		return false;
+	return true;
+}
+
+// Mirrors PoracleNG's own gym matcher: a team change (to one of `teams`) always matches; when the
+// team hasn't changed, only slot/battle changes the subscription opted into can trigger a match.
+function matchesGymFilters(context: GymTemplateContext, filters: GymSubscriptionFilters): boolean {
+	if (filters.teams && filters.teams.length > 0 && !filters.teams.includes(context.teamId))
+		return false;
+
+	if (!context.teamChanged) {
+		const wantsSlotChange = context.slotsChanged && filters.slotChanges;
+		const wantsBattleChange = context.inBattle && filters.battleChanges;
+		if (!wantsSlotChange && !wantsBattleChange) return false;
+	}
+
 	return true;
 }
 
@@ -877,6 +948,98 @@ async function handleLure(message: GolbatLureMessage, thisFetch: typeof fetch) {
 	await Promise.all(matches.map((sub) => deliverLure(sub, context, thisFetch)));
 }
 
+// No sprite/map image, same reasoning as invasion/lure — a gym change isn't about one pokemon.
+async function deliverGym(
+	subscription: NotificationSubscription,
+	context: GymTemplateContext,
+	thisFetch: typeof fetch
+) {
+	if (!(await matchesArea(subscription, context, thisFetch))) return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.userId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return; // template was deleted, skip silently
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(
+				{
+					content: "{{gymName}} is now {{teamName}}",
+					title: "Gym Update",
+					description: "{{gymName}}\n{{oldTeamName}} → {{teamName}}",
+					color: "3447003",
+					thumbnailUrl: "",
+					imageUrl: "",
+					footerText: "{{slotsAvailable}}/6 slots open{{#if inBattle}} — In Battle!{{/if}}",
+					url: "{{{googleMapsUrl}}}",
+					fields: []
+				},
+				context
+			);
+
+	const discordId = await getUserDiscordId(subscription.userId);
+	if (!discordId) {
+		log.warning(`No Discord id found for user ${subscription.userId}, skipping delivery`);
+		return;
+	}
+
+	await sendDirectMessage(discordId, { content: embed.content, embed, attachments: [] });
+}
+
+async function handleGym(message: GolbatGymMessage, thisFetch: typeof fetch) {
+	const gymId = message.gym_id || message.id || "";
+	if (!gymId) return;
+
+	const teamId = (message.team_id || message.team || 0) as RaidTeam;
+	const slotsAvailable = message.slots_available ?? 0;
+	const inBattle = !!(message.is_in_battle || message.in_battle);
+	const now = Date.now();
+
+	const { old, current, wasInCooldown } = updateGymState(
+		gymId,
+		teamId,
+		slotsAvailable,
+		inBattle,
+		now
+	);
+
+	const oldTeamId = old?.teamId ?? -1; // -1 = unknown previous state (first sighting)
+	const oldSlotsAvailable = old?.slotsAvailable ?? -1;
+	const teamChanged = oldTeamId !== teamId;
+	const slotsChanged = oldSlotsAvailable !== slotsAvailable;
+
+	// Battle cooldown: while a battle is ongoing and nothing else material changed, rate-limit to
+	// once per 5 minutes per gym instead of re-notifying on every webhook tick.
+	if (old && wasInCooldown && !teamChanged && !slotsChanged) return;
+	// Nothing changed at all and no battle in progress — no subscription's filter could possibly
+	// want this, skip the DB round-trip entirely.
+	if (!teamChanged && !slotsChanged && !inBattle) return;
+
+	const context = buildGymContext({
+		gymId,
+		gymName: message.name ?? "",
+		gymUrl: message.url ?? "",
+		latitude: message.latitude,
+		longitude: message.longitude,
+		teamId,
+		oldTeamId,
+		slotsAvailable,
+		oldSlotsAvailable,
+		inBattle,
+		lastControllerId: current.lastControllerId
+	});
+
+	const candidates = await getSubscriptionsByType("gym");
+	const matches = candidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesGymFilters(context, sub.filters as GymSubscriptionFilters)
+	);
+
+	await Promise.all(matches.map((sub) => deliverGym(sub, context, thisFetch)));
+}
+
 export const POST: RequestHandler = async ({ request, fetch }) => {
 	const discordConfig = getServerConfig().auth.discord;
 	if (!discordConfig?.botToken || !discordConfig?.webhookSecret) {
@@ -923,6 +1086,8 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 				await handleQuest(envelope.message as GolbatQuestMessage, fetch);
 			} else if (envelope.type === "invasion") {
 				await handleInvasion(envelope.message as GolbatInvasionMessage, fetch);
+			} else if (envelope.type === "gym" || envelope.type === "gym_details") {
+				await handleGym(envelope.message as GolbatGymMessage, fetch);
 			} else if (envelope.type === "pokestop") {
 				// A "pokestop" envelope can carry lure data, invasion data, or both (see PoracleNG's
 				// own routePokestop) — both are handled independently since they're orthogonal.
@@ -937,7 +1102,7 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 					await handleInvasion(envelope.message as GolbatInvasionMessage, fetch);
 				}
 			}
-			// else: not yet supported (gym, fort) — ignored for now.
+			// else: not yet supported (fort) — ignored for now.
 		} catch (error) {
 			log.warning(`Failed to process ${envelope.type} webhook event: ${error}`);
 		}

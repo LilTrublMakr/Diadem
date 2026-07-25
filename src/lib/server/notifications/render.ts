@@ -27,6 +27,7 @@ import type {
 } from "@/lib/server/notifications/golbatTypes";
 import type {
 	EmbedTemplate,
+	GymTemplateContext,
 	InvasionKindFilter,
 	InvasionTemplateContext,
 	LureTemplateContext,
@@ -686,6 +687,65 @@ export async function buildLureContext(
 	};
 }
 
+function gymTeamName(teamId: number): string {
+	if (teamId < 0) return "Unknown";
+	return RAID_TEAM_NAMES[teamId] ?? "Neutral";
+}
+
+function gymTeamEmoji(teamId: number): string {
+	if (teamId < 0) return "";
+	return discordEmojiTag(`team_${RAID_TEAM_SLUGS[teamId] ?? "neutral"}`);
+}
+
+/**
+ * A team/slot/battle-state delta at a gym. Unlike every other build*Context function, this one
+ * isn't a pure transform of a single Golbat message — the caller (webhook/golbat/+server.ts) owns
+ * the gym state tracker and resolves old-vs-new values before calling this, since that's server
+ * state, not something derivable from one webhook message alone.
+ */
+export function buildGymContext(params: {
+	gymId: string;
+	gymName: string;
+	gymUrl: string;
+	latitude: number;
+	longitude: number;
+	teamId: RaidTeam;
+	oldTeamId: number; // -1 = unknown (first sighting)
+	slotsAvailable: number;
+	oldSlotsAvailable: number; // -1 = unknown (first sighting)
+	inBattle: boolean;
+	lastControllerId: number; // -1 = never controlled
+}): GymTemplateContext {
+	return {
+		gymId: params.gymId,
+		gymName: params.gymName,
+		gymUrl: params.gymUrl,
+		teamId: params.teamId,
+		teamName: gymTeamName(params.teamId),
+		teamEmoji: gymTeamEmoji(params.teamId),
+		oldTeamId: params.oldTeamId,
+		oldTeamName: gymTeamName(params.oldTeamId),
+		oldTeamEmoji: gymTeamEmoji(params.oldTeamId),
+		lastControllerId: params.lastControllerId,
+		lastControllerName: gymTeamName(params.lastControllerId),
+		slotsAvailable: params.slotsAvailable,
+		oldSlotsAvailable: params.oldSlotsAvailable,
+		trainerCount: 6 - params.slotsAvailable,
+		oldTrainerCount: params.oldSlotsAvailable >= 0 ? 6 - params.oldSlotsAvailable : -1,
+		inBattle: params.inBattle,
+		teamChanged: params.oldTeamId !== params.teamId,
+		slotsChanged: params.oldSlotsAvailable !== params.slotsAvailable,
+		latitude: params.latitude,
+		longitude: params.longitude,
+		googleMapsUrl: `https://maps.google.com/maps?q=${params.latitude},${params.longitude}`,
+		appleMapsUrl: `https://maps.apple.com/?ll=${params.latitude},${params.longitude}`,
+		wazeMapUrl: `https://waze.com/ul?ll=${params.latitude},${params.longitude}&navigate=yes`,
+		mapImageUrl: "",
+		// No gym detail page exists in this app yet — nothing to link to.
+		diademUrl: ""
+	};
+}
+
 export type TrackedStatus = { shiny: boolean; hundo: boolean; nundo: boolean; shundo: boolean };
 
 /**
@@ -736,6 +796,7 @@ export function renderEmbed(
 		| QuestTemplateContext
 		| InvasionTemplateContext
 		| LureTemplateContext
+		| GymTemplateContext
 ): EmbedTemplate {
 	return {
 		// template.content ?? "" — older saved templates predate this field

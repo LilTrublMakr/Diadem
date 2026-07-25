@@ -4,6 +4,8 @@
 	import {
 		CONDITIONAL_TEMPLATE_FIELDS,
 		EMOJI_TEMPLATE_FIELDS,
+		GYM_PRESET_TEMPLATE_FIELDS,
+		GYM_TEMPLATE_FIELDS,
 		INVASION_PRESET_TEMPLATE_FIELDS,
 		INVASION_TEMPLATE_FIELDS,
 		LURE_PRESET_TEMPLATE_FIELDS,
@@ -42,8 +44,13 @@
 		LURE_TEST_SCENARIOS,
 		randomizeLureContext
 	} from "@/lib/features/notifications/lureTestData";
+	import {
+		GYM_TEST_SCENARIOS,
+		randomizeGymContext
+	} from "@/lib/features/notifications/gymTestData";
 	import type {
 		EmbedTemplate,
+		GymTemplateContext,
 		InvasionTemplateContext,
 		LureTemplateContext,
 		MaxBattleTemplateContext,
@@ -62,7 +69,8 @@
 		| MaxBattleTemplateContext
 		| QuestTemplateContext
 		| InvasionTemplateContext
-		| LureTemplateContext;
+		| LureTemplateContext
+		| GymTemplateContext;
 
 	let { type = "pokemon", embed = $bindable() }: { type?: NotificationType; embed: EmbedTemplate } =
 		$props();
@@ -78,6 +86,7 @@
 		if (type === "quest") return QUEST_TEMPLATE_FIELDS;
 		if (type === "invasion") return INVASION_TEMPLATE_FIELDS;
 		if (type === "lure") return LURE_TEMPLATE_FIELDS;
+		if (type === "gym") return GYM_TEMPLATE_FIELDS;
 		return POKEMON_TEMPLATE_FIELDS;
 	});
 	const typePresets = untrack(() => {
@@ -86,6 +95,7 @@
 		if (type === "quest") return QUEST_PRESET_TEMPLATE_FIELDS;
 		if (type === "invasion") return INVASION_PRESET_TEMPLATE_FIELDS;
 		if (type === "lure") return LURE_PRESET_TEMPLATE_FIELDS;
+		if (type === "gym") return GYM_PRESET_TEMPLATE_FIELDS;
 		return PRESET_TEMPLATE_FIELDS;
 	});
 	const scenarios: { id: string; label: string; context: PreviewContext }[] = untrack(() => {
@@ -94,6 +104,7 @@
 		if (type === "quest") return QUEST_TEST_SCENARIOS;
 		if (type === "invasion") return INVASION_TEST_SCENARIOS;
 		if (type === "lure") return LURE_TEST_SCENARIOS;
+		if (type === "gym") return GYM_TEST_SCENARIOS;
 		return TEST_SCENARIOS;
 	});
 
@@ -103,6 +114,7 @@
 		if (type === "quest") return randomizeQuestContext();
 		if (type === "invasion") return randomizeInvasionContext();
 		if (type === "lure") return randomizeLureContext();
+		if (type === "gym") return randomizeGymContext();
 		return randomizePokemonContext();
 	}
 
