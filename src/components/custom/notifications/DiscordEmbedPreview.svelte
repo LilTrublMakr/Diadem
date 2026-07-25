@@ -3,6 +3,7 @@
 		EmbedTemplate,
 		MaxBattleTemplateContext,
 		PokemonTemplateContext,
+		QuestTemplateContext,
 		RaidTemplateContext
 	} from "@/lib/features/notifications/types";
 	import { registerNotificationHelpers } from "@/lib/features/notifications/handlebarsHelpers";
@@ -16,7 +17,11 @@
 		context
 	}: {
 		embed: EmbedTemplate;
-		context: PokemonTemplateContext | RaidTemplateContext | MaxBattleTemplateContext;
+		context:
+			| PokemonTemplateContext
+			| RaidTemplateContext
+			| MaxBattleTemplateContext
+			| QuestTemplateContext;
 	} = $props();
 
 	function render(source: string): string {

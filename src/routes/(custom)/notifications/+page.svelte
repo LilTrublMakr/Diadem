@@ -7,6 +7,7 @@
 	import PokemonFormPicker from "@/components/custom/notifications/PokemonFormPicker.svelte";
 	import RaidFilterEditor from "@/components/custom/notifications/RaidFilterEditor.svelte";
 	import MaxBattleFilterEditor from "@/components/custom/notifications/MaxBattleFilterEditor.svelte";
+	import QuestFilterEditor from "@/components/custom/notifications/QuestFilterEditor.svelte";
 	import type {
 		NotificationSchedule,
 		SubscriptionMode
@@ -30,6 +31,7 @@
 		NotificationTemplateDto,
 		NotificationType,
 		PokemonSubscriptionFilters,
+		QuestSubscriptionFilters,
 		RaidSubscriptionFilters
 	} from "@/lib/features/notifications/types";
 	import { getUserDetails } from "@/lib/services/user/userDetails.svelte";
@@ -147,6 +149,20 @@
 		};
 	}
 
+	function defaultQuestEmbed(): EmbedTemplate {
+		return {
+			content: "{{questTitle}} at {{pokestopName}}",
+			title: "Field Research",
+			description: "{{pokestopName}}\nReward: {{rewardString}}",
+			color: "#5865F2",
+			thumbnailUrl: "{{{pokemonImageUrl}}}",
+			imageUrl: "",
+			footerText: "{{#if withAr}}AR Quest{{else}}Standard Quest{{/if}}",
+			url: "{{{googleMapsUrl}}}",
+			fields: []
+		};
+	}
+
 	function defaultFilters(): PokemonSubscriptionFilters {
 		return { pokemonIds: [] };
 	}
@@ -159,10 +175,15 @@
 		return {};
 	}
 
+	function defaultQuestFilters(): QuestSubscriptionFilters {
+		return {};
+	}
+
 	const CATEGORY_LABELS: Record<NotificationType, string> = {
 		pokemon: "Pokemon",
 		raid: "Raid",
-		maxbattle: "Max Battle"
+		maxbattle: "Max Battle",
+		quest: "Quest"
 	};
 
 	const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -265,6 +286,7 @@
 	function defaultEmbedForType(type: NotificationType): EmbedTemplate {
 		if (type === "raid") return defaultRaidEmbed();
 		if (type === "maxbattle") return defaultMaxBattleEmbed();
+		if (type === "quest") return defaultQuestEmbed();
 		return defaultEmbed();
 	}
 
@@ -333,6 +355,7 @@
 	let subFilters = $state<PokemonSubscriptionFilters>(defaultFilters());
 	let raidFilters = $state<RaidSubscriptionFilters>(defaultRaidFilters());
 	let maxBattleFilters = $state<MaxBattleSubscriptionFilters>(defaultMaxBattleFilters());
+	let questFilters = $state<QuestSubscriptionFilters>(defaultQuestFilters());
 	let subMode = $state<SubscriptionMode>("manual");
 	let subSchedule = $state<NotificationSchedule>(defaultSchedule());
 	let savingSubscription = $state(false);
@@ -346,6 +369,7 @@
 		subFilters = defaultFilters();
 		raidFilters = defaultRaidFilters();
 		maxBattleFilters = defaultMaxBattleFilters();
+		questFilters = defaultQuestFilters();
 		subMode = "manual";
 		subSchedule = defaultSchedule();
 	}
@@ -360,6 +384,8 @@
 			raidFilters = { ...(sub.filters as RaidSubscriptionFilters) };
 		} else if (sub.type === "maxbattle") {
 			maxBattleFilters = { ...(sub.filters as MaxBattleSubscriptionFilters) };
+		} else if (sub.type === "quest") {
+			questFilters = { ...(sub.filters as QuestSubscriptionFilters) };
 		} else {
 			const filters = sub.filters as PokemonSubscriptionFilters;
 			subFilters = { ...filters, pokemonIds: filters.pokemonIds ?? [] };
@@ -384,6 +410,7 @@
 	function activeFilters(): AnySubscriptionFilters {
 		if (subType === "raid") return raidFilters;
 		if (subType === "maxbattle") return maxBattleFilters;
+		if (subType === "quest") return questFilters;
 		return subFilters;
 	}
 
@@ -500,6 +527,37 @@
 				parts.push(`Level ${f.minLevel ?? 1}–${f.maxLevel ?? 8}`);
 			}
 			if (f.gmaxOnly) parts.push("Gigantamax only");
+		} else if (type === "quest") {
+			const f = filters as QuestSubscriptionFilters;
+			if (!f.rewardType) {
+				parts.push("Any reward");
+			} else {
+				parts.push(f.rewardType);
+				if (
+					f.rewardType === "pokemon" ||
+					f.rewardType === "candy" ||
+					f.rewardType === "megaEnergy"
+				) {
+					if (f.rewardPokemonIds && f.rewardPokemonIds.length > 0) {
+						parts.push(
+							f.rewardPokemonIds.length === 1
+								? `#${f.rewardPokemonIds[0]}`
+								: `${f.rewardPokemonIds.length} species`
+						);
+					}
+				}
+				if (f.rewardType === "item" && f.rewardItemIds && f.rewardItemIds.length > 0) {
+					parts.push(
+						f.rewardItemIds.length === 1
+							? `item #${f.rewardItemIds[0]}`
+							: `${f.rewardItemIds.length} items`
+					);
+				}
+				if (f.minAmount !== undefined) parts.push(`≥${f.minAmount}`);
+				if (f.shinyOnly) parts.push("shiny-possible only");
+			}
+			if (f.withAr === true) parts.push("AR only");
+			if (f.withAr === false) parts.push("standard only");
 		} else {
 			const f = filters as PokemonSubscriptionFilters;
 			if (!f.pokemonIds || f.pokemonIds.length === 0) {
@@ -705,6 +763,13 @@
 							{:else if subType === "maxbattle"}
 								<MaxBattleFilterEditor
 									bind:filters={maxBattleFilters}
+									ownAreas={scanAreasState.areas}
+									kojiAreas={kojiGeofences}
+									notificationAreas={notificationAreasState.areas}
+								/>
+							{:else if subType === "quest"}
+								<QuestFilterEditor
+									bind:filters={questFilters}
 									ownAreas={scanAreasState.areas}
 									kojiAreas={kojiGeofences}
 									notificationAreas={notificationAreasState.areas}

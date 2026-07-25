@@ -21,6 +21,7 @@ import {
 	applyTrackedBadges,
 	buildMaxBattleContext,
 	buildPokemonContext,
+	buildQuestContext,
 	buildRaidContext,
 	renderEmbed
 } from "@/lib/server/notifications/render";
@@ -28,6 +29,7 @@ import { getNotificationTemplate } from "@/lib/server/db/internal/repository";
 import type {
 	GolbatMaxBattleMessage,
 	GolbatPokemonMessage,
+	GolbatQuestMessage,
 	GolbatRaidMessage,
 	GolbatWebhookEnvelope
 } from "@/lib/server/notifications/golbatTypes";
@@ -36,6 +38,8 @@ import type {
 	MaxBattleTemplateContext,
 	PokemonSubscriptionFilters,
 	PokemonTemplateContext,
+	QuestSubscriptionFilters,
+	QuestTemplateContext,
 	RaidSubscriptionFilters,
 	RaidTemplateContext
 } from "@/lib/features/notifications/types";
@@ -121,6 +125,40 @@ function isDuplicateMaxBattle(message: GolbatMaxBattleMessage): boolean {
 	const fp = maxBattleFingerprint(message);
 	const existing = seenMaxBattles.get(message.id);
 	seenMaxBattles.set(message.id, { fingerprint: fp, expiresAt: message.battle_end * 1000 });
+	return existing?.fingerprint === fp;
+}
+
+// Same idea again, keyed on pokestop+AR-flag (a stop can host an AR and a standard quest
+// simultaneously — separate objectives/rewards, so they need independent dedup slots rather than
+// sharing one like PoracleNG's own single-slot-per-stop CheckQuest does). Fingerprinting on the
+// reward list means a reward change (Niantic sometimes swaps quest rewards) fires a fresh alert.
+const seenQuests = new Map<string, { fingerprint: string; expiresAt: number }>();
+
+function questFingerprint(message: GolbatQuestMessage): string {
+	return message.rewards
+		.map((r) => {
+			const info = r.info;
+			const p = info.pokemon_id != null ? `p${info.pokemon_id}` : "";
+			const i = info.item_id != null ? `i${info.item_id}` : "";
+			const a = info.amount != null ? `a${info.amount}` : "";
+			return `${r.type}:${p}${i}${a}`;
+		})
+		.join(";");
+}
+
+function isDuplicateQuest(message: GolbatQuestMessage): boolean {
+	const now = Date.now();
+	if (seenQuests.size > 5000) {
+		for (const [key, entry] of seenQuests) {
+			if (entry.expiresAt < now) seenQuests.delete(key);
+		}
+	}
+
+	const key = `${message.pokestop_id}:${message.with_ar ? "ar" : "std"}`;
+	const fp = questFingerprint(message);
+	const existing = seenQuests.get(key);
+	// Quests carry no wire-level expiry (they reset once daily) — a fixed 24h TTL is plenty.
+	seenQuests.set(key, { fingerprint: fp, expiresAt: now + 24 * 60 * 60 * 1000 });
 	return existing?.fingerprint === fp;
 }
 
@@ -232,6 +270,47 @@ function matchesMaxBattleFilters(
 	)
 		return false;
 	if (filters.form !== undefined && filters.form !== context.form) return false;
+	return true;
+}
+
+// Only the FIRST reward is matched against (see buildQuestContext's doc comment) — quests almost
+// always carry exactly one.
+function matchesQuestFilters(
+	context: QuestTemplateContext,
+	filters: QuestSubscriptionFilters
+): boolean {
+	if (filters.withAr !== undefined && context.withAr !== filters.withAr) return false;
+	if (!filters.rewardType) return true;
+	if (filters.rewardType !== context.rewardType) return false;
+
+	if (filters.rewardType === "pokemon") {
+		if (
+			filters.rewardPokemonIds &&
+			filters.rewardPokemonIds.length > 0 &&
+			!filters.rewardPokemonIds.includes(context.pokemonId)
+		)
+			return false;
+		if (filters.shinyOnly && !context.shiny) return false;
+	} else if (filters.rewardType === "item") {
+		if (
+			filters.rewardItemIds &&
+			filters.rewardItemIds.length > 0 &&
+			!filters.rewardItemIds.includes(context.itemId)
+		)
+			return false;
+		if (filters.minAmount !== undefined && context.amount < filters.minAmount) return false;
+	} else if (filters.rewardType === "stardust") {
+		if (filters.minAmount !== undefined && context.amount < filters.minAmount) return false;
+	} else if (filters.rewardType === "candy" || filters.rewardType === "megaEnergy") {
+		if (
+			filters.rewardPokemonIds &&
+			filters.rewardPokemonIds.length > 0 &&
+			!filters.rewardPokemonIds.includes(context.pokemonId)
+		)
+			return false;
+		if (filters.minAmount !== undefined && context.amount < filters.minAmount) return false;
+	}
+
 	return true;
 }
 
@@ -527,6 +606,82 @@ async function handleMaxBattle(message: GolbatMaxBattleMessage, thisFetch: typeo
 	);
 }
 
+// Same shape as deliverRaid/deliverMaxBattle — no tracked badges, sprite reuses the shared
+// species-only sprite fetch (only meaningful for a pokemon-encounter reward), no map thumbnail.
+async function deliverQuest(
+	subscription: NotificationSubscription,
+	context: QuestTemplateContext,
+	getSpriteImage: () => Promise<Buffer | null>,
+	thisFetch: typeof fetch
+) {
+	if (!(await matchesArea(subscription, context, thisFetch))) return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.userId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return; // template was deleted, skip silently
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(
+				{
+					content: "{{questTitle}} at {{pokestopName}}",
+					title: "Field Research",
+					description: "{{pokestopName}}\nReward: {{rewardString}}",
+					color: "3447003",
+					thumbnailUrl: "{{{pokemonImageUrl}}}",
+					imageUrl: "",
+					footerText: "{{#if withAr}}AR Quest{{else}}Standard Quest{{/if}}",
+					url: "{{{googleMapsUrl}}}",
+					fields: []
+				},
+				context
+			);
+
+	const usesSpriteImage =
+		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
+	const spriteImage = usesSpriteImage ? await getSpriteImage() : null;
+
+	const discordId = await getUserDiscordId(subscription.userId);
+	if (!discordId) {
+		log.warning(`No Discord id found for user ${subscription.userId}, skipping delivery`);
+		return;
+	}
+
+	await sendDirectMessage(discordId, {
+		content: embed.content,
+		embed,
+		attachments: [spriteImage ? { filename: "pokemon.png", data: spriteImage } : null]
+	});
+}
+
+async function handleQuest(message: GolbatQuestMessage, thisFetch: typeof fetch) {
+	if (isDuplicateQuest(message)) return;
+
+	const context = await buildQuestContext(message, thisFetch);
+	const candidates = await getSubscriptionsByType("quest");
+	const matches = candidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesQuestFilters(context, sub.filters as QuestSubscriptionFilters)
+	);
+
+	// Generated at most once per event. Only meaningful for a pokemon-encounter reward.
+	let spriteImage: Buffer | null | undefined;
+	const getSpriteImage = async () => {
+		if (context.rewardType !== "pokemon" || !context.pokemonId) return null;
+		if (spriteImage === undefined) {
+			spriteImage = await generatePokemonSpriteImage(
+				{ pokemon_id: context.pokemonId, form: context.form, shiny: context.shiny },
+				thisFetch
+			);
+		}
+		return spriteImage;
+	};
+
+	await Promise.all(matches.map((sub) => deliverQuest(sub, context, getSpriteImage, thisFetch)));
+}
+
 export const POST: RequestHandler = async ({ request, fetch }) => {
 	const discordConfig = getServerConfig().auth.discord;
 	if (!discordConfig?.botToken || !discordConfig?.webhookSecret) {
@@ -569,8 +724,10 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 				await handleRaid(envelope.message as GolbatRaidMessage, fetch);
 			} else if (envelope.type === "max_battle") {
 				await handleMaxBattle(envelope.message as GolbatMaxBattleMessage, fetch);
+			} else if (envelope.type === "quest") {
+				await handleQuest(envelope.message as GolbatQuestMessage, fetch);
 			}
-			// else: not yet supported (quest, invasion, lure, gym, fort) — ignored for now.
+			// else: not yet supported (invasion, lure, gym, fort) — ignored for now.
 		} catch (error) {
 			log.warning(`Failed to process ${envelope.type} webhook event: ${error}`);
 		}

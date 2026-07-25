@@ -1,5 +1,5 @@
 import { getNormalizedForm, getPokemonSize, typeIdToText } from "@/lib/utils/pokemonUtils";
-import { loadRemoteLocale, mMove, mPokemon, mWeather } from "@/lib/services/ingameLocale";
+import { loadRemoteLocale, mItem, mMove, mPokemon, mWeather } from "@/lib/services/ingameLocale";
 import { getMasterFile, getMasterPokemon } from "@/lib/services/masterfile";
 import type { MasterMove } from "@/lib/types/masterfile";
 import { getClientConfig } from "@/lib/services/config/config.server";
@@ -12,6 +12,8 @@ import type {
 	GolbatMaxBattleMessage,
 	GolbatPokemonMessage,
 	GolbatPvpEntry,
+	GolbatQuestMessage,
+	GolbatQuestReward,
 	GolbatRaidMessage
 } from "@/lib/server/notifications/golbatTypes";
 import type {
@@ -19,6 +21,8 @@ import type {
 	MaxBattleTemplateContext,
 	PokemonTemplateContext,
 	PvpEntryContext,
+	QuestRewardTypeFilter,
+	QuestTemplateContext,
 	RaidTeam,
 	RaidTemplateContext
 } from "@/lib/features/notifications/types";
@@ -422,6 +426,139 @@ export async function buildMaxBattleContext(
 	};
 }
 
+// Golbat quest reward `type` values this app recognizes — see GolbatQuestReward's doc comment.
+const QUEST_REWARD_TYPE_MAP: Record<number, QuestRewardTypeFilter> = {
+	2: "item",
+	3: "stardust",
+	4: "candy",
+	7: "pokemon",
+	12: "megaEnergy"
+};
+
+// Human-readable summary of every reward on a quest (usually just one) — used for the
+// `rewardString` tag. Mirrors PoracleNG's own reward-text formatting (enrichment/quest.go) but
+// hardcodes English rather than pulling from its translation system, matching this codebase's
+// existing "custom pages hardcode English" convention.
+function buildQuestRewardString(rewards: GolbatQuestReward[]): string {
+	const parts = rewards.map((r) => {
+		const info = r.info;
+		const amount = Number(info.amount) || 0;
+		switch (r.type) {
+			case 7: {
+				// pokemon
+				const pokemonId = Number(info.pokemon_id) || 0;
+				if (!pokemonId) return "";
+				const form = getNormalizedForm(pokemonId, Number(info.form_id) || 0);
+				return mPokemon({ pokemon_id: pokemonId, form, shiny: !!info.shiny });
+			}
+			case 2: {
+				// item
+				const itemId = Number(info.item_id) || 0;
+				if (!itemId) return "";
+				const name = mItem(itemId);
+				return amount > 0 ? `${amount} ${name}` : name;
+			}
+			case 3: // stardust
+				return amount > 0 ? `${amount} Stardust` : "Stardust";
+			case 4: {
+				// candy
+				const pokemonId = Number(info.pokemon_id) || 0;
+				if (!pokemonId) return "";
+				const name = `${mPokemon({ pokemon_id: pokemonId })} Candy`;
+				return amount > 0 ? `${amount} ${name}` : name;
+			}
+			case 12: {
+				// mega energy
+				const pokemonId = Number(info.pokemon_id) || 0;
+				const name = pokemonId
+					? `${mPokemon({ pokemon_id: pokemonId })} Mega Energy`
+					: "Mega Energy";
+				return amount > 0 ? `${amount} ${name}` : name;
+			}
+			default:
+				return "";
+		}
+	});
+	return parts.filter(Boolean).join(", ");
+}
+
+/**
+ * Quests almost always carry exactly one reward, so — like PoracleNG's own summary-buffer
+ * simplification — only the FIRST reward is modeled in structured fields (pokemonName, itemId,
+ * amount, etc). `rewardString` still summarizes every reward for display. No despawn/countdown
+ * fields — Golbat's quest webhook carries no expiry timestamp.
+ */
+export async function buildQuestContext(
+	message: GolbatQuestMessage,
+	thisFetch: typeof fetch = fetch
+): Promise<QuestTemplateContext> {
+	const clientConfig = getClientConfig();
+	await loadRemoteLocale(clientConfig.general.defaultLocale, thisFetch);
+
+	const primary = message.rewards[0] as GolbatQuestReward | undefined;
+	const rewardType: QuestRewardTypeFilter | "" = primary
+		? (QUEST_REWARD_TYPE_MAP[primary.type] ?? "")
+		: "";
+
+	let pokemonName = "";
+	let pokemonId = 0;
+	let form = 0;
+	let formName = "";
+	let shiny = false;
+	let itemId = 0;
+	let itemName = "";
+	let amount = 0;
+
+	if (primary) {
+		const info = primary.info;
+		if (rewardType === "pokemon") {
+			pokemonId = Number(info.pokemon_id) || 0;
+			form = pokemonId ? getNormalizedForm(pokemonId, Number(info.form_id) || 0) : 0;
+			formName = form ? (getMasterPokemon(pokemonId, form)?.name ?? "") : "";
+			shiny = !!info.shiny;
+			pokemonName = pokemonId ? mPokemon({ pokemon_id: pokemonId, form, shiny }) : "";
+		} else if (rewardType === "candy" || rewardType === "megaEnergy") {
+			pokemonId = Number(info.pokemon_id) || 0;
+			amount = Number(info.amount) || 0;
+			pokemonName = pokemonId ? mPokemon({ pokemon_id: pokemonId }) : "";
+		} else if (rewardType === "item") {
+			itemId = Number(info.item_id) || 0;
+			amount = Number(info.amount) || 0;
+			itemName = itemId ? mItem(itemId) : "";
+		} else if (rewardType === "stardust") {
+			amount = Number(info.amount) || 0;
+		}
+	}
+
+	return {
+		pokestopId: message.pokestop_id,
+		pokestopName: message.pokestop_name ?? "",
+		pokestopUrl: message.pokestop_url ?? "",
+		questTitle: message.title ?? "",
+		target: message.target ?? 0,
+		withAr: !!message.with_ar,
+		rewardType,
+		rewardString: buildQuestRewardString(message.rewards),
+		pokemonName,
+		pokemonId,
+		form,
+		formName,
+		shiny,
+		itemId,
+		itemName,
+		amount,
+		pokemonImageUrl: rewardType === "pokemon" && pokemonId ? "attachment://pokemon.png" : "",
+		latitude: message.latitude,
+		longitude: message.longitude,
+		googleMapsUrl: `https://maps.google.com/maps?q=${message.latitude},${message.longitude}`,
+		appleMapsUrl: `https://maps.apple.com/?ll=${message.latitude},${message.longitude}`,
+		wazeMapUrl: `https://waze.com/ul?ll=${message.latitude},${message.longitude}&navigate=yes`,
+		mapImageUrl: "",
+		// No pokestop detail page exists in this app yet — nothing to link to.
+		diademUrl: ""
+	};
+}
+
 export type TrackedStatus = { shiny: boolean; hundo: boolean; nundo: boolean; shundo: boolean };
 
 /**
@@ -465,7 +602,11 @@ function compile(source: string): Handlebars.TemplateDelegate {
 
 export function renderEmbed(
 	template: EmbedTemplate,
-	context: PokemonTemplateContext | RaidTemplateContext | MaxBattleTemplateContext
+	context:
+		| PokemonTemplateContext
+		| RaidTemplateContext
+		| MaxBattleTemplateContext
+		| QuestTemplateContext
 ): EmbedTemplate {
 	return {
 		// template.content ?? "" — older saved templates predate this field

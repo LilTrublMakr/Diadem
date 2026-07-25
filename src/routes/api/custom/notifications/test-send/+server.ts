@@ -11,6 +11,7 @@ import type { GolbatPokemonMessage } from "@/lib/server/notifications/golbatType
 import type {
 	MaxBattleTemplateContext,
 	PokemonTemplateContext,
+	QuestTemplateContext,
 	RaidTemplateContext
 } from "@/lib/features/notifications/types";
 import { extractEmojiTags } from "@/lib/features/notifications/discordEmoji";
@@ -27,7 +28,7 @@ const POKEMON_IMAGE_TAG = "attachment://pokemon.png";
 // Loosely validated — this only ever renders into a DM sent back to the requesting
 // user's own Discord account, so a malformed/adversarial context can't affect anyone else.
 const testSendSchema = z.object({
-	type: z.enum(["pokemon", "raid", "maxbattle"]).default("pokemon"),
+	type: z.enum(["pokemon", "raid", "maxbattle", "quest"]).default("pokemon"),
 	embed: embedTemplateSchema,
 	context: z.record(z.string(), z.unknown())
 });
@@ -89,6 +90,20 @@ export const POST: RequestHandler = async ({ locals, request, fetch }) => {
 			if (usesSpriteImage && context.pokemonId) {
 				spriteImage = await generatePokemonSpriteImage(
 					{ pokemon_id: context.pokemonId, form: context.form, shiny: false },
+					fetch
+				);
+			}
+		} else if (parsed.data.type === "quest") {
+			const context = parsed.data.context as unknown as QuestTemplateContext;
+			rendered = renderEmbed(parsed.data.embed, context);
+			rendered.title = `🧪 TEST — ${rendered.title}`.trim();
+			if (rendered.content) rendered.content = `🧪 TEST — ${rendered.content}`;
+
+			const usesSpriteImage =
+				rendered.imageUrl === POKEMON_IMAGE_TAG || rendered.thumbnailUrl === POKEMON_IMAGE_TAG;
+			if (usesSpriteImage && context.rewardType === "pokemon" && context.pokemonId) {
+				spriteImage = await generatePokemonSpriteImage(
+					{ pokemon_id: context.pokemonId, form: context.form, shiny: context.shiny },
 					fetch
 				);
 			}

@@ -8,6 +8,8 @@
 		MAXBATTLE_TEMPLATE_FIELDS,
 		POKEMON_TEMPLATE_FIELDS,
 		PRESET_TEMPLATE_FIELDS,
+		QUEST_PRESET_TEMPLATE_FIELDS,
+		QUEST_TEMPLATE_FIELDS,
 		RAID_PRESET_TEMPLATE_FIELDS,
 		RAID_TEMPLATE_FIELDS
 	} from "@/lib/features/notifications/templateFields";
@@ -24,18 +26,27 @@
 		MAXBATTLE_TEST_SCENARIOS,
 		randomizeMaxBattleContext
 	} from "@/lib/features/notifications/maxBattleTestData";
+	import {
+		QUEST_TEST_SCENARIOS,
+		randomizeQuestContext
+	} from "@/lib/features/notifications/questTestData";
 	import type {
 		EmbedTemplate,
 		MaxBattleTemplateContext,
 		NotificationType,
 		PokemonTemplateContext,
+		QuestTemplateContext,
 		RaidTemplateContext,
 		TemplateField
 	} from "@/lib/features/notifications/types";
 	import { X } from "@lucide/svelte";
 	import { tick, untrack } from "svelte";
 
-	type PreviewContext = PokemonTemplateContext | RaidTemplateContext | MaxBattleTemplateContext;
+	type PreviewContext =
+		| PokemonTemplateContext
+		| RaidTemplateContext
+		| MaxBattleTemplateContext
+		| QuestTemplateContext;
 
 	let { type = "pokemon", embed = $bindable() }: { type?: NotificationType; embed: EmbedTemplate } =
 		$props();
@@ -48,22 +59,26 @@
 	const typeFields = untrack(() => {
 		if (type === "raid") return RAID_TEMPLATE_FIELDS;
 		if (type === "maxbattle") return MAXBATTLE_TEMPLATE_FIELDS;
+		if (type === "quest") return QUEST_TEMPLATE_FIELDS;
 		return POKEMON_TEMPLATE_FIELDS;
 	});
 	const typePresets = untrack(() => {
 		if (type === "raid") return RAID_PRESET_TEMPLATE_FIELDS;
 		if (type === "maxbattle") return MAXBATTLE_PRESET_TEMPLATE_FIELDS;
+		if (type === "quest") return QUEST_PRESET_TEMPLATE_FIELDS;
 		return PRESET_TEMPLATE_FIELDS;
 	});
 	const scenarios: { id: string; label: string; context: PreviewContext }[] = untrack(() => {
 		if (type === "raid") return RAID_TEST_SCENARIOS;
 		if (type === "maxbattle") return MAXBATTLE_TEST_SCENARIOS;
+		if (type === "quest") return QUEST_TEST_SCENARIOS;
 		return TEST_SCENARIOS;
 	});
 
 	function randomizeContext(): PreviewContext {
 		if (type === "raid") return randomizeRaidContext();
 		if (type === "maxbattle") return randomizeMaxBattleContext();
+		if (type === "quest") return randomizeQuestContext();
 		return randomizePokemonContext();
 	}
 

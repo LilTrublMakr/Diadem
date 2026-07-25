@@ -449,6 +449,105 @@ export const MAXBATTLE_TEMPLATE_FIELDS: TemplateField[] = [
 ];
 
 /**
+ * Field registry for the "quest" notification type — a Field Research task at a pokestop. Only
+ * the FIRST reward is modeled (see buildQuestContext in render.ts) since quests almost always
+ * carry exactly one. No IV/CP/stats — same "only tags that make sense" reasoning as raid/maxbattle.
+ * No despawn/countdown tags either — Golbat's quest webhook carries no expiry timestamp.
+ */
+export const QUEST_TEMPLATE_FIELDS: TemplateField[] = [
+	{ tag: "questTitle", label: "Quest Title", category: "Quest", sample: "Catch 5 Pokémon" },
+	{ tag: "target", label: "Quest Target Count", category: "Quest", sample: "5" },
+	{ tag: "withAr", label: "Requires AR (true/false)", category: "Quest", sample: "false" },
+	{
+		tag: "rewardType",
+		label: "Reward Type (pokemon/item/stardust/candy/megaEnergy)",
+		category: "Quest",
+		sample: "pokemon"
+	},
+	{
+		tag: "rewardString",
+		label: "Reward Summary (all rewards)",
+		category: "Quest",
+		sample: "Bulbasaur"
+	},
+
+	{
+		tag: "pokemonName",
+		label: "Reward Pokemon Name (pokemon/candy/mega energy rewards)",
+		category: "Reward",
+		sample: "Bulbasaur"
+	},
+	{ tag: "pokemonId", label: "Reward Pokemon ID", category: "Reward", sample: "1" },
+	{ tag: "form", label: "Reward Form ID (pokemon reward only)", category: "Reward", sample: "0" },
+	{
+		tag: "formName",
+		label: "Reward Form Name (pokemon reward only)",
+		category: "Reward",
+		sample: ""
+	},
+	{
+		tag: "shiny",
+		label: "Reward Shiny (true/false, pokemon reward only)",
+		category: "Reward",
+		sample: "false"
+	},
+	{
+		tag: "itemName",
+		label: "Reward Item Name (item reward only)",
+		category: "Reward",
+		sample: "Poke Ball"
+	},
+	{ tag: "itemId", label: "Reward Item ID (item reward only)", category: "Reward", sample: "1" },
+	{
+		tag: "amount",
+		label: "Reward Amount (item/stardust/candy/mega energy)",
+		category: "Reward",
+		sample: "3"
+	},
+	{
+		tag: "pokemonImageUrl",
+		label: "Reward Sprite (pokemon reward only, use in Thumbnail or Image field)",
+		category: "Reward",
+		sample: "attachment://pokemon.png",
+		unescaped: true
+	},
+
+	{ tag: "pokestopId", label: "Pokestop ID", category: "Pokestop", sample: "abc123.16" },
+	{ tag: "pokestopName", label: "Pokestop Name", category: "Pokestop", sample: "City Hall" },
+	{
+		tag: "pokestopUrl",
+		label: "Pokestop Photo URL",
+		category: "Pokestop",
+		sample: "",
+		unescaped: true
+	},
+
+	{ tag: "latitude", label: "Latitude", category: "Location", sample: "44.4759" },
+	{ tag: "longitude", label: "Longitude", category: "Location", sample: "-73.2121" },
+	{
+		tag: "googleMapsUrl",
+		label: "Google Maps Link",
+		category: "Location",
+		sample: "https://maps.google.com/maps?q=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "appleMapsUrl",
+		label: "Apple Maps Link",
+		category: "Location",
+		sample: "https://maps.apple.com/?ll=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "wazeMapUrl",
+		label: "Waze Link",
+		category: "Location",
+		sample: "https://waze.com/ul?ll=44.4759,-73.2121&navigate=yes",
+		unescaped: true
+	}
+];
+
+/**
  * Clickable conditional-block/helper skeletons — inserted literally (not wrapped
  * in {{ }}) via TemplateField.raw. %CURSOR% marks where the caret lands after
  * insertion so the user can fill in the condition/args immediately.
@@ -546,6 +645,17 @@ export const MAXBATTLE_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 	{
 		tag: "{{#if gmax}}⚡ Gigantamax! {{/if}}{{pokemonName}} — ends in {{minutesLeft}}m",
 		label: "Gigantamax callout summary",
+		category: "Presets",
+		sample: "",
+		raw: true
+	}
+];
+
+/** Preset snippets for the "quest" type. */
+export const QUEST_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
+	{
+		tag: "{{questTitle}} — Reward: {{rewardString}}",
+		label: "Quest + reward summary",
 		category: "Presets",
 		sample: "",
 		raw: true

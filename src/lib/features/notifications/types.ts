@@ -12,10 +12,10 @@ export type NotificationAreaDto = {
 	updatedAt: string;
 };
 
-// Phase 1 shipped "pokemon". Phase 2 adds the rest one at a time — "raid" and "maxbattle" are
-// done; quest, invasion, lure, gym, and fort follow the same pattern (nests are deferred
+// Phase 1 shipped "pokemon". Phase 2 adds the rest one at a time — "raid", "maxbattle", and
+// "quest" are done; invasion, lure, gym, and fort follow the same pattern (nests are deferred
 // indefinitely, Golbat has no live "nest changed" event to key off).
-export type NotificationType = "pokemon" | "raid" | "maxbattle";
+export type NotificationType = "pokemon" | "raid" | "maxbattle" | "quest";
 
 export type EmbedFieldTemplate = {
 	name: string;
@@ -111,6 +111,25 @@ export type MaxBattleSubscriptionFilters = BaseSubscriptionFilters & {
 	gmaxOnly?: boolean;
 };
 
+export type QuestRewardTypeFilter = "pokemon" | "item" | "stardust" | "candy" | "megaEnergy";
+
+export type QuestSubscriptionFilters = BaseSubscriptionFilters & {
+	// Empty/absent = any reward at all (area/AR filters still apply). Golbat quest wire reward
+	// types this app recognizes: 2=item, 3=stardust, 4=candy, 7=pokemon, 12=mega energy — see
+	// buildQuestContext in render.ts.
+	rewardType?: QuestRewardTypeFilter;
+	// Applies when rewardType is "pokemon", "candy", or "megaEnergy" — empty/absent = any species.
+	rewardPokemonIds?: number[];
+	// Applies when rewardType is "item" — empty/absent = any item.
+	rewardItemIds?: number[];
+	// "At least this much" — applies to item/stardust/candy/megaEnergy reward amounts.
+	minAmount?: number;
+	// Applies when rewardType is "pokemon" only.
+	shinyOnly?: boolean;
+	// undefined = any, true = AR-required quests only, false = standard quests only.
+	withAr?: boolean;
+};
+
 // Every notification type's filters, keyed loosely by NotificationType — not a TS discriminated
 // union (that would need every call site to narrow via a type guard for marginal safety gain);
 // callers narrow by checking subscription.type instead, matching this codebase's existing
@@ -118,7 +137,8 @@ export type MaxBattleSubscriptionFilters = BaseSubscriptionFilters & {
 export type AnySubscriptionFilters =
 	| PokemonSubscriptionFilters
 	| RaidSubscriptionFilters
-	| MaxBattleSubscriptionFilters;
+	| MaxBattleSubscriptionFilters
+	| QuestSubscriptionFilters;
 
 export type NotificationTemplateDto = {
 	id: number;
@@ -281,6 +301,42 @@ export type RaidTemplateContext = {
 	raidEndTime: string;
 	despawnUnix: number; // hatch time (egg) or raid end time (boss), whichever is upcoming
 	minutesLeft: number;
+	latitude: number;
+	longitude: number;
+	googleMapsUrl: string;
+	appleMapsUrl: string;
+	wazeMapUrl: string;
+	mapImageUrl: string;
+	diademUrl: string;
+};
+
+// Rendering context for the "quest" type. Quests almost always carry exactly one reward, so
+// (matching PoracleNG's own summary-buffer simplification) only the FIRST reward is modeled here
+// for both templates and filter matching — rewardString still summarizes every reward present for
+// display purposes. No IV/CP/stats — same "only tags that make sense" reasoning as raid/maxbattle.
+// No despawn/countdown fields either — Golbat's quest webhook carries no expiry timestamp.
+export type QuestTemplateContext = {
+	pokestopId: string;
+	pokestopName: string;
+	pokestopUrl: string;
+	questTitle: string; // Golbat sends this as already display-ready text, not a translation key
+	target: number;
+	withAr: boolean;
+	// "" only if the webhook somehow carried zero rewards (shouldn't happen in practice).
+	rewardType: QuestRewardTypeFilter | "";
+	rewardString: string; // human-readable summary of ALL rewards (usually just the one)
+	// Populated when rewardType is "pokemon", "candy", or "megaEnergy"; empty/0 otherwise.
+	pokemonName: string;
+	pokemonId: number;
+	form: number;
+	formName: string;
+	shiny: boolean; // pokemon reward only
+	// Populated when rewardType is "item"; empty/0 otherwise.
+	itemId: number;
+	itemName: string;
+	// Populated when rewardType is "item", "stardust", "candy", or "megaEnergy"; 0 otherwise.
+	amount: number;
+	pokemonImageUrl: string; // pokemon reward only, "" otherwise
 	latitude: number;
 	longitude: number;
 	googleMapsUrl: string;

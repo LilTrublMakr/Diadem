@@ -103,6 +103,37 @@ export type GolbatMaxBattleMessage = {
 	updated: number;
 };
 
+// Shape of a Golbat webhook envelope's `message` for type "quest" — verified against PoracleNG's
+// QuestWebhook struct (processor/internal/webhook/types.go:250-283). `type` here is the quest
+// OBJECTIVE type (e.g. "catch 5 pokemon"), unused by this app — not to be confused with a
+// reward's own `type` field below (2=item, 3=stardust, 4=candy, 7=pokemon, 12=mega energy).
+export type GolbatQuestReward = {
+	type: number;
+	info: Record<string, unknown>;
+};
+
+export type GolbatQuestCondition = {
+	type: number;
+	info: Record<string, unknown>;
+};
+
+export type GolbatQuestMessage = {
+	pokestop_id: string;
+	pokestop_name?: string;
+	pokestop_url?: string;
+	latitude: number;
+	longitude: number;
+	title?: string;
+	target: number;
+	type: number;
+	template?: string;
+	rewards: GolbatQuestReward[];
+	conditions?: GolbatQuestCondition[];
+	// The same pokestop can host both an AR and a standard quest simultaneously (separate
+	// objectives, separate rewards) — see webhook/golbat/+server.ts's dedup key.
+	with_ar: boolean;
+};
+
 export type GolbatWebhookEnvelope = {
 	type: string;
 	message: unknown;
