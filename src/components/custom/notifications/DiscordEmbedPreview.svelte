@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type {
 		EmbedTemplate,
+		MaxBattleTemplateContext,
 		PokemonTemplateContext,
 		RaidTemplateContext
 	} from "@/lib/features/notifications/types";
@@ -13,7 +14,10 @@
 	let {
 		embed,
 		context
-	}: { embed: EmbedTemplate; context: PokemonTemplateContext | RaidTemplateContext } = $props();
+	}: {
+		embed: EmbedTemplate;
+		context: PokemonTemplateContext | RaidTemplateContext | MaxBattleTemplateContext;
+	} = $props();
 
 	function render(source: string): string {
 		try {

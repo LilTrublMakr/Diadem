@@ -4,6 +4,8 @@
 	import {
 		CONDITIONAL_TEMPLATE_FIELDS,
 		EMOJI_TEMPLATE_FIELDS,
+		MAXBATTLE_PRESET_TEMPLATE_FIELDS,
+		MAXBATTLE_TEMPLATE_FIELDS,
 		POKEMON_TEMPLATE_FIELDS,
 		PRESET_TEMPLATE_FIELDS,
 		RAID_PRESET_TEMPLATE_FIELDS,
@@ -18,8 +20,13 @@
 		RAID_TEST_SCENARIOS,
 		randomizeRaidContext
 	} from "@/lib/features/notifications/raidTestData";
+	import {
+		MAXBATTLE_TEST_SCENARIOS,
+		randomizeMaxBattleContext
+	} from "@/lib/features/notifications/maxBattleTestData";
 	import type {
 		EmbedTemplate,
+		MaxBattleTemplateContext,
 		NotificationType,
 		PokemonTemplateContext,
 		RaidTemplateContext,
@@ -28,7 +35,7 @@
 	import { X } from "@lucide/svelte";
 	import { tick, untrack } from "svelte";
 
-	type PreviewContext = PokemonTemplateContext | RaidTemplateContext;
+	type PreviewContext = PokemonTemplateContext | RaidTemplateContext | MaxBattleTemplateContext;
 
 	let { type = "pokemon", embed = $bindable() }: { type?: NotificationType; embed: EmbedTemplate } =
 		$props();
@@ -38,18 +45,26 @@
 	// {{iv}}/{{quickMove}}-as-pokemon-move confusion on a raid template).
 	// `type` never actually changes after mount (the editor remounts fresh each time its dialog
 	// opens) — untrack() makes that one-time capture explicit instead of implying reactivity.
-	const typeFields = untrack(() =>
-		type === "raid" ? RAID_TEMPLATE_FIELDS : POKEMON_TEMPLATE_FIELDS
-	);
-	const typePresets = untrack(() =>
-		type === "raid" ? RAID_PRESET_TEMPLATE_FIELDS : PRESET_TEMPLATE_FIELDS
-	);
-	const scenarios: { id: string; label: string; context: PreviewContext }[] = untrack(() =>
-		type === "raid" ? RAID_TEST_SCENARIOS : TEST_SCENARIOS
-	);
+	const typeFields = untrack(() => {
+		if (type === "raid") return RAID_TEMPLATE_FIELDS;
+		if (type === "maxbattle") return MAXBATTLE_TEMPLATE_FIELDS;
+		return POKEMON_TEMPLATE_FIELDS;
+	});
+	const typePresets = untrack(() => {
+		if (type === "raid") return RAID_PRESET_TEMPLATE_FIELDS;
+		if (type === "maxbattle") return MAXBATTLE_PRESET_TEMPLATE_FIELDS;
+		return PRESET_TEMPLATE_FIELDS;
+	});
+	const scenarios: { id: string; label: string; context: PreviewContext }[] = untrack(() => {
+		if (type === "raid") return RAID_TEST_SCENARIOS;
+		if (type === "maxbattle") return MAXBATTLE_TEST_SCENARIOS;
+		return TEST_SCENARIOS;
+	});
 
 	function randomizeContext(): PreviewContext {
-		return type === "raid" ? randomizeRaidContext() : randomizePokemonContext();
+		if (type === "raid") return randomizeRaidContext();
+		if (type === "maxbattle") return randomizeMaxBattleContext();
+		return randomizePokemonContext();
 	}
 
 	type PreviewMode = "scenario" | "random" | "custom";

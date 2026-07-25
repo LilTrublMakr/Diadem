@@ -55,7 +55,7 @@ export const embedTemplateSchema = z.object({
 
 export const createTemplateSchema = z.object({
 	name: notificationNameSchema,
-	type: z.enum(["pokemon", "raid"]),
+	type: z.enum(["pokemon", "raid", "maxbattle"]),
 	embed: embedTemplateSchema
 });
 
@@ -115,9 +115,20 @@ export const raidFiltersSchema = z.object({
 	...baseFiltersShape
 });
 
+export const maxBattleFiltersSchema = z.object({
+	bossPokemonIds: z.array(z.number().int().positive()).max(50).optional(),
+	form: z.number().int().min(0).optional(),
+	minLevel: z.number().int().min(1).max(8).optional(),
+	maxLevel: z.number().int().min(1).max(8).optional(),
+	gmaxOnly: z.boolean().optional(),
+	...baseFiltersShape
+});
+
 /** Picks the right filters schema for a subscription's type — used for both create and patch. */
 export function filtersSchemaForType(type: NotificationType) {
-	return type === "raid" ? raidFiltersSchema : pokemonFiltersSchema;
+	if (type === "raid") return raidFiltersSchema;
+	if (type === "maxbattle") return maxBattleFiltersSchema;
+	return pokemonFiltersSchema;
 }
 
 // `filters` is intentionally loose here (validated for real against the type-specific schema —
@@ -125,7 +136,7 @@ export function filtersSchemaForType(type: NotificationType) {
 // one schema works for every notification type without a discriminated union at the API boundary.
 export const createSubscriptionSchema = z.object({
 	name: notificationNameSchema,
-	type: z.enum(["pokemon", "raid"]),
+	type: z.enum(["pokemon", "raid", "maxbattle"]),
 	templateId: z.number().int().positive().nullable().optional(),
 	enabled: z.boolean().optional(),
 	filters: z.record(z.string(), z.unknown()),

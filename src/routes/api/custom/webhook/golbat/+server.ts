@@ -19,17 +19,21 @@ import {
 } from "@/lib/server/notifications/mapImage";
 import {
 	applyTrackedBadges,
+	buildMaxBattleContext,
 	buildPokemonContext,
 	buildRaidContext,
 	renderEmbed
 } from "@/lib/server/notifications/render";
 import { getNotificationTemplate } from "@/lib/server/db/internal/repository";
 import type {
+	GolbatMaxBattleMessage,
 	GolbatPokemonMessage,
 	GolbatRaidMessage,
 	GolbatWebhookEnvelope
 } from "@/lib/server/notifications/golbatTypes";
 import type {
+	MaxBattleSubscriptionFilters,
+	MaxBattleTemplateContext,
 	PokemonSubscriptionFilters,
 	PokemonTemplateContext,
 	RaidSubscriptionFilters,
@@ -95,6 +99,28 @@ function isDuplicateRaid(message: GolbatRaidMessage): boolean {
 	const fp = raidFingerprint(message);
 	const existing = seenRaids.get(message.gym_id);
 	seenRaids.set(message.gym_id, { fingerprint: fp, expiresAt: message.end * 1000 });
+	return existing?.fingerprint === fp;
+}
+
+// Same idea again, keyed on station instead. Fingerprinting on pokemonId+level+battleEnd
+// mirrors PoracleNG's own dedup (station id, battle end, boss pokemon id).
+const seenMaxBattles = new Map<string, { fingerprint: string; expiresAt: number }>();
+
+function maxBattleFingerprint(message: GolbatMaxBattleMessage): string {
+	return [message.battle_pokemon_id, message.battle_level, message.battle_end].join(":");
+}
+
+function isDuplicateMaxBattle(message: GolbatMaxBattleMessage): boolean {
+	const now = Date.now();
+	if (seenMaxBattles.size > 5000) {
+		for (const [key, entry] of seenMaxBattles) {
+			if (entry.expiresAt < now) seenMaxBattles.delete(key);
+		}
+	}
+
+	const fp = maxBattleFingerprint(message);
+	const existing = seenMaxBattles.get(message.id);
+	seenMaxBattles.set(message.id, { fingerprint: fp, expiresAt: message.battle_end * 1000 });
 	return existing?.fingerprint === fp;
 }
 
@@ -189,6 +215,23 @@ function matchesRaidFilters(
 		if (filters.exRaidOnly && !context.exRaidEligible) return false;
 	}
 
+	return true;
+}
+
+function matchesMaxBattleFilters(
+	context: MaxBattleTemplateContext,
+	filters: MaxBattleSubscriptionFilters
+): boolean {
+	if (filters.minLevel !== undefined && context.level < filters.minLevel) return false;
+	if (filters.maxLevel !== undefined && context.level > filters.maxLevel) return false;
+	if (filters.gmaxOnly && !context.gmax) return false;
+	if (
+		filters.bossPokemonIds &&
+		filters.bossPokemonIds.length > 0 &&
+		!filters.bossPokemonIds.includes(context.pokemonId)
+	)
+		return false;
+	if (filters.form !== undefined && filters.form !== context.form) return false;
 	return true;
 }
 
@@ -406,6 +449,84 @@ async function handleRaid(message: GolbatRaidMessage, thisFetch: typeof fetch) {
 	await Promise.all(matches.map((sub) => deliverRaid(sub, context, getSpriteImage, thisFetch)));
 }
 
+// Same shape as deliverRaid — no tracked badges, boss sprite reuses the shared species-only
+// sprite fetch, no map thumbnail yet.
+async function deliverMaxBattle(
+	subscription: NotificationSubscription,
+	context: MaxBattleTemplateContext,
+	getSpriteImage: () => Promise<Buffer | null>,
+	thisFetch: typeof fetch
+) {
+	if (!(await matchesArea(subscription, context, thisFetch))) return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.userId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return; // template was deleted, skip silently
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(
+				{
+					content: "{{#if gmax}}Gigantamax {{/if}}{{pokemonName}} battle at {{stationName}}",
+					title: "{{#if gmax}}Gigantamax {{/if}}{{pokemonName}} Max Battle",
+					description: "{{stationName}} — Level {{level}}",
+					color: "3447003",
+					thumbnailUrl: "{{{pokemonImageUrl}}}",
+					imageUrl: "",
+					footerText: "Battle ends at {{battleEndTime}} ({{minutesLeft}}m left)",
+					url: "{{{googleMapsUrl}}}",
+					fields: []
+				},
+				context
+			);
+
+	const usesSpriteImage =
+		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
+	const spriteImage = usesSpriteImage ? await getSpriteImage() : null;
+
+	const discordId = await getUserDiscordId(subscription.userId);
+	if (!discordId) {
+		log.warning(`No Discord id found for user ${subscription.userId}, skipping delivery`);
+		return;
+	}
+
+	await sendDirectMessage(discordId, {
+		content: embed.content,
+		embed,
+		attachments: [spriteImage ? { filename: "pokemon.png", data: spriteImage } : null]
+	});
+}
+
+async function handleMaxBattle(message: GolbatMaxBattleMessage, thisFetch: typeof fetch) {
+	if (isDuplicateMaxBattle(message)) return;
+
+	const context = await buildMaxBattleContext(message, thisFetch);
+	const candidates = await getSubscriptionsByType("maxbattle");
+	const matches = candidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesMaxBattleFilters(context, sub.filters as MaxBattleSubscriptionFilters)
+	);
+
+	// Generated at most once per event. Only meaningful once a boss is actually known.
+	let spriteImage: Buffer | null | undefined;
+	const getSpriteImage = async () => {
+		if (!context.pokemonId) return null;
+		if (spriteImage === undefined) {
+			spriteImage = await generatePokemonSpriteImage(
+				{ pokemon_id: context.pokemonId, form: context.form, shiny: false },
+				thisFetch
+			);
+		}
+		return spriteImage;
+	};
+
+	await Promise.all(
+		matches.map((sub) => deliverMaxBattle(sub, context, getSpriteImage, thisFetch))
+	);
+}
+
 export const POST: RequestHandler = async ({ request, fetch }) => {
 	const discordConfig = getServerConfig().auth.discord;
 	if (!discordConfig?.botToken || !discordConfig?.webhookSecret) {
@@ -446,6 +567,8 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 				await handlePokemon(envelope.message as GolbatPokemonMessage, fetch);
 			} else if (envelope.type === "raid") {
 				await handleRaid(envelope.message as GolbatRaidMessage, fetch);
+			} else if (envelope.type === "max_battle") {
+				await handleMaxBattle(envelope.message as GolbatMaxBattleMessage, fetch);
 			}
 			// else: not yet supported (quest, invasion, lure, gym, fort) — ignored for now.
 		} catch (error) {

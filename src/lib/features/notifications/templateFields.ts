@@ -336,6 +336,119 @@ export const RAID_TEMPLATE_FIELDS: TemplateField[] = [
 ];
 
 /**
+ * Field registry for the "maxbattle" notification type — a Dynamax/Gigantamax battle station
+ * (see buildMaxBattleContext in render.ts). No egg-phase equivalent and no IV/CP tags, same
+ * reasoning as raids.
+ */
+export const MAXBATTLE_TEMPLATE_FIELDS: TemplateField[] = [
+	{ tag: "stationId", label: "Station ID", category: "Battle", sample: "abc123.16" },
+	{ tag: "stationName", label: "Station Name", category: "Battle", sample: "City Hall" },
+	{ tag: "level", label: "Battle Level", category: "Battle", sample: "6" },
+	{ tag: "gmax", label: "Is Gigantamax (true/false)", category: "Battle", sample: "true" },
+	{ tag: "gmaxYesNo", label: "Is Gigantamax (Yes/No)", category: "Battle", sample: "Yes" },
+
+	{
+		tag: "pokemonName",
+		label: "Boss Name (empty until a battle is active)",
+		category: "Boss",
+		sample: "Gigantamax Butterfree"
+	},
+	{ tag: "pokemonId", label: "Boss Pokemon ID", category: "Boss", sample: "12" },
+	{ tag: "form", label: "Boss Form ID", category: "Boss", sample: "0" },
+	{ tag: "formName", label: "Boss Form Name", category: "Boss", sample: "" },
+	{ tag: "type1", label: "Boss Primary Type", category: "Boss", sample: "Bug" },
+	{ tag: "type2", label: "Boss Secondary Type", category: "Boss", sample: "Flying" },
+	{
+		tag: "type1Emoji",
+		label: "Boss Primary Type Emoji",
+		category: "Boss",
+		sample: "<:type_bug:...>",
+		unescaped: true
+	},
+	{
+		tag: "type2Emoji",
+		label: "Boss Secondary Type Emoji",
+		category: "Boss",
+		sample: "<:type_flying:...>",
+		unescaped: true
+	},
+	{ tag: "quickMove", label: "Boss Quick Move", category: "Boss", sample: "Bug Bite" },
+	{ tag: "chargeMove", label: "Boss Charge Move", category: "Boss", sample: "Bug Buzz" },
+	{
+		tag: "quickMoveEmoji",
+		label: "Boss Quick Move Type Emoji",
+		category: "Boss",
+		sample: "<:type_bug:...>",
+		unescaped: true
+	},
+	{
+		tag: "chargeMoveEmoji",
+		label: "Boss Charge Move Type Emoji",
+		category: "Boss",
+		sample: "<:type_bug:...>",
+		unescaped: true
+	},
+	{
+		tag: "shinyRatePercent",
+		label: "Boss All-Time Shiny Rate (%)",
+		category: "Boss",
+		sample: "2.5%"
+	},
+	{
+		tag: "shinyRateFraction",
+		label: "Boss All-Time Shiny Rate (full fraction)",
+		category: "Boss",
+		sample: "5/200"
+	},
+	{
+		tag: "shinyRateReduced",
+		label: "Boss All-Time Shiny Rate (reduced, ~1 in N)",
+		category: "Boss",
+		sample: "~1 in 40"
+	},
+
+	{ tag: "battleEndTime", label: "Battle End Time", category: "Time", sample: "4:45:12 PM" },
+	{
+		tag: "despawnUnix",
+		label: "Countdown Unix Time (for Discord <t:...> tags)",
+		category: "Time",
+		sample: "1700000000"
+	},
+	{ tag: "minutesLeft", label: "Minutes Left", category: "Time", sample: "42" },
+
+	{ tag: "latitude", label: "Latitude", category: "Location", sample: "44.4759" },
+	{ tag: "longitude", label: "Longitude", category: "Location", sample: "-73.2121" },
+	{
+		tag: "googleMapsUrl",
+		label: "Google Maps Link",
+		category: "Location",
+		sample: "https://maps.google.com/maps?q=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "appleMapsUrl",
+		label: "Apple Maps Link",
+		category: "Location",
+		sample: "https://maps.apple.com/?ll=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "wazeMapUrl",
+		label: "Waze Link",
+		category: "Location",
+		sample: "https://waze.com/ul?ll=44.4759,-73.2121&navigate=yes",
+		unescaped: true
+	},
+	{
+		tag: "pokemonImageUrl",
+		label: "Boss Sprite (use in Thumbnail or Image field, empty until a battle is active)",
+		category: "Location",
+		sample: "attachment://pokemon.png",
+		unescaped: true
+	}
+];
+
+/**
  * Clickable conditional-block/helper skeletons — inserted literally (not wrapped
  * in {{ }}) via TemplateField.raw. %CURSOR% marks where the caret lands after
  * insertion so the user can fill in the condition/args immediately.
@@ -422,6 +535,17 @@ export const RAID_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 	{
 		tag: "{{#if isEgg}}Hatches {{minutesLeft}}m from now{{else}}{{pokemonName}} — despawns in {{minutesLeft}}m{{/if}}",
 		label: "Egg vs boss summary",
+		category: "Presets",
+		sample: "",
+		raw: true
+	}
+];
+
+/** Preset snippets for the "maxbattle" type. */
+export const MAXBATTLE_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
+	{
+		tag: "{{#if gmax}}⚡ Gigantamax! {{/if}}{{pokemonName}} — ends in {{minutesLeft}}m",
+		label: "Gigantamax callout summary",
 		category: "Presets",
 		sample: "",
 		raw: true

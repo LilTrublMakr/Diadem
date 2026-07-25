@@ -9,12 +9,14 @@ import { isMapImageConfigured } from "@/lib/server/notifications/mapImage";
 import { getShinyRate } from "@/lib/server/provider/shinyRateProvider";
 import { registerNotificationHelpers } from "@/lib/features/notifications/handlebarsHelpers";
 import type {
+	GolbatMaxBattleMessage,
 	GolbatPokemonMessage,
 	GolbatPvpEntry,
 	GolbatRaidMessage
 } from "@/lib/server/notifications/golbatTypes";
 import type {
 	EmbedTemplate,
+	MaxBattleTemplateContext,
 	PokemonTemplateContext,
 	PvpEntryContext,
 	RaidTeam,
@@ -347,6 +349,79 @@ export async function buildRaidContext(
 	};
 }
 
+/**
+ * A Dynamax/Gigantamax battle station. No egg phase — the webhook always carries whatever boss
+ * info is currently known (zeroed out fields before a battle is active).
+ */
+export async function buildMaxBattleContext(
+	message: GolbatMaxBattleMessage,
+	thisFetch: typeof fetch = fetch
+): Promise<MaxBattleTemplateContext> {
+	const clientConfig = getClientConfig();
+	await loadRemoteLocale(clientConfig.general.defaultLocale, thisFetch);
+
+	const pokemonId = message.battle_pokemon_id ?? 0;
+	const hasBoss = pokemonId > 0;
+	const form = hasBoss ? getNormalizedForm(pokemonId, message.battle_pokemon_form ?? 0) : 0;
+	const master = hasBoss ? getMasterPokemon(pokemonId, form) : undefined;
+	const formName = hasBoss && form ? (master?.name ?? "") : "";
+	const type1 = hasBoss ? typeIdToText(master?.types?.[0]) : "";
+	const type2 = hasBoss && master?.types?.[1] ? typeIdToText(master.types[1]) : "";
+	const shinyRate = hasBoss
+		? formatShinyRate(await getShinyRate(pokemonId, form))
+		: { percent: "?", fraction: "?", reduced: "?" };
+
+	// Golbat has no plain "is this gmax" field — derive it the same way PoracleNG does
+	// (processor/cmd/processor/maxbattle.go:56-63): bread_mode 2 = Gigantamax; bread_mode 0 with
+	// a level above the normal Dynamax range also counts (older/incomplete scans).
+	const gmax =
+		message.battle_pokemon_bread_mode === 2 ||
+		(message.battle_pokemon_bread_mode === 0 && message.battle_level > 6);
+
+	const battleEnd = new Date(message.battle_end * 1000);
+	const despawnUnix = Math.floor(message.battle_end);
+	const minutesLeft = Math.max(0, Math.round((despawnUnix * 1000 - Date.now()) / 60000));
+
+	return {
+		stationId: message.id,
+		stationName: message.name ?? "",
+		level: message.battle_level,
+		gmax,
+		gmaxYesNo: gmax ? "Yes" : "No",
+		pokemonName: hasBoss ? mPokemon({ pokemon_id: pokemonId, form }) : "",
+		pokemonId,
+		form,
+		formName,
+		type1,
+		type2,
+		type1Emoji: type1 ? discordEmojiTag(`type_${type1}`) : "",
+		type2Emoji: type2 ? discordEmojiTag(`type_${type2}`) : "",
+		quickMove: hasBoss ? mMove(message.battle_pokemon_move_1) : "",
+		chargeMove: hasBoss ? mMove(message.battle_pokemon_move_2) : "",
+		quickMoveEmoji: hasBoss ? moveTypeEmoji(master?.quickMoves, message.battle_pokemon_move_1) : "",
+		chargeMoveEmoji: hasBoss
+			? moveTypeEmoji(master?.chargedMoves, message.battle_pokemon_move_2)
+			: "",
+		shinyRatePercent: shinyRate.percent,
+		shinyRateFraction: shinyRate.fraction,
+		shinyRateReduced: shinyRate.reduced,
+		evolutions: hasBoss ? buildEvolutionFamily(pokemonId) : [],
+		// Reuses generatePokemonSpriteImage (species-only, see webhook/golbat/+server.ts).
+		pokemonImageUrl: hasBoss ? "attachment://pokemon.png" : "",
+		battleEndTime: hasBoss ? battleEnd.toLocaleTimeString() : "",
+		despawnUnix,
+		minutesLeft,
+		latitude: message.latitude,
+		longitude: message.longitude,
+		googleMapsUrl: `https://maps.google.com/maps?q=${message.latitude},${message.longitude}`,
+		appleMapsUrl: `https://maps.apple.com/?ll=${message.latitude},${message.longitude}`,
+		wazeMapUrl: `https://waze.com/ul?ll=${message.latitude},${message.longitude}&navigate=yes`,
+		mapImageUrl: "",
+		// No dedicated station detail page exists in this app yet — nothing to link to.
+		diademUrl: ""
+	};
+}
+
 export type TrackedStatus = { shiny: boolean; hundo: boolean; nundo: boolean; shundo: boolean };
 
 /**
@@ -390,7 +465,7 @@ function compile(source: string): Handlebars.TemplateDelegate {
 
 export function renderEmbed(
 	template: EmbedTemplate,
-	context: PokemonTemplateContext | RaidTemplateContext
+	context: PokemonTemplateContext | RaidTemplateContext | MaxBattleTemplateContext
 ): EmbedTemplate {
 	return {
 		// template.content ?? "" — older saved templates predate this field

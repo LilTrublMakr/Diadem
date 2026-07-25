@@ -12,10 +12,10 @@ export type NotificationAreaDto = {
 	updatedAt: string;
 };
 
-// Phase 1 shipped "pokemon". Phase 2 adds the rest one at a time — "raid" is next; quest,
-// invasion, lure, gym, and fort follow the same pattern (nests are deferred indefinitely,
-// Golbat has no live "nest changed" event to key off).
-export type NotificationType = "pokemon" | "raid";
+// Phase 1 shipped "pokemon". Phase 2 adds the rest one at a time — "raid" and "maxbattle" are
+// done; quest, invasion, lure, gym, and fort follow the same pattern (nests are deferred
+// indefinitely, Golbat has no live "nest changed" event to key off).
+export type NotificationType = "pokemon" | "raid" | "maxbattle";
 
 export type EmbedFieldTemplate = {
 	name: string;
@@ -100,11 +100,25 @@ export type RaidSubscriptionFilters = BaseSubscriptionFilters & {
 	notifyOnBoss?: boolean; // default true
 };
 
+export type MaxBattleSubscriptionFilters = BaseSubscriptionFilters & {
+	// Empty/absent = any boss species.
+	bossPokemonIds?: number[];
+	form?: number;
+	minLevel?: number;
+	maxLevel?: number;
+	// true = only Gigantamax battles (see buildMaxBattleContext's gmax derivation — Golbat
+	// doesn't send a plain "is this gmax" flag, it's inferred from bread_mode/battle_level).
+	gmaxOnly?: boolean;
+};
+
 // Every notification type's filters, keyed loosely by NotificationType — not a TS discriminated
 // union (that would need every call site to narrow via a type guard for marginal safety gain);
 // callers narrow by checking subscription.type instead, matching this codebase's existing
 // light-touch typing style (see schema.ts's $type<>() cast on the `filters` column).
-export type AnySubscriptionFilters = PokemonSubscriptionFilters | RaidSubscriptionFilters;
+export type AnySubscriptionFilters =
+	| PokemonSubscriptionFilters
+	| RaidSubscriptionFilters
+	| MaxBattleSubscriptionFilters;
 
 export type NotificationTemplateDto = {
 	id: number;
@@ -266,6 +280,44 @@ export type RaidTemplateContext = {
 	hatchTime: string;
 	raidEndTime: string;
 	despawnUnix: number; // hatch time (egg) or raid end time (boss), whichever is upcoming
+	minutesLeft: number;
+	latitude: number;
+	longitude: number;
+	googleMapsUrl: string;
+	appleMapsUrl: string;
+	wazeMapUrl: string;
+	mapImageUrl: string;
+	diademUrl: string;
+};
+
+// Rendering context for the "maxbattle" type — a Dynamax/Gigantamax battle station. No egg
+// phase (the webhook always carries whatever boss info is currently known) and no IV/CP fields,
+// same reasoning as raids.
+export type MaxBattleTemplateContext = {
+	stationId: string;
+	stationName: string;
+	level: number;
+	gmax: boolean; // derived server-side, not a raw Golbat field — see buildMaxBattleContext
+	gmaxYesNo: string;
+	pokemonName: string;
+	pokemonId: number;
+	form: number;
+	formName: string;
+	type1: string;
+	type2: string;
+	type1Emoji: string;
+	type2Emoji: string;
+	quickMove: string;
+	chargeMove: string;
+	quickMoveEmoji: string;
+	chargeMoveEmoji: string;
+	shinyRatePercent: string;
+	shinyRateFraction: string;
+	shinyRateReduced: string;
+	evolutions: { fullName: string; pokemonId: number }[];
+	pokemonImageUrl: string;
+	battleEndTime: string;
+	despawnUnix: number;
 	minutesLeft: number;
 	latitude: number;
 	longitude: number;

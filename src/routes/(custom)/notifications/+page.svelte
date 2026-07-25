@@ -6,6 +6,7 @@
 	import PokemonPicker from "@/components/custom/notifications/PokemonPicker.svelte";
 	import PokemonFormPicker from "@/components/custom/notifications/PokemonFormPicker.svelte";
 	import RaidFilterEditor from "@/components/custom/notifications/RaidFilterEditor.svelte";
+	import MaxBattleFilterEditor from "@/components/custom/notifications/MaxBattleFilterEditor.svelte";
 	import type {
 		NotificationSchedule,
 		SubscriptionMode
@@ -24,6 +25,7 @@
 	import type {
 		AnySubscriptionFilters,
 		EmbedTemplate,
+		MaxBattleSubscriptionFilters,
 		NotificationSubscriptionDto,
 		NotificationTemplateDto,
 		NotificationType,
@@ -131,6 +133,20 @@
 		};
 	}
 
+	function defaultMaxBattleEmbed(): EmbedTemplate {
+		return {
+			content: "{{#if gmax}}Gigantamax {{/if}}{{pokemonName}} battle at {{stationName}}",
+			title: "{{#if gmax}}Gigantamax {{/if}}{{pokemonName}} Max Battle",
+			description: "{{stationName}} — Level {{level}}",
+			color: "#5865F2",
+			thumbnailUrl: "{{{pokemonImageUrl}}}",
+			imageUrl: "",
+			footerText: "Battle ends at {{battleEndTime}} ({{minutesLeft}}m left)",
+			url: "{{{googleMapsUrl}}}",
+			fields: []
+		};
+	}
+
 	function defaultFilters(): PokemonSubscriptionFilters {
 		return { pokemonIds: [] };
 	}
@@ -139,7 +155,15 @@
 		return {};
 	}
 
-	const CATEGORY_LABELS: Record<NotificationType, string> = { pokemon: "Pokemon", raid: "Raid" };
+	function defaultMaxBattleFilters(): MaxBattleSubscriptionFilters {
+		return {};
+	}
+
+	const CATEGORY_LABELS: Record<NotificationType, string> = {
+		pokemon: "Pokemon",
+		raid: "Raid",
+		maxbattle: "Max Battle"
+	};
 
 	const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 	function defaultSchedule(): NotificationSchedule {
@@ -238,11 +262,17 @@
 	let templateEmbed = $state<EmbedTemplate>(defaultEmbed());
 	let savingTemplate = $state(false);
 
+	function defaultEmbedForType(type: NotificationType): EmbedTemplate {
+		if (type === "raid") return defaultRaidEmbed();
+		if (type === "maxbattle") return defaultMaxBattleEmbed();
+		return defaultEmbed();
+	}
+
 	function startCreateTemplate() {
 		templateMode = "creating";
 		templateType = categoryFilter;
 		templateName = "";
-		templateEmbed = templateType === "raid" ? defaultRaidEmbed() : defaultEmbed();
+		templateEmbed = defaultEmbedForType(templateType);
 	}
 
 	function startEditTemplate(template: NotificationTemplateDto) {
@@ -302,6 +332,7 @@
 	let subTemplateId = $state<number | null>(null);
 	let subFilters = $state<PokemonSubscriptionFilters>(defaultFilters());
 	let raidFilters = $state<RaidSubscriptionFilters>(defaultRaidFilters());
+	let maxBattleFilters = $state<MaxBattleSubscriptionFilters>(defaultMaxBattleFilters());
 	let subMode = $state<SubscriptionMode>("manual");
 	let subSchedule = $state<NotificationSchedule>(defaultSchedule());
 	let savingSubscription = $state(false);
@@ -314,6 +345,7 @@
 		subTemplateId = null;
 		subFilters = defaultFilters();
 		raidFilters = defaultRaidFilters();
+		maxBattleFilters = defaultMaxBattleFilters();
 		subMode = "manual";
 		subSchedule = defaultSchedule();
 	}
@@ -326,6 +358,8 @@
 		subTemplateId = sub.templateId;
 		if (sub.type === "raid") {
 			raidFilters = { ...(sub.filters as RaidSubscriptionFilters) };
+		} else if (sub.type === "maxbattle") {
+			maxBattleFilters = { ...(sub.filters as MaxBattleSubscriptionFilters) };
 		} else {
 			const filters = sub.filters as PokemonSubscriptionFilters;
 			subFilters = { ...filters, pokemonIds: filters.pokemonIds ?? [] };
@@ -347,6 +381,12 @@
 		else subFilters.pvpMaxRank = undefined;
 	}
 
+	function activeFilters(): AnySubscriptionFilters {
+		if (subType === "raid") return raidFilters;
+		if (subType === "maxbattle") return maxBattleFilters;
+		return subFilters;
+	}
+
 	async function saveSubscription() {
 		const name = subName.trim();
 		if (!name) {
@@ -360,7 +400,7 @@
 				type: subType,
 				enabled: subEnabled,
 				templateId: subTemplateId,
-				filters: (subType === "raid" ? raidFilters : subFilters) as AnySubscriptionFilters,
+				filters: activeFilters(),
 				mode: subMode,
 				schedule: subMode === "scheduled" ? { ...subSchedule, tz: browserTz } : null
 			};
@@ -447,6 +487,19 @@
 			if (f.exRaidOnly) parts.push("EX only");
 			if (f.notifyOnEgg === false) parts.push("bosses only");
 			if (f.notifyOnBoss === false) parts.push("eggs only");
+		} else if (type === "maxbattle") {
+			const f = filters as MaxBattleSubscriptionFilters;
+			if (!f.bossPokemonIds || f.bossPokemonIds.length === 0) {
+				parts.push("Any boss");
+			} else if (f.bossPokemonIds.length === 1) {
+				parts.push(`Boss #${f.bossPokemonIds[0]}`);
+			} else {
+				parts.push(`${f.bossPokemonIds.length} bosses`);
+			}
+			if (f.minLevel !== undefined || f.maxLevel !== undefined) {
+				parts.push(`Level ${f.minLevel ?? 1}–${f.maxLevel ?? 8}`);
+			}
+			if (f.gmaxOnly) parts.push("Gigantamax only");
 		} else {
 			const f = filters as PokemonSubscriptionFilters;
 			if (!f.pokemonIds || f.pokemonIds.length === 0) {
@@ -645,6 +698,13 @@
 							{#if subType === "raid"}
 								<RaidFilterEditor
 									bind:filters={raidFilters}
+									ownAreas={scanAreasState.areas}
+									kojiAreas={kojiGeofences}
+									notificationAreas={notificationAreasState.areas}
+								/>
+							{:else if subType === "maxbattle"}
+								<MaxBattleFilterEditor
+									bind:filters={maxBattleFilters}
 									ownAreas={scanAreasState.areas}
 									kojiAreas={kojiGeofences}
 									notificationAreas={notificationAreasState.areas}

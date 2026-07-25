@@ -76,6 +76,33 @@ export type GolbatRaidMessage = {
 	ex_raid_eligible: boolean;
 };
 
+// Shape of a Golbat webhook envelope's `message` for type "max_battle" — a Dynamax/Gigantamax
+// battle station. `bread_mode`/`battle_level` together determine gmax (see PoracleNG's
+// processor/cmd/processor/maxbattle.go:56-63) — Golbat has no plain "is this gmax" field.
+export type GolbatMaxBattleMessage = {
+	id: string;
+	name: string;
+	latitude: number;
+	longitude: number;
+	start_time: number;
+	end_time: number;
+	is_battle_available: boolean;
+	battle_level: number;
+	battle_start: number;
+	battle_end: number;
+	battle_pokemon_id: number;
+	battle_pokemon_form: number;
+	battle_pokemon_costume: number;
+	battle_pokemon_gender: number;
+	battle_pokemon_alignment: number;
+	battle_pokemon_bread_mode: number;
+	battle_pokemon_move_1: number;
+	battle_pokemon_move_2: number;
+	total_stationed_pokemon: number;
+	total_stationed_gmax: number;
+	updated: number;
+};
+
 export type GolbatWebhookEnvelope = {
 	type: string;
 	message: unknown;
