@@ -19,6 +19,7 @@ import {
 } from "@/lib/server/notifications/mapImage";
 import {
 	applyTrackedBadges,
+	buildInvasionContext,
 	buildMaxBattleContext,
 	buildPokemonContext,
 	buildQuestContext,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/server/notifications/render";
 import { getNotificationTemplate } from "@/lib/server/db/internal/repository";
 import type {
+	GolbatInvasionMessage,
 	GolbatMaxBattleMessage,
 	GolbatPokemonMessage,
 	GolbatQuestMessage,
@@ -34,6 +36,8 @@ import type {
 	GolbatWebhookEnvelope
 } from "@/lib/server/notifications/golbatTypes";
 import type {
+	InvasionSubscriptionFilters,
+	InvasionTemplateContext,
 	MaxBattleSubscriptionFilters,
 	MaxBattleTemplateContext,
 	PokemonSubscriptionFilters,
@@ -159,6 +163,37 @@ function isDuplicateQuest(message: GolbatQuestMessage): boolean {
 	const existing = seenQuests.get(key);
 	// Quests carry no wire-level expiry (they reset once daily) — a fixed 24h TTL is plenty.
 	seenQuests.set(key, { fingerprint: fp, expiresAt: now + 24 * 60 * 60 * 1000 });
+	return existing?.fingerprint === fp;
+}
+
+// Keyed on pokestop alone (unlike quest, only one invasion can be active on a stop at once).
+// Fingerprinting on expiration+character+displayType+confirmed means an unconfirmed->confirmed
+// reveal (Niantic later confirms the specific grunt) fires a fresh notification.
+const seenInvasions = new Map<string, { fingerprint: string; expiresAt: number }>();
+
+function invasionFingerprint(message: GolbatInvasionMessage): string {
+	return [
+		message.incident_expiration,
+		message.incident_grunt_type ?? message.grunt_type ?? 0,
+		message.incident_display_type ?? message.display_type ?? 0,
+		message.confirmed
+	].join(":");
+}
+
+function isDuplicateInvasion(message: GolbatInvasionMessage): boolean {
+	const now = Date.now();
+	if (seenInvasions.size > 5000) {
+		for (const [key, entry] of seenInvasions) {
+			if (entry.expiresAt < now) seenInvasions.delete(key);
+		}
+	}
+
+	const fp = invasionFingerprint(message);
+	const existing = seenInvasions.get(message.pokestop_id);
+	seenInvasions.set(message.pokestop_id, {
+		fingerprint: fp,
+		expiresAt: message.incident_expiration * 1000
+	});
 	return existing?.fingerprint === fp;
 }
 
@@ -311,6 +346,24 @@ function matchesQuestFilters(
 		if (filters.minAmount !== undefined && context.amount < filters.minAmount) return false;
 	}
 
+	return true;
+}
+
+function matchesInvasionFilters(
+	context: InvasionTemplateContext,
+	filters: InvasionSubscriptionFilters
+): boolean {
+	if (filters.kinds && filters.kinds.length > 0 && !filters.kinds.includes(context.kind))
+		return false;
+	if (context.kind === "grunt") {
+		if (
+			filters.characters &&
+			filters.characters.length > 0 &&
+			!filters.characters.includes(context.character)
+		)
+			return false;
+		if (filters.confirmedOnly && !context.confirmed) return false;
+	}
 	return true;
 }
 
@@ -682,6 +735,61 @@ async function handleQuest(message: GolbatQuestMessage, thisFetch: typeof fetch)
 	await Promise.all(matches.map((sub) => deliverQuest(sub, context, getSpriteImage, thisFetch)));
 }
 
+// No sprite/map image — an invasion isn't about one specific pokemon the way a raid/maxbattle
+// boss or quest reward is (lineup is a list, not a single subject).
+async function deliverInvasion(
+	subscription: NotificationSubscription,
+	context: InvasionTemplateContext,
+	thisFetch: typeof fetch
+) {
+	if (!(await matchesArea(subscription, context, thisFetch))) return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.userId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return; // template was deleted, skip silently
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(
+				{
+					content: "Pokestop invasion at {{pokestopName}}",
+					title: "Pokestop Invasion",
+					description:
+						'{{pokestopName}}\n{{#if (eq kind "grunt")}}{{characterName}}{{else}}{{kind}}{{/if}}',
+					color: "3447003",
+					thumbnailUrl: "",
+					imageUrl: "",
+					footerText: "Ends {{minutesLeft}}m from now",
+					url: "{{{googleMapsUrl}}}",
+					fields: []
+				},
+				context
+			);
+
+	const discordId = await getUserDiscordId(subscription.userId);
+	if (!discordId) {
+		log.warning(`No Discord id found for user ${subscription.userId}, skipping delivery`);
+		return;
+	}
+
+	await sendDirectMessage(discordId, { content: embed.content, embed, attachments: [] });
+}
+
+async function handleInvasion(message: GolbatInvasionMessage, thisFetch: typeof fetch) {
+	if (isDuplicateInvasion(message)) return;
+
+	const context = await buildInvasionContext(message, thisFetch);
+	const candidates = await getSubscriptionsByType("invasion");
+	const matches = candidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesInvasionFilters(context, sub.filters as InvasionSubscriptionFilters)
+	);
+
+	await Promise.all(matches.map((sub) => deliverInvasion(sub, context, thisFetch)));
+}
+
 export const POST: RequestHandler = async ({ request, fetch }) => {
 	const discordConfig = getServerConfig().auth.discord;
 	if (!discordConfig?.botToken || !discordConfig?.webhookSecret) {
@@ -726,8 +834,19 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 				await handleMaxBattle(envelope.message as GolbatMaxBattleMessage, fetch);
 			} else if (envelope.type === "quest") {
 				await handleQuest(envelope.message as GolbatQuestMessage, fetch);
+			} else if (envelope.type === "invasion") {
+				await handleInvasion(envelope.message as GolbatInvasionMessage, fetch);
+			} else if (envelope.type === "pokestop") {
+				// A "pokestop" envelope can carry lure data, invasion data, or both (see PoracleNG's
+				// own routePokestop) — lure isn't built yet, so only the invasion half is sniffed here.
+				const message = envelope.message as Record<string, unknown>;
+				const incidentExpiration = Number(message.incident_expiration) || 0;
+				const incidentGruntType = Number(message.incident_grunt_type) || 0;
+				if (incidentExpiration > 0 || incidentGruntType > 0) {
+					await handleInvasion(envelope.message as GolbatInvasionMessage, fetch);
+				}
 			}
-			// else: not yet supported (invasion, lure, gym, fort) — ignored for now.
+			// else: not yet supported (lure, gym, fort) — ignored for now.
 		} catch (error) {
 			log.warning(`Failed to process ${envelope.type} webhook event: ${error}`);
 		}

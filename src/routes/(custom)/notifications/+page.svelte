@@ -8,6 +8,7 @@
 	import RaidFilterEditor from "@/components/custom/notifications/RaidFilterEditor.svelte";
 	import MaxBattleFilterEditor from "@/components/custom/notifications/MaxBattleFilterEditor.svelte";
 	import QuestFilterEditor from "@/components/custom/notifications/QuestFilterEditor.svelte";
+	import InvasionFilterEditor from "@/components/custom/notifications/InvasionFilterEditor.svelte";
 	import type {
 		NotificationSchedule,
 		SubscriptionMode
@@ -26,6 +27,7 @@
 	import type {
 		AnySubscriptionFilters,
 		EmbedTemplate,
+		InvasionSubscriptionFilters,
 		MaxBattleSubscriptionFilters,
 		NotificationSubscriptionDto,
 		NotificationTemplateDto,
@@ -163,6 +165,21 @@
 		};
 	}
 
+	function defaultInvasionEmbed(): EmbedTemplate {
+		return {
+			content: "Pokestop invasion at {{pokestopName}}",
+			title: "Pokestop Invasion",
+			description:
+				'{{pokestopName}}\n{{#if (eq kind "grunt")}}{{characterName}}{{else}}{{kind}}{{/if}}',
+			color: "#5865F2",
+			thumbnailUrl: "",
+			imageUrl: "",
+			footerText: "Ends {{minutesLeft}}m from now",
+			url: "{{{googleMapsUrl}}}",
+			fields: []
+		};
+	}
+
 	function defaultFilters(): PokemonSubscriptionFilters {
 		return { pokemonIds: [] };
 	}
@@ -179,11 +196,16 @@
 		return {};
 	}
 
+	function defaultInvasionFilters(): InvasionSubscriptionFilters {
+		return {};
+	}
+
 	const CATEGORY_LABELS: Record<NotificationType, string> = {
 		pokemon: "Pokemon",
 		raid: "Raid",
 		maxbattle: "Max Battle",
-		quest: "Quest"
+		quest: "Quest",
+		invasion: "Invasion"
 	};
 
 	const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -287,6 +309,7 @@
 		if (type === "raid") return defaultRaidEmbed();
 		if (type === "maxbattle") return defaultMaxBattleEmbed();
 		if (type === "quest") return defaultQuestEmbed();
+		if (type === "invasion") return defaultInvasionEmbed();
 		return defaultEmbed();
 	}
 
@@ -356,6 +379,7 @@
 	let raidFilters = $state<RaidSubscriptionFilters>(defaultRaidFilters());
 	let maxBattleFilters = $state<MaxBattleSubscriptionFilters>(defaultMaxBattleFilters());
 	let questFilters = $state<QuestSubscriptionFilters>(defaultQuestFilters());
+	let invasionFilters = $state<InvasionSubscriptionFilters>(defaultInvasionFilters());
 	let subMode = $state<SubscriptionMode>("manual");
 	let subSchedule = $state<NotificationSchedule>(defaultSchedule());
 	let savingSubscription = $state(false);
@@ -370,6 +394,7 @@
 		raidFilters = defaultRaidFilters();
 		maxBattleFilters = defaultMaxBattleFilters();
 		questFilters = defaultQuestFilters();
+		invasionFilters = defaultInvasionFilters();
 		subMode = "manual";
 		subSchedule = defaultSchedule();
 	}
@@ -386,6 +411,8 @@
 			maxBattleFilters = { ...(sub.filters as MaxBattleSubscriptionFilters) };
 		} else if (sub.type === "quest") {
 			questFilters = { ...(sub.filters as QuestSubscriptionFilters) };
+		} else if (sub.type === "invasion") {
+			invasionFilters = { ...(sub.filters as InvasionSubscriptionFilters) };
 		} else {
 			const filters = sub.filters as PokemonSubscriptionFilters;
 			subFilters = { ...filters, pokemonIds: filters.pokemonIds ?? [] };
@@ -411,6 +438,7 @@
 		if (subType === "raid") return raidFilters;
 		if (subType === "maxbattle") return maxBattleFilters;
 		if (subType === "quest") return questFilters;
+		if (subType === "invasion") return invasionFilters;
 		return subFilters;
 	}
 
@@ -558,6 +586,21 @@
 			}
 			if (f.withAr === true) parts.push("AR only");
 			if (f.withAr === false) parts.push("standard only");
+		} else if (type === "invasion") {
+			const f = filters as InvasionSubscriptionFilters;
+			if (!f.kinds || f.kinds.length === 0) {
+				parts.push("Any kind");
+			} else {
+				parts.push(f.kinds.join("/"));
+			}
+			if (f.characters && f.characters.length > 0) {
+				parts.push(
+					f.characters.length === 1
+						? `Character #${f.characters[0]}`
+						: `${f.characters.length} characters`
+				);
+			}
+			if (f.confirmedOnly) parts.push("confirmed only");
 		} else {
 			const f = filters as PokemonSubscriptionFilters;
 			if (!f.pokemonIds || f.pokemonIds.length === 0) {
@@ -770,6 +813,13 @@
 							{:else if subType === "quest"}
 								<QuestFilterEditor
 									bind:filters={questFilters}
+									ownAreas={scanAreasState.areas}
+									kojiAreas={kojiGeofences}
+									notificationAreas={notificationAreasState.areas}
+								/>
+							{:else if subType === "invasion"}
+								<InvasionFilterEditor
+									bind:filters={invasionFilters}
 									ownAreas={scanAreasState.areas}
 									kojiAreas={kojiGeofences}
 									notificationAreas={notificationAreasState.areas}

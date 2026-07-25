@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type {
 		EmbedTemplate,
+		InvasionTemplateContext,
 		MaxBattleTemplateContext,
 		PokemonTemplateContext,
 		QuestTemplateContext,
@@ -21,7 +22,8 @@
 			| PokemonTemplateContext
 			| RaidTemplateContext
 			| MaxBattleTemplateContext
-			| QuestTemplateContext;
+			| QuestTemplateContext
+			| InvasionTemplateContext;
 	} = $props();
 
 	function render(source: string): string {

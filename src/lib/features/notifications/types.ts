@@ -12,10 +12,10 @@ export type NotificationAreaDto = {
 	updatedAt: string;
 };
 
-// Phase 1 shipped "pokemon". Phase 2 adds the rest one at a time — "raid", "maxbattle", and
-// "quest" are done; invasion, lure, gym, and fort follow the same pattern (nests are deferred
+// Phase 1 shipped "pokemon". Phase 2 adds the rest one at a time — "raid", "maxbattle", "quest",
+// and "invasion" are done; lure, gym, and fort follow the same pattern (nests are deferred
 // indefinitely, Golbat has no live "nest changed" event to key off).
-export type NotificationType = "pokemon" | "raid" | "maxbattle" | "quest";
+export type NotificationType = "pokemon" | "raid" | "maxbattle" | "quest" | "invasion";
 
 export type EmbedFieldTemplate = {
 	name: string;
@@ -130,6 +130,23 @@ export type QuestSubscriptionFilters = BaseSubscriptionFilters & {
 	withAr?: boolean;
 };
 
+// "grunt" covers every regular Team GO Rocket grunt AND the three Team Leaders/Giovanni (all
+// share the same character-id numbering, resolved via mCharacter() in ingameLocale.ts — the same
+// scheme the map's own invasion filters already use, see FiltersetInvasion.characters). The event
+// incidents are separate kinds since they carry no grunt character at all (character id 0).
+export type InvasionKindFilter = "grunt" | "kecleon" | "showcase" | "goldStop";
+
+export type InvasionSubscriptionFilters = BaseSubscriptionFilters & {
+	// Empty/absent = any kind (grunts + all three event incidents). Multiple = OR match.
+	kinds?: InvasionKindFilter[];
+	// Only applies when kind is "grunt" — empty/absent = any character. Character ids match
+	// Niantic's incident character enum (mCharacter() resolves display names).
+	characters?: number[];
+	// Grunt-only — excludes the "could be Giovanni" unconfirmed male-grunt placeholder (character
+	// id 4) until a player scan confirms the actual grunt.
+	confirmedOnly?: boolean;
+};
+
 // Every notification type's filters, keyed loosely by NotificationType — not a TS discriminated
 // union (that would need every call site to narrow via a type guard for marginal safety gain);
 // callers narrow by checking subscription.type instead, matching this codebase's existing
@@ -138,7 +155,8 @@ export type AnySubscriptionFilters =
 	| PokemonSubscriptionFilters
 	| RaidSubscriptionFilters
 	| MaxBattleSubscriptionFilters
-	| QuestSubscriptionFilters;
+	| QuestSubscriptionFilters
+	| InvasionSubscriptionFilters;
 
 export type NotificationTemplateDto = {
 	id: number;
@@ -337,6 +355,33 @@ export type QuestTemplateContext = {
 	// Populated when rewardType is "item", "stardust", "candy", or "megaEnergy"; 0 otherwise.
 	amount: number;
 	pokemonImageUrl: string; // pokemon reward only, "" otherwise
+	latitude: number;
+	longitude: number;
+	googleMapsUrl: string;
+	appleMapsUrl: string;
+	wazeMapUrl: string;
+	mapImageUrl: string;
+	diademUrl: string;
+};
+
+// Rendering context for the "invasion" type — a Team GO Rocket grunt takeover OR a Kecleon/
+// Showcase/Gold-Stop event incident at a pokestop, modeled as one context type (matching this
+// app's existing map-filter convention rather than PoracleNG's separate-template-per-kind
+// approach). No IV/CP/stats — same "only tags that make sense" reasoning as raid/maxbattle/quest.
+export type InvasionTemplateContext = {
+	pokestopId: string;
+	pokestopName: string;
+	pokestopUrl: string;
+	kind: InvasionKindFilter;
+	// Grunt-only — 0 and "" for the three event incident kinds (they carry no character).
+	character: number;
+	characterName: string;
+	confirmed: boolean;
+	// Confirmed catches from a completed grunt battle — empty until the battle is won and
+	// reported, always empty for event incidents.
+	lineup: { pokemonName: string; pokemonId: number; form: number }[];
+	expireUnix: number;
+	minutesLeft: number;
 	latitude: number;
 	longitude: number;
 	googleMapsUrl: string;

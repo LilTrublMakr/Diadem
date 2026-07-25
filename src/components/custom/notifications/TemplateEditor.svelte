@@ -4,6 +4,8 @@
 	import {
 		CONDITIONAL_TEMPLATE_FIELDS,
 		EMOJI_TEMPLATE_FIELDS,
+		INVASION_PRESET_TEMPLATE_FIELDS,
+		INVASION_TEMPLATE_FIELDS,
 		MAXBATTLE_PRESET_TEMPLATE_FIELDS,
 		MAXBATTLE_TEMPLATE_FIELDS,
 		POKEMON_TEMPLATE_FIELDS,
@@ -30,8 +32,13 @@
 		QUEST_TEST_SCENARIOS,
 		randomizeQuestContext
 	} from "@/lib/features/notifications/questTestData";
+	import {
+		INVASION_TEST_SCENARIOS,
+		randomizeInvasionContext
+	} from "@/lib/features/notifications/invasionTestData";
 	import type {
 		EmbedTemplate,
+		InvasionTemplateContext,
 		MaxBattleTemplateContext,
 		NotificationType,
 		PokemonTemplateContext,
@@ -46,7 +53,8 @@
 		| PokemonTemplateContext
 		| RaidTemplateContext
 		| MaxBattleTemplateContext
-		| QuestTemplateContext;
+		| QuestTemplateContext
+		| InvasionTemplateContext;
 
 	let { type = "pokemon", embed = $bindable() }: { type?: NotificationType; embed: EmbedTemplate } =
 		$props();
@@ -60,18 +68,21 @@
 		if (type === "raid") return RAID_TEMPLATE_FIELDS;
 		if (type === "maxbattle") return MAXBATTLE_TEMPLATE_FIELDS;
 		if (type === "quest") return QUEST_TEMPLATE_FIELDS;
+		if (type === "invasion") return INVASION_TEMPLATE_FIELDS;
 		return POKEMON_TEMPLATE_FIELDS;
 	});
 	const typePresets = untrack(() => {
 		if (type === "raid") return RAID_PRESET_TEMPLATE_FIELDS;
 		if (type === "maxbattle") return MAXBATTLE_PRESET_TEMPLATE_FIELDS;
 		if (type === "quest") return QUEST_PRESET_TEMPLATE_FIELDS;
+		if (type === "invasion") return INVASION_PRESET_TEMPLATE_FIELDS;
 		return PRESET_TEMPLATE_FIELDS;
 	});
 	const scenarios: { id: string; label: string; context: PreviewContext }[] = untrack(() => {
 		if (type === "raid") return RAID_TEST_SCENARIOS;
 		if (type === "maxbattle") return MAXBATTLE_TEST_SCENARIOS;
 		if (type === "quest") return QUEST_TEST_SCENARIOS;
+		if (type === "invasion") return INVASION_TEST_SCENARIOS;
 		return TEST_SCENARIOS;
 	});
 
@@ -79,6 +90,7 @@
 		if (type === "raid") return randomizeRaidContext();
 		if (type === "maxbattle") return randomizeMaxBattleContext();
 		if (type === "quest") return randomizeQuestContext();
+		if (type === "invasion") return randomizeInvasionContext();
 		return randomizePokemonContext();
 	}
 

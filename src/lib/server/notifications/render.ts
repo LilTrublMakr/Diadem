@@ -1,5 +1,12 @@
 import { getNormalizedForm, getPokemonSize, typeIdToText } from "@/lib/utils/pokemonUtils";
-import { loadRemoteLocale, mItem, mMove, mPokemon, mWeather } from "@/lib/services/ingameLocale";
+import {
+	loadRemoteLocale,
+	mCharacter,
+	mItem,
+	mMove,
+	mPokemon,
+	mWeather
+} from "@/lib/services/ingameLocale";
 import { getMasterFile, getMasterPokemon } from "@/lib/services/masterfile";
 import type { MasterMove } from "@/lib/types/masterfile";
 import { getClientConfig } from "@/lib/services/config/config.server";
@@ -9,6 +16,7 @@ import { isMapImageConfigured } from "@/lib/server/notifications/mapImage";
 import { getShinyRate } from "@/lib/server/provider/shinyRateProvider";
 import { registerNotificationHelpers } from "@/lib/features/notifications/handlebarsHelpers";
 import type {
+	GolbatInvasionMessage,
 	GolbatMaxBattleMessage,
 	GolbatPokemonMessage,
 	GolbatPvpEntry,
@@ -18,6 +26,8 @@ import type {
 } from "@/lib/server/notifications/golbatTypes";
 import type {
 	EmbedTemplate,
+	InvasionKindFilter,
+	InvasionTemplateContext,
 	MaxBattleTemplateContext,
 	PokemonTemplateContext,
 	PvpEntryContext,
@@ -559,6 +569,75 @@ export async function buildQuestContext(
 	};
 }
 
+// Matches pokestopUtils.ts's own INCIDENT_DISPLAY_* constants — redeclared locally rather than
+// imported so this server-side render module doesn't pull in that file's reactive client state
+// (getActiveSearch/getUserSettings), which it only uses for map-filter helpers this module
+// doesn't need.
+const INCIDENT_DISPLAY_GOLD = 7;
+const INCIDENT_DISPLAY_KECLEON = 8;
+const INCIDENT_DISPLAY_SHOWCASE = 9;
+
+/**
+ * Covers both a regular Team GO Rocket grunt takeover AND a Kecleon/Showcase/Gold-Stop event
+ * incident — same Golbat wire type, differentiated by `kind` (derived from the incident's
+ * display type). Event incidents carry no grunt character, so `character`/`characterName`/
+ * `confirmed` are 0/""/false for those three kinds.
+ */
+export async function buildInvasionContext(
+	message: GolbatInvasionMessage,
+	thisFetch: typeof fetch = fetch
+): Promise<InvasionTemplateContext> {
+	const clientConfig = getClientConfig();
+	await loadRemoteLocale(clientConfig.general.defaultLocale, thisFetch);
+
+	const displayType = message.incident_display_type ?? message.display_type ?? 0;
+	const kind: InvasionKindFilter =
+		displayType === INCIDENT_DISPLAY_KECLEON
+			? "kecleon"
+			: displayType === INCIDENT_DISPLAY_SHOWCASE
+				? "showcase"
+				: displayType === INCIDENT_DISPLAY_GOLD
+					? "goldStop"
+					: "grunt";
+
+	const character = kind === "grunt" ? message.incident_grunt_type || message.grunt_type || 0 : 0;
+	const confirmed = !!message.confirmed;
+	const characterName = kind === "grunt" ? mCharacter(character, { confirmed }) : "";
+
+	const lineup = (message.lineup ?? []).map((entry) => {
+		const form = getNormalizedForm(entry.pokemon_id, entry.form ?? 0);
+		return {
+			pokemonName: mPokemon({ pokemon_id: entry.pokemon_id, form }),
+			pokemonId: entry.pokemon_id,
+			form
+		};
+	});
+
+	const expireUnix = Math.floor(message.incident_expiration);
+	const minutesLeft = Math.max(0, Math.round((expireUnix * 1000 - Date.now()) / 60000));
+
+	return {
+		pokestopId: message.pokestop_id,
+		pokestopName: message.pokestop_name ?? "",
+		pokestopUrl: message.url ?? "",
+		kind,
+		character,
+		characterName,
+		confirmed,
+		lineup,
+		expireUnix,
+		minutesLeft,
+		latitude: message.latitude,
+		longitude: message.longitude,
+		googleMapsUrl: `https://maps.google.com/maps?q=${message.latitude},${message.longitude}`,
+		appleMapsUrl: `https://maps.apple.com/?ll=${message.latitude},${message.longitude}`,
+		wazeMapUrl: `https://waze.com/ul?ll=${message.latitude},${message.longitude}&navigate=yes`,
+		mapImageUrl: "",
+		// No pokestop detail page exists in this app yet — nothing to link to.
+		diademUrl: ""
+	};
+}
+
 export type TrackedStatus = { shiny: boolean; hundo: boolean; nundo: boolean; shundo: boolean };
 
 /**
@@ -607,6 +686,7 @@ export function renderEmbed(
 		| RaidTemplateContext
 		| MaxBattleTemplateContext
 		| QuestTemplateContext
+		| InvasionTemplateContext
 ): EmbedTemplate {
 	return {
 		// template.content ?? "" — older saved templates predate this field

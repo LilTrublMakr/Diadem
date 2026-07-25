@@ -134,6 +134,26 @@ export type GolbatQuestMessage = {
 	with_ar: boolean;
 };
 
+// Shape of a Golbat webhook envelope's `message` for type "invasion" (also arrives bundled onto
+// a "pokestop" envelope on some Golbat versions — see webhook/golbat/+server.ts's dispatch sniff)
+// — verified against PoracleNG's InvasionWebhook struct (processor/internal/webhook/types.go:
+// 211-236). `incident_grunt_type`/`grunt_type` and `display_type`/`incident_display_type` are
+// each two wire fields for the same concept — this app reads the `incident_*` one first.
+export type GolbatInvasionMessage = {
+	pokestop_id: string;
+	pokestop_name?: string;
+	url?: string;
+	latitude: number;
+	longitude: number;
+	incident_expiration: number;
+	incident_grunt_type?: number;
+	grunt_type?: number;
+	display_type?: number;
+	incident_display_type?: number;
+	confirmed: boolean;
+	lineup?: { pokemon_id: number; form: number }[];
+};
+
 export type GolbatWebhookEnvelope = {
 	type: string;
 	message: unknown;

@@ -548,6 +548,75 @@ export const QUEST_TEMPLATE_FIELDS: TemplateField[] = [
 ];
 
 /**
+ * Field registry for the "invasion" notification type — a Team GO Rocket grunt takeover OR a
+ * Kecleon/Showcase/Gold-Stop event incident (see buildInvasionContext in render.ts). No IV/CP/
+ * stats — same "only tags that make sense" reasoning as raid/maxbattle/quest.
+ */
+export const INVASION_TEMPLATE_FIELDS: TemplateField[] = [
+	{
+		tag: "kind",
+		label: "Kind (grunt/kecleon/showcase/goldStop)",
+		category: "Invasion",
+		sample: "grunt"
+	},
+	{
+		tag: "characterName",
+		label: "Grunt Name (empty for event incidents)",
+		category: "Invasion",
+		sample: "Grunt (Electric)"
+	},
+	{ tag: "character", label: "Grunt Character ID", category: "Invasion", sample: "8" },
+	{
+		tag: "confirmed",
+		label: "Grunt Confirmed (true/false, vs unconfirmed placeholder)",
+		category: "Invasion",
+		sample: "true"
+	},
+
+	{ tag: "pokestopId", label: "Pokestop ID", category: "Pokestop", sample: "abc123.16" },
+	{ tag: "pokestopName", label: "Pokestop Name", category: "Pokestop", sample: "City Hall" },
+	{
+		tag: "pokestopUrl",
+		label: "Pokestop Photo URL",
+		category: "Pokestop",
+		sample: "",
+		unescaped: true
+	},
+
+	{
+		tag: "expireUnix",
+		label: "Countdown Unix Time (for Discord <t:...> tags)",
+		category: "Time",
+		sample: "1700000000"
+	},
+	{ tag: "minutesLeft", label: "Minutes Left", category: "Time", sample: "42" },
+
+	{ tag: "latitude", label: "Latitude", category: "Location", sample: "44.4759" },
+	{ tag: "longitude", label: "Longitude", category: "Location", sample: "-73.2121" },
+	{
+		tag: "googleMapsUrl",
+		label: "Google Maps Link",
+		category: "Location",
+		sample: "https://maps.google.com/maps?q=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "appleMapsUrl",
+		label: "Apple Maps Link",
+		category: "Location",
+		sample: "https://maps.apple.com/?ll=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "wazeMapUrl",
+		label: "Waze Link",
+		category: "Location",
+		sample: "https://waze.com/ul?ll=44.4759,-73.2121&navigate=yes",
+		unescaped: true
+	}
+];
+
+/**
  * Clickable conditional-block/helper skeletons — inserted literally (not wrapped
  * in {{ }}) via TemplateField.raw. %CURSOR% marks where the caret lands after
  * insertion so the user can fill in the condition/args immediately.
@@ -656,6 +725,24 @@ export const QUEST_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 	{
 		tag: "{{questTitle}} — Reward: {{rewardString}}",
 		label: "Quest + reward summary",
+		category: "Presets",
+		sample: "",
+		raw: true
+	}
+];
+
+/** Preset snippets for the "invasion" type. */
+export const INVASION_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
+	{
+		tag: '{{#if (eq kind "grunt")}}{{characterName}}{{else}}{{kind}} incident{{/if}} at {{pokestopName}}',
+		label: "Kind-aware summary",
+		category: "Presets",
+		sample: "",
+		raw: true
+	},
+	{
+		tag: "{{#if lineup.length}}Confirmed catches: {{#each lineup}}{{pokemonName}}{{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}",
+		label: "Confirmed catches list (lineup)",
 		category: "Presets",
 		sample: "",
 		raw: true
