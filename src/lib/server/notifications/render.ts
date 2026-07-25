@@ -290,6 +290,8 @@ export function renderEmbed(
 	context: PokemonTemplateContext
 ): EmbedTemplate {
 	return {
+		// template.content ?? "" — older saved templates predate this field
+		content: compile(template.content ?? "")(context),
 		title: compile(template.title)(context),
 		description: compile(template.description)(context),
 		color: compile(template.color)(context),

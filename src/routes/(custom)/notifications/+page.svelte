@@ -100,6 +100,7 @@
 
 	function defaultEmbed(): EmbedTemplate {
 		return {
+			content: "{{pokemonName}}",
 			title: "{{pokemonName}}",
 			description: "IV: {{iv}}% • CP: {{cp}} • Level: {{level}}",
 			color: "#5865F2",
@@ -214,8 +215,12 @@
 	function startEditTemplate(template: NotificationTemplateDto) {
 		templateMode = template.id;
 		templateName = template.name;
-		// `fields` predates existing saved templates — default it if the saved row lacks it
-		templateEmbed = { ...template.embed, fields: template.embed.fields ?? [] };
+		// `fields`/`content` predate existing saved templates — default them if the saved row lacks them
+		templateEmbed = {
+			...template.embed,
+			content: template.embed.content ?? "",
+			fields: template.embed.fields ?? []
+		};
 	}
 
 	function cancelTemplateEdit() {

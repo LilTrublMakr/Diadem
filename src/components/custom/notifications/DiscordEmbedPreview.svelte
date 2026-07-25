@@ -106,6 +106,10 @@
 		return s;
 	}
 
+	// older saved templates predate this field
+	let contentText = $derived(render(embed.content ?? ""));
+	let contentHtml = $derived(renderDescription(contentText));
+
 	let titleText = $derived(render(embed.title));
 	let descriptionText = $derived(render(embed.description));
 	let color = $derived(render(embed.color));
@@ -144,6 +148,9 @@
 </script>
 
 <div class="rounded-md bg-[#313338] p-3 max-w-md font-sans text-[15px] leading-snug">
+	{#if contentText}
+		<p class="text-zinc-100 break-words mb-2">{@html contentHtml}</p>
+	{/if}
 	<div class="flex gap-3 border-l-4 rounded-sm pl-3 py-2" style="border-color: {barColor}">
 		<div class="flex-1 min-w-0">
 			{#if titleText}

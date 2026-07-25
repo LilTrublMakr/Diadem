@@ -93,6 +93,7 @@
 	}
 
 	type FieldKey =
+		| "content"
 		| "title"
 		| "description"
 		| "color"
@@ -167,6 +168,18 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 	<div class="flex flex-col gap-3">
+		<label class="flex flex-col gap-1 text-sm">
+			<span class="text-zinc-500 dark:text-zinc-400">Message Content</span>
+			<textarea
+				bind:value={embed.content}
+				use:trackRef={"content"}
+				onfocus={() => (activeKey = "content")}
+				rows={2}
+				maxlength={2000}
+				class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
+			></textarea>
+		</label>
+
 		<label class="flex flex-col gap-1 text-sm">
 			<span class="text-zinc-500 dark:text-zinc-400">Title</span>
 			<input

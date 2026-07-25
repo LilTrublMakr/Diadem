@@ -23,6 +23,9 @@ export type EmbedFieldTemplate = {
 };
 
 export type EmbedTemplate = {
+	// Plain message text, sent OUTSIDE the embed (Discord's top-level `content`). Mobile push
+	// notifications show this instead of a generic "N images" placeholder when it's non-empty.
+	content: string;
 	title: string;
 	description: string;
 	color: string;

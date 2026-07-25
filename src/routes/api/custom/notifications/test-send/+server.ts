@@ -56,6 +56,7 @@ export const POST: RequestHandler = async ({ locals, request, fetch }) => {
 		const context = applyTrackedBadges(rawContext, tracker);
 		const rendered = renderEmbed(parsed.data.embed, context);
 		rendered.title = `🧪 TEST — ${rendered.title}`.trim();
+		if (rendered.content) rendered.content = `🧪 TEST — ${rendered.content}`;
 
 		const usesMapImage =
 			rendered.imageUrl === MAP_IMAGE_TAG || rendered.thumbnailUrl === MAP_IMAGE_TAG;
@@ -90,6 +91,7 @@ export const POST: RequestHandler = async ({ locals, request, fetch }) => {
 		}
 
 		await sendDirectMessage(discordId, {
+			content: rendered.content,
 			embed: rendered,
 			attachments: [
 				mapImage ? { filename: "map.png", data: mapImage } : null,

@@ -191,6 +191,7 @@ async function deliver(
 		? renderEmbed(template.embed, userContext)
 		: renderEmbed(
 				{
+					content: "{{pokemonName}}",
 					title: "{{pokemonName}}",
 					description: "IV: {{iv}}% CP: {{cp}} Level: {{level}}",
 					color: "3447003",
@@ -220,6 +221,7 @@ async function deliver(
 	}
 
 	await sendDirectMessage(discordId, {
+		content: embed.content,
 		embed,
 		attachments: [
 			mapImage ? { filename: "map.png", data: mapImage } : null,

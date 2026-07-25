@@ -41,6 +41,7 @@ export const embedFieldTemplateSchema = z.object({
 });
 
 export const embedTemplateSchema = z.object({
+	content: z.string().max(2000),
 	title: z.string().max(256),
 	description: z.string().max(4096),
 	color: z.string().max(16),
