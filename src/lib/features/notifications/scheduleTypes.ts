@@ -6,8 +6,10 @@ export type DayToken = (typeof DAY_TOKENS)[number];
 
 // "HH:MM" times; end <= start means the window wraps past midnight; "24:00" allowed as end
 export type WeeklyWindow = { days: DayToken[]; start: string; end: string };
-// One-off calendar date ("YYYY-MM-DD") with a time window on that date
-export type DatedWindow = { date: string; start: string; end: string };
+// One-off calendar date ("YYYY-MM-DD") with a time window on that date. `endDate`, if present,
+// turns this into a range — the same start/end time window applies on every date from `date`
+// through `endDate` inclusive; absent means a single date.
+export type DatedWindow = { date: string; endDate?: string; start: string; end: string };
 
 export type NotificationSchedule = {
 	tz: string; // IANA timezone the times were entered in (from the user's browser)

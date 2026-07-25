@@ -69,11 +69,14 @@ function isInAnyWindow(schedule: NotificationSchedule, now: Date): boolean {
 
 	for (const window of schedule.dated) {
 		const duration = windowDuration(window.start, window.end);
-		if (window.date === date) {
+		// endDate absent = single date, same as endDate === date. String comparison works because
+		// dates are zero-padded "YYYY-MM-DD" — lexicographic order matches chronological order.
+		const rangeEnd = window.endDate ?? window.date;
+		if (date >= window.date && date <= rangeEnd) {
 			const start = toMinutes(window.start);
 			if (minute >= start && minute < start + duration) return true;
 		}
-		if (window.date === yesterdayDate) {
+		if (yesterdayDate >= window.date && yesterdayDate <= rangeEnd) {
 			const start = toMinutes(window.start) - 1440;
 			if (minute >= start && minute < start + duration) return true;
 		}

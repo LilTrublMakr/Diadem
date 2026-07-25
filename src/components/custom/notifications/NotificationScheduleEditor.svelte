@@ -118,6 +118,17 @@
 					min={today}
 					class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-1.5 py-0.5 text-sm text-zinc-900 dark:text-zinc-100"
 				/>
+				<span class="text-xs text-zinc-400">to</span>
+				<input
+					type="date"
+					value={window.endDate ?? ""}
+					min={window.date}
+					title="Optional — leave blank for a single date"
+					oninput={(e) => {
+						window.endDate = e.currentTarget.value || undefined;
+					}}
+					class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-1.5 py-0.5 text-sm text-zinc-900 dark:text-zinc-100"
+				/>
 				<input
 					type="time"
 					bind:value={window.start}
@@ -138,6 +149,11 @@
 					<X size={14} />
 				</button>
 			</div>
+			{#if window.endDate}
+				<p class="text-xs text-zinc-400 -mt-1">
+					Applies every day from {window.date} through {window.endDate}
+				</p>
+			{/if}
 		{/each}
 		{#if schedule.dated.length < 50}
 			<button

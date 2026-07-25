@@ -40,12 +40,15 @@
 	import type { Polygon } from "geojson";
 	import {
 		exportNotificationsBackup,
+		exportSingleNotificationItem,
 		importNotificationsBackup,
 		isBackupApiError,
 		type BackupSection
 	} from "@/lib/features/notifications/backupState";
 	import type { BackupImportSummary } from "@/lib/features/notifications/backupTypes";
+	import { isScheduleActiveNow } from "@/lib/features/notifications/scheduleActive";
 	import CloseButton from "@/components/ui/CloseButton.svelte";
+	import Switch from "@/components/ui/input/Switch.svelte";
 	import { Dialog } from "bits-ui";
 	import { Download, Loader2, Pencil, Plus, Trash2, Upload, X } from "@lucide/svelte";
 
@@ -327,6 +330,27 @@
 	async function toggleEnabled(sub: NotificationSubscriptionDto) {
 		const result = await patchSubscription(sub.id, { enabled: !sub.enabled });
 		if (isApiError(result)) showError(result.message);
+	}
+
+	async function exportSingleItem(kind: "area" | "template" | "subscription", id: number) {
+		const result = await exportSingleNotificationItem(kind, id);
+		if (result) showError(result.message);
+	}
+
+	// Ticks every 30s so a scheduled subscription's Active/Inactive badge updates live
+	// as its windows start/end, without needing a page reload.
+	let nowTick = $state(Date.now());
+	$effect(() => {
+		const interval = setInterval(() => (nowTick = Date.now()), 30_000);
+		return () => clearInterval(interval);
+	});
+
+	// Mirrors the server's own isSubscriptionActiveNow (golbat/+server.ts) — a disabled
+	// subscription is always inactive; a scheduled one is active only inside its windows.
+	function isSubActive(sub: NotificationSubscriptionDto): boolean {
+		if (!sub.enabled) return false;
+		if (sub.mode !== "scheduled") return true;
+		return !!sub.schedule && isScheduleActiveNow(sub.schedule, new Date(nowTick));
 	}
 
 	function templateName_(id: number | null): string {
@@ -701,14 +725,24 @@
 								</p>
 							</div>
 							<div class="flex items-center gap-2 shrink-0">
-								<button
-									class="text-xs rounded border px-2 py-1 {sub.enabled
+								<span
+									class="text-xs rounded border px-2 py-1 {isSubActive(sub)
 										? 'border-emerald-400 text-emerald-600 dark:text-emerald-400'
 										: 'border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400'}"
-									onclick={() => toggleEnabled(sub)}
 								>
-									{sub.enabled ? "Enabled" : "Disabled"}
-								</button>
+									{isSubActive(sub) ? "Active" : "Inactive"}
+								</span>
+								<Switch
+									checked={sub.enabled}
+									onCheckedChange={() => toggleEnabled(sub)}
+									class="data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-zinc-300 dark:data-[state=unchecked]:bg-zinc-600"
+								/>
+								<button
+									class="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+									title="Export"
+									onclick={() => exportSingleItem("subscription", sub.id)}
+									><Download size={16} /></button
+								>
 								<button
 									class="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
 									title="Edit"
@@ -801,6 +835,12 @@
 						>
 							<p class="font-medium text-zinc-900 dark:text-zinc-100 truncate">{template.name}</p>
 							<div class="flex items-center gap-2 shrink-0">
+								<button
+									class="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+									title="Export"
+									onclick={() => exportSingleItem("template", template.id)}
+									><Download size={16} /></button
+								>
 								<button
 									class="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
 									title="Edit"
@@ -920,6 +960,11 @@
 								</p>
 							</div>
 							<div class="flex items-center gap-2 shrink-0">
+								<button
+									class="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+									title="Export"
+									onclick={() => exportSingleItem("area", area.id)}><Download size={16} /></button
+								>
 								<button
 									class="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
 									title="Edit"

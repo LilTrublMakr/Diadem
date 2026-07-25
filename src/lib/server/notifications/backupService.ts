@@ -15,15 +15,29 @@ import type {
 } from "@/lib/features/notifications/backupTypes";
 import type { PokemonSubscriptionFilters } from "@/lib/features/notifications/types";
 
-export type BackupInclude = { areas: boolean; templates: boolean; subscriptions: boolean };
+// "all" = every row in the section; a number[] = only those ids (single-item export passes a
+// one-element array); absent = skip the section entirely.
+export type BackupSelector = "all" | number[];
+export type BackupInclude = {
+	areas?: BackupSelector;
+	templates?: BackupSelector;
+	subscriptions?: BackupSelector;
+};
 
 function isNameTaken(error: unknown): boolean {
 	return error instanceof NotificationError && error.code === "name_taken";
 }
 
+function selected<T extends { id: number }>(rows: T[], selector: BackupSelector | undefined): T[] {
+	if (!selector) return [];
+	return selector === "all" ? rows : rows.filter((r) => selector.includes(r.id));
+}
+
 /**
- * Builds a portable export of the requested sections. Subscriptions always resolve their
- * area/template references to NAMES (not the raw ids) — see backupTypes.ts for why.
+ * Builds a portable export of the requested sections/ids. Subscriptions always resolve their
+ * area/template references to NAMES (not the raw ids) — see backupTypes.ts for why. Notification
+ * areas/templates are always fetched in full regardless of `include` since a single exported
+ * subscription still needs the complete name maps to resolve its own references.
  */
 export async function exportBackup(
 	userId: string,
@@ -47,13 +61,19 @@ export async function exportBackup(
 	};
 
 	if (include.areas) {
-		backup.areas = notificationAreas.map((a) => ({ name: a.name, geofence: a.geofence }));
+		backup.areas = selected(notificationAreas, include.areas).map((a) => ({
+			name: a.name,
+			geofence: a.geofence
+		}));
 	}
 	if (include.templates) {
-		backup.templates = templates.map((t) => ({ name: t.name, embed: t.embed }));
+		backup.templates = selected(templates, include.templates).map((t) => ({
+			name: t.name,
+			embed: t.embed
+		}));
 	}
 	if (include.subscriptions) {
-		backup.subscriptions = subscriptions.map((s) => {
+		backup.subscriptions = selected(subscriptions, include.subscriptions).map((s) => {
 			const { areaId, areaSource, ...restFilters } = s.filters;
 
 			let areaRef: BackupAreaRef | undefined;

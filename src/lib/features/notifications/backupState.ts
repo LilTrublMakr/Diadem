@@ -17,14 +17,7 @@ async function parseError(res: Response): Promise<BackupApiError> {
 	}
 }
 
-/**
- * Downloads a backup file for the requested sections (omit for "everything in one shot").
- * Triggers a real browser download rather than returning the data.
- */
-export async function exportNotificationsBackup(
-	sections?: BackupSection[]
-): Promise<BackupApiError | null> {
-	const query = sections && sections.length > 0 ? `?include=${sections.join(",")}` : "";
+async function downloadBackup(query: string): Promise<BackupApiError | null> {
 	const res = await fetch(`/api/custom/notifications/backup${query}`);
 	if (!res.ok) return parseError(res);
 
@@ -42,6 +35,26 @@ export async function exportNotificationsBackup(
 	a.remove();
 	URL.revokeObjectURL(url);
 	return null;
+}
+
+/**
+ * Downloads a backup file for the requested sections (omit for "everything in one shot").
+ * Triggers a real browser download rather than returning the data.
+ */
+export async function exportNotificationsBackup(
+	sections?: BackupSection[]
+): Promise<BackupApiError | null> {
+	const query = sections && sections.length > 0 ? `?include=${sections.join(",")}` : "";
+	return downloadBackup(query);
+}
+
+/** Downloads a backup file containing just the one area/template/subscription. */
+export async function exportSingleNotificationItem(
+	kind: "area" | "template" | "subscription",
+	id: number
+): Promise<BackupApiError | null> {
+	const param = kind === "area" ? "areaId" : kind === "template" ? "templateId" : "subscriptionId";
+	return downloadBackup(`?${param}=${id}`);
 }
 
 /**

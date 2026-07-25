@@ -11,11 +11,19 @@ export const weeklyWindowSchema = z.object({
 	end: timeSchema
 });
 
-export const datedWindowSchema = z.object({
-	date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD"),
-	start: timeSchema,
-	end: timeSchema
-});
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
+
+export const datedWindowSchema = z
+	.object({
+		date: dateSchema,
+		endDate: dateSchema.optional(),
+		start: timeSchema,
+		end: timeSchema
+	})
+	.refine((w) => !w.endDate || w.endDate >= w.date, {
+		message: "End date must be on or after the start date",
+		path: ["endDate"]
+	});
 
 // No overlap validation here — unlike scan-area schedules, notification schedules aren't
 // protecting a shared worker allotment, so overlapping windows are fine.
