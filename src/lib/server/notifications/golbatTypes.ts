@@ -141,7 +141,12 @@ export type GolbatQuestMessage = {
 // each two wire fields for the same concept — this app reads the `incident_*` one first.
 export type GolbatInvasionMessage = {
 	pokestop_id: string;
+	// PoracleNG's own InvasionWebhook struct tags this `pokestop_name`, but its LureWebhook struct
+	// (same underlying "pokestop" envelope — see routePokestop) tags the same concept `name`, and
+	// its lure.go enrichment comment explicitly confirms `name` is the real wire field. Both are
+	// accepted here defensively since which one a given Golbat version actually sends is unclear.
 	pokestop_name?: string;
+	name?: string;
 	url?: string;
 	latitude: number;
 	longitude: number;
@@ -152,6 +157,22 @@ export type GolbatInvasionMessage = {
 	incident_display_type?: number;
 	confirmed: boolean;
 	lineup?: { pokemon_id: number; form: number }[];
+};
+
+// Shape of a Golbat webhook envelope's `message` for a lured pokestop — verified against
+// PoracleNG's LureWebhook struct (processor/internal/webhook/types.go:285-303). Golbat has no
+// dedicated "lure" wire type: this always arrives bundled on a "pokestop" envelope, sniffed via
+// `lure_expiration > 0` — see webhook/golbat/+server.ts's dispatch (same "pokestop" envelope
+// invasion is sniffed from; a stop can carry both simultaneously).
+export type GolbatLureMessage = {
+	pokestop_id: string;
+	name?: string;
+	pokestop_name?: string;
+	url?: string;
+	latitude: number;
+	longitude: number;
+	lure_expiration: number;
+	lure_id: number;
 };
 
 export type GolbatWebhookEnvelope = {

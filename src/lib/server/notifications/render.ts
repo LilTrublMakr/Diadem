@@ -17,6 +17,7 @@ import { getShinyRate } from "@/lib/server/provider/shinyRateProvider";
 import { registerNotificationHelpers } from "@/lib/features/notifications/handlebarsHelpers";
 import type {
 	GolbatInvasionMessage,
+	GolbatLureMessage,
 	GolbatMaxBattleMessage,
 	GolbatPokemonMessage,
 	GolbatPvpEntry,
@@ -28,6 +29,7 @@ import type {
 	EmbedTemplate,
 	InvasionKindFilter,
 	InvasionTemplateContext,
+	LureTemplateContext,
 	MaxBattleTemplateContext,
 	PokemonTemplateContext,
 	PvpEntryContext,
@@ -618,13 +620,59 @@ export async function buildInvasionContext(
 
 	return {
 		pokestopId: message.pokestop_id,
-		pokestopName: message.pokestop_name ?? "",
+		pokestopName: message.pokestop_name ?? message.name ?? "",
 		pokestopUrl: message.url ?? "",
 		kind,
 		character,
 		characterName,
 		confirmed,
 		lineup,
+		expireUnix,
+		minutesLeft,
+		latitude: message.latitude,
+		longitude: message.longitude,
+		googleMapsUrl: `https://maps.google.com/maps?q=${message.latitude},${message.longitude}`,
+		appleMapsUrl: `https://maps.apple.com/?ll=${message.latitude},${message.longitude}`,
+		wazeMapUrl: `https://waze.com/ul?ll=${message.latitude},${message.longitude}&navigate=yes`,
+		mapImageUrl: "",
+		// No pokestop detail page exists in this app yet — nothing to link to.
+		diademUrl: ""
+	};
+}
+
+// Golbat's raw lure_id -> display name/emoji slug. Best-effort community-known numbering (no
+// authoritative local source) — matches the `pstop_lure_*` emoji set already uploaded for this
+// bot (discordEmoji.ts). Wrong purely-cosmetic ordering here doesn't affect filter matching
+// (still keyed on the raw numeric lureId), only the display name/emoji.
+const LURE_TYPE_INFO: Record<number, { name: string; slug: string }> = {
+	501: { name: "Normal Lure", slug: "normal" },
+	502: { name: "Glacial Lure", slug: "glacial" },
+	503: { name: "Mossy Lure", slug: "mossy" },
+	504: { name: "Magnetic Lure", slug: "magnetic" },
+	505: { name: "Rainy Lure", slug: "rainy" },
+	506: { name: "Golden Lure", slug: "golden" }
+};
+
+/** A lured pokestop. Golbat has no dedicated "lure" wire type — always arrives bundled on a
+ * "pokestop" envelope (see webhook/golbat/+server.ts's dispatch sniff). */
+export async function buildLureContext(
+	message: GolbatLureMessage,
+	thisFetch: typeof fetch = fetch
+): Promise<LureTemplateContext> {
+	const clientConfig = getClientConfig();
+	await loadRemoteLocale(clientConfig.general.defaultLocale, thisFetch);
+
+	const info = LURE_TYPE_INFO[message.lure_id];
+	const expireUnix = Math.floor(message.lure_expiration);
+	const minutesLeft = Math.max(0, Math.round((expireUnix * 1000 - Date.now()) / 60000));
+
+	return {
+		pokestopId: message.pokestop_id,
+		pokestopName: message.pokestop_name ?? message.name ?? "",
+		pokestopUrl: message.url ?? "",
+		lureId: message.lure_id,
+		lureTypeName: info?.name ?? `Lure #${message.lure_id}`,
+		lureTypeEmoji: info ? discordEmojiTag(`pstop_lure_${info.slug}`) : "",
 		expireUnix,
 		minutesLeft,
 		latitude: message.latitude,
@@ -687,6 +735,7 @@ export function renderEmbed(
 		| MaxBattleTemplateContext
 		| QuestTemplateContext
 		| InvasionTemplateContext
+		| LureTemplateContext
 ): EmbedTemplate {
 	return {
 		// template.content ?? "" — older saved templates predate this field

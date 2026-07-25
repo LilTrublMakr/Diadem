@@ -2,6 +2,7 @@
 	import type {
 		EmbedTemplate,
 		InvasionTemplateContext,
+		LureTemplateContext,
 		MaxBattleTemplateContext,
 		PokemonTemplateContext,
 		QuestTemplateContext,
@@ -23,7 +24,8 @@
 			| RaidTemplateContext
 			| MaxBattleTemplateContext
 			| QuestTemplateContext
-			| InvasionTemplateContext;
+			| InvasionTemplateContext
+			| LureTemplateContext;
 	} = $props();
 
 	function render(source: string): string {

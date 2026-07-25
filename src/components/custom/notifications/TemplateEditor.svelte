@@ -6,6 +6,8 @@
 		EMOJI_TEMPLATE_FIELDS,
 		INVASION_PRESET_TEMPLATE_FIELDS,
 		INVASION_TEMPLATE_FIELDS,
+		LURE_PRESET_TEMPLATE_FIELDS,
+		LURE_TEMPLATE_FIELDS,
 		MAXBATTLE_PRESET_TEMPLATE_FIELDS,
 		MAXBATTLE_TEMPLATE_FIELDS,
 		POKEMON_TEMPLATE_FIELDS,
@@ -36,9 +38,14 @@
 		INVASION_TEST_SCENARIOS,
 		randomizeInvasionContext
 	} from "@/lib/features/notifications/invasionTestData";
+	import {
+		LURE_TEST_SCENARIOS,
+		randomizeLureContext
+	} from "@/lib/features/notifications/lureTestData";
 	import type {
 		EmbedTemplate,
 		InvasionTemplateContext,
+		LureTemplateContext,
 		MaxBattleTemplateContext,
 		NotificationType,
 		PokemonTemplateContext,
@@ -54,7 +61,8 @@
 		| RaidTemplateContext
 		| MaxBattleTemplateContext
 		| QuestTemplateContext
-		| InvasionTemplateContext;
+		| InvasionTemplateContext
+		| LureTemplateContext;
 
 	let { type = "pokemon", embed = $bindable() }: { type?: NotificationType; embed: EmbedTemplate } =
 		$props();
@@ -69,6 +77,7 @@
 		if (type === "maxbattle") return MAXBATTLE_TEMPLATE_FIELDS;
 		if (type === "quest") return QUEST_TEMPLATE_FIELDS;
 		if (type === "invasion") return INVASION_TEMPLATE_FIELDS;
+		if (type === "lure") return LURE_TEMPLATE_FIELDS;
 		return POKEMON_TEMPLATE_FIELDS;
 	});
 	const typePresets = untrack(() => {
@@ -76,6 +85,7 @@
 		if (type === "maxbattle") return MAXBATTLE_PRESET_TEMPLATE_FIELDS;
 		if (type === "quest") return QUEST_PRESET_TEMPLATE_FIELDS;
 		if (type === "invasion") return INVASION_PRESET_TEMPLATE_FIELDS;
+		if (type === "lure") return LURE_PRESET_TEMPLATE_FIELDS;
 		return PRESET_TEMPLATE_FIELDS;
 	});
 	const scenarios: { id: string; label: string; context: PreviewContext }[] = untrack(() => {
@@ -83,6 +93,7 @@
 		if (type === "maxbattle") return MAXBATTLE_TEST_SCENARIOS;
 		if (type === "quest") return QUEST_TEST_SCENARIOS;
 		if (type === "invasion") return INVASION_TEST_SCENARIOS;
+		if (type === "lure") return LURE_TEST_SCENARIOS;
 		return TEST_SCENARIOS;
 	});
 
@@ -91,6 +102,7 @@
 		if (type === "maxbattle") return randomizeMaxBattleContext();
 		if (type === "quest") return randomizeQuestContext();
 		if (type === "invasion") return randomizeInvasionContext();
+		if (type === "lure") return randomizeLureContext();
 		return randomizePokemonContext();
 	}
 

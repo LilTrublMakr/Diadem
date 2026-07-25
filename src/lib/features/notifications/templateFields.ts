@@ -617,6 +617,65 @@ export const INVASION_TEMPLATE_FIELDS: TemplateField[] = [
 ];
 
 /**
+ * Field registry for the "lure" notification type — a lured pokestop (see buildLureContext in
+ * render.ts). No IV/CP/stats, same "only tags that make sense" reasoning as the other event
+ * categories.
+ */
+export const LURE_TEMPLATE_FIELDS: TemplateField[] = [
+	{ tag: "lureTypeName", label: "Lure Type Name", category: "Lure", sample: "Golden Lure" },
+	{ tag: "lureId", label: "Lure Type ID", category: "Lure", sample: "506" },
+	{
+		tag: "lureTypeEmoji",
+		label: "Lure Type Emoji",
+		category: "Lure",
+		sample: "<:pstop_lure_golden:...>",
+		unescaped: true
+	},
+
+	{ tag: "pokestopId", label: "Pokestop ID", category: "Pokestop", sample: "abc123.16" },
+	{ tag: "pokestopName", label: "Pokestop Name", category: "Pokestop", sample: "City Hall" },
+	{
+		tag: "pokestopUrl",
+		label: "Pokestop Photo URL",
+		category: "Pokestop",
+		sample: "",
+		unescaped: true
+	},
+
+	{
+		tag: "expireUnix",
+		label: "Countdown Unix Time (for Discord <t:...> tags)",
+		category: "Time",
+		sample: "1700000000"
+	},
+	{ tag: "minutesLeft", label: "Minutes Left", category: "Time", sample: "27" },
+
+	{ tag: "latitude", label: "Latitude", category: "Location", sample: "44.4759" },
+	{ tag: "longitude", label: "Longitude", category: "Location", sample: "-73.2121" },
+	{
+		tag: "googleMapsUrl",
+		label: "Google Maps Link",
+		category: "Location",
+		sample: "https://maps.google.com/maps?q=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "appleMapsUrl",
+		label: "Apple Maps Link",
+		category: "Location",
+		sample: "https://maps.apple.com/?ll=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "wazeMapUrl",
+		label: "Waze Link",
+		category: "Location",
+		sample: "https://waze.com/ul?ll=44.4759,-73.2121&navigate=yes",
+		unescaped: true
+	}
+];
+
+/**
  * Clickable conditional-block/helper skeletons — inserted literally (not wrapped
  * in {{ }}) via TemplateField.raw. %CURSOR% marks where the caret lands after
  * insertion so the user can fill in the condition/args immediately.
@@ -743,6 +802,17 @@ export const INVASION_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 	{
 		tag: "{{#if lineup.length}}Confirmed catches: {{#each lineup}}{{pokemonName}}{{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}",
 		label: "Confirmed catches list (lineup)",
+		category: "Presets",
+		sample: "",
+		raw: true
+	}
+];
+
+/** Preset snippets for the "lure" type. */
+export const LURE_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
+	{
+		tag: "{{lureTypeEmoji}} {{lureTypeName}} at {{pokestopName}} — expires in {{minutesLeft}}m",
+		label: "Lure summary",
 		category: "Presets",
 		sample: "",
 		raw: true

@@ -13,9 +13,9 @@ export type NotificationAreaDto = {
 };
 
 // Phase 1 shipped "pokemon". Phase 2 adds the rest one at a time — "raid", "maxbattle", "quest",
-// and "invasion" are done; lure, gym, and fort follow the same pattern (nests are deferred
+// "invasion", and "lure" are done; gym and fort follow the same pattern (nests are deferred
 // indefinitely, Golbat has no live "nest changed" event to key off).
-export type NotificationType = "pokemon" | "raid" | "maxbattle" | "quest" | "invasion";
+export type NotificationType = "pokemon" | "raid" | "maxbattle" | "quest" | "invasion" | "lure";
 
 export type EmbedFieldTemplate = {
 	name: string;
@@ -147,6 +147,12 @@ export type InvasionSubscriptionFilters = BaseSubscriptionFilters & {
 	confirmedOnly?: boolean;
 };
 
+export type LureSubscriptionFilters = BaseSubscriptionFilters & {
+	// Empty/absent = any lure type. Multiple = OR match. Ids match Golbat's raw lure_id (501-506:
+	// normal/glacial/mossy/magnetic/rainy/golden — see LURE_TYPE_INFO in render.ts).
+	lureIds?: number[];
+};
+
 // Every notification type's filters, keyed loosely by NotificationType — not a TS discriminated
 // union (that would need every call site to narrow via a type guard for marginal safety gain);
 // callers narrow by checking subscription.type instead, matching this codebase's existing
@@ -156,7 +162,8 @@ export type AnySubscriptionFilters =
 	| RaidSubscriptionFilters
 	| MaxBattleSubscriptionFilters
 	| QuestSubscriptionFilters
-	| InvasionSubscriptionFilters;
+	| InvasionSubscriptionFilters
+	| LureSubscriptionFilters;
 
 export type NotificationTemplateDto = {
 	id: number;
@@ -380,6 +387,26 @@ export type InvasionTemplateContext = {
 	// Confirmed catches from a completed grunt battle — empty until the battle is won and
 	// reported, always empty for event incidents.
 	lineup: { pokemonName: string; pokemonId: number; form: number }[];
+	expireUnix: number;
+	minutesLeft: number;
+	latitude: number;
+	longitude: number;
+	googleMapsUrl: string;
+	appleMapsUrl: string;
+	wazeMapUrl: string;
+	mapImageUrl: string;
+	diademUrl: string;
+};
+
+// Rendering context for the "lure" type — a lured pokestop. No IV/CP/stats, same "only tags that
+// make sense" reasoning as the other event categories.
+export type LureTemplateContext = {
+	pokestopId: string;
+	pokestopName: string;
+	pokestopUrl: string;
+	lureId: number;
+	lureTypeName: string;
+	lureTypeEmoji: string;
 	expireUnix: number;
 	minutesLeft: number;
 	latitude: number;

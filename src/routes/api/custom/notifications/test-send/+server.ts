@@ -10,6 +10,7 @@ import { embedTemplateSchema } from "@/lib/server/notifications/validation";
 import type { GolbatPokemonMessage } from "@/lib/server/notifications/golbatTypes";
 import type {
 	InvasionTemplateContext,
+	LureTemplateContext,
 	MaxBattleTemplateContext,
 	PokemonTemplateContext,
 	QuestTemplateContext,
@@ -29,7 +30,7 @@ const POKEMON_IMAGE_TAG = "attachment://pokemon.png";
 // Loosely validated — this only ever renders into a DM sent back to the requesting
 // user's own Discord account, so a malformed/adversarial context can't affect anyone else.
 const testSendSchema = z.object({
-	type: z.enum(["pokemon", "raid", "maxbattle", "quest", "invasion"]).default("pokemon"),
+	type: z.enum(["pokemon", "raid", "maxbattle", "quest", "invasion", "lure"]).default("pokemon"),
 	embed: embedTemplateSchema,
 	context: z.record(z.string(), z.unknown())
 });
@@ -110,6 +111,11 @@ export const POST: RequestHandler = async ({ locals, request, fetch }) => {
 			}
 		} else if (parsed.data.type === "invasion") {
 			const context = parsed.data.context as unknown as InvasionTemplateContext;
+			rendered = renderEmbed(parsed.data.embed, context);
+			rendered.title = `🧪 TEST — ${rendered.title}`.trim();
+			if (rendered.content) rendered.content = `🧪 TEST — ${rendered.content}`;
+		} else if (parsed.data.type === "lure") {
+			const context = parsed.data.context as unknown as LureTemplateContext;
 			rendered = renderEmbed(parsed.data.embed, context);
 			rendered.title = `🧪 TEST — ${rendered.title}`.trim();
 			if (rendered.content) rendered.content = `🧪 TEST — ${rendered.content}`;

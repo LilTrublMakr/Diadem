@@ -20,6 +20,7 @@ import {
 import {
 	applyTrackedBadges,
 	buildInvasionContext,
+	buildLureContext,
 	buildMaxBattleContext,
 	buildPokemonContext,
 	buildQuestContext,
@@ -29,6 +30,7 @@ import {
 import { getNotificationTemplate } from "@/lib/server/db/internal/repository";
 import type {
 	GolbatInvasionMessage,
+	GolbatLureMessage,
 	GolbatMaxBattleMessage,
 	GolbatPokemonMessage,
 	GolbatQuestMessage,
@@ -38,6 +40,8 @@ import type {
 import type {
 	InvasionSubscriptionFilters,
 	InvasionTemplateContext,
+	LureSubscriptionFilters,
+	LureTemplateContext,
 	MaxBattleSubscriptionFilters,
 	MaxBattleTemplateContext,
 	PokemonSubscriptionFilters,
@@ -193,6 +197,27 @@ function isDuplicateInvasion(message: GolbatInvasionMessage): boolean {
 	seenInvasions.set(message.pokestop_id, {
 		fingerprint: fp,
 		expiresAt: message.incident_expiration * 1000
+	});
+	return existing?.fingerprint === fp;
+}
+
+// Keyed on pokestop alone — a lure module is edit-in-place (a new one replaces the old at the
+// same stop). Fingerprinting on lureId+expiration means a renewed/changed lure re-notifies.
+const seenLures = new Map<string, { fingerprint: string; expiresAt: number }>();
+
+function isDuplicateLure(message: GolbatLureMessage): boolean {
+	const now = Date.now();
+	if (seenLures.size > 5000) {
+		for (const [key, entry] of seenLures) {
+			if (entry.expiresAt < now) seenLures.delete(key);
+		}
+	}
+
+	const fp = `${message.lure_id}:${message.lure_expiration}`;
+	const existing = seenLures.get(message.pokestop_id);
+	seenLures.set(message.pokestop_id, {
+		fingerprint: fp,
+		expiresAt: message.lure_expiration * 1000
 	});
 	return existing?.fingerprint === fp;
 }
@@ -364,6 +389,15 @@ function matchesInvasionFilters(
 			return false;
 		if (filters.confirmedOnly && !context.confirmed) return false;
 	}
+	return true;
+}
+
+function matchesLureFilters(
+	context: LureTemplateContext,
+	filters: LureSubscriptionFilters
+): boolean {
+	if (filters.lureIds && filters.lureIds.length > 0 && !filters.lureIds.includes(context.lureId))
+		return false;
 	return true;
 }
 
@@ -790,6 +824,59 @@ async function handleInvasion(message: GolbatInvasionMessage, thisFetch: typeof 
 	await Promise.all(matches.map((sub) => deliverInvasion(sub, context, thisFetch)));
 }
 
+// No sprite/map image, same reasoning as invasion — a lure isn't about one specific pokemon.
+async function deliverLure(
+	subscription: NotificationSubscription,
+	context: LureTemplateContext,
+	thisFetch: typeof fetch
+) {
+	if (!(await matchesArea(subscription, context, thisFetch))) return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.userId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return; // template was deleted, skip silently
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(
+				{
+					content: "{{lureTypeName}} at {{pokestopName}}",
+					title: "{{lureTypeName}}",
+					description: "{{pokestopName}}",
+					color: "3447003",
+					thumbnailUrl: "",
+					imageUrl: "",
+					footerText: "Expires {{minutesLeft}}m from now",
+					url: "{{{googleMapsUrl}}}",
+					fields: []
+				},
+				context
+			);
+
+	const discordId = await getUserDiscordId(subscription.userId);
+	if (!discordId) {
+		log.warning(`No Discord id found for user ${subscription.userId}, skipping delivery`);
+		return;
+	}
+
+	await sendDirectMessage(discordId, { content: embed.content, embed, attachments: [] });
+}
+
+async function handleLure(message: GolbatLureMessage, thisFetch: typeof fetch) {
+	if (isDuplicateLure(message)) return;
+
+	const context = await buildLureContext(message, thisFetch);
+	const candidates = await getSubscriptionsByType("lure");
+	const matches = candidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesLureFilters(context, sub.filters as LureSubscriptionFilters)
+	);
+
+	await Promise.all(matches.map((sub) => deliverLure(sub, context, thisFetch)));
+}
+
 export const POST: RequestHandler = async ({ request, fetch }) => {
 	const discordConfig = getServerConfig().auth.discord;
 	if (!discordConfig?.botToken || !discordConfig?.webhookSecret) {
@@ -838,15 +925,19 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 				await handleInvasion(envelope.message as GolbatInvasionMessage, fetch);
 			} else if (envelope.type === "pokestop") {
 				// A "pokestop" envelope can carry lure data, invasion data, or both (see PoracleNG's
-				// own routePokestop) — lure isn't built yet, so only the invasion half is sniffed here.
+				// own routePokestop) — both are handled independently since they're orthogonal.
 				const message = envelope.message as Record<string, unknown>;
+				const lureExpiration = Number(message.lure_expiration) || 0;
 				const incidentExpiration = Number(message.incident_expiration) || 0;
 				const incidentGruntType = Number(message.incident_grunt_type) || 0;
+				if (lureExpiration > 0) {
+					await handleLure(envelope.message as GolbatLureMessage, fetch);
+				}
 				if (incidentExpiration > 0 || incidentGruntType > 0) {
 					await handleInvasion(envelope.message as GolbatInvasionMessage, fetch);
 				}
 			}
-			// else: not yet supported (lure, gym, fort) — ignored for now.
+			// else: not yet supported (gym, fort) — ignored for now.
 		} catch (error) {
 			log.warning(`Failed to process ${envelope.type} webhook event: ${error}`);
 		}

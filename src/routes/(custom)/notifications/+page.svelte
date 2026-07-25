@@ -9,6 +9,7 @@
 	import MaxBattleFilterEditor from "@/components/custom/notifications/MaxBattleFilterEditor.svelte";
 	import QuestFilterEditor from "@/components/custom/notifications/QuestFilterEditor.svelte";
 	import InvasionFilterEditor from "@/components/custom/notifications/InvasionFilterEditor.svelte";
+	import LureFilterEditor from "@/components/custom/notifications/LureFilterEditor.svelte";
 	import type {
 		NotificationSchedule,
 		SubscriptionMode
@@ -28,6 +29,7 @@
 		AnySubscriptionFilters,
 		EmbedTemplate,
 		InvasionSubscriptionFilters,
+		LureSubscriptionFilters,
 		MaxBattleSubscriptionFilters,
 		NotificationSubscriptionDto,
 		NotificationTemplateDto,
@@ -180,6 +182,20 @@
 		};
 	}
 
+	function defaultLureEmbed(): EmbedTemplate {
+		return {
+			content: "{{lureTypeName}} at {{pokestopName}}",
+			title: "{{lureTypeName}}",
+			description: "{{pokestopName}}",
+			color: "#5865F2",
+			thumbnailUrl: "",
+			imageUrl: "",
+			footerText: "Expires {{minutesLeft}}m from now",
+			url: "{{{googleMapsUrl}}}",
+			fields: []
+		};
+	}
+
 	function defaultFilters(): PokemonSubscriptionFilters {
 		return { pokemonIds: [] };
 	}
@@ -200,12 +216,17 @@
 		return {};
 	}
 
+	function defaultLureFilters(): LureSubscriptionFilters {
+		return {};
+	}
+
 	const CATEGORY_LABELS: Record<NotificationType, string> = {
 		pokemon: "Pokemon",
 		raid: "Raid",
 		maxbattle: "Max Battle",
 		quest: "Quest",
-		invasion: "Invasion"
+		invasion: "Invasion",
+		lure: "Lure"
 	};
 
 	const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -310,6 +331,7 @@
 		if (type === "maxbattle") return defaultMaxBattleEmbed();
 		if (type === "quest") return defaultQuestEmbed();
 		if (type === "invasion") return defaultInvasionEmbed();
+		if (type === "lure") return defaultLureEmbed();
 		return defaultEmbed();
 	}
 
@@ -380,6 +402,7 @@
 	let maxBattleFilters = $state<MaxBattleSubscriptionFilters>(defaultMaxBattleFilters());
 	let questFilters = $state<QuestSubscriptionFilters>(defaultQuestFilters());
 	let invasionFilters = $state<InvasionSubscriptionFilters>(defaultInvasionFilters());
+	let lureFilters = $state<LureSubscriptionFilters>(defaultLureFilters());
 	let subMode = $state<SubscriptionMode>("manual");
 	let subSchedule = $state<NotificationSchedule>(defaultSchedule());
 	let savingSubscription = $state(false);
@@ -395,6 +418,7 @@
 		maxBattleFilters = defaultMaxBattleFilters();
 		questFilters = defaultQuestFilters();
 		invasionFilters = defaultInvasionFilters();
+		lureFilters = defaultLureFilters();
 		subMode = "manual";
 		subSchedule = defaultSchedule();
 	}
@@ -413,6 +437,8 @@
 			questFilters = { ...(sub.filters as QuestSubscriptionFilters) };
 		} else if (sub.type === "invasion") {
 			invasionFilters = { ...(sub.filters as InvasionSubscriptionFilters) };
+		} else if (sub.type === "lure") {
+			lureFilters = { ...(sub.filters as LureSubscriptionFilters) };
 		} else {
 			const filters = sub.filters as PokemonSubscriptionFilters;
 			subFilters = { ...filters, pokemonIds: filters.pokemonIds ?? [] };
@@ -439,6 +465,7 @@
 		if (subType === "maxbattle") return maxBattleFilters;
 		if (subType === "quest") return questFilters;
 		if (subType === "invasion") return invasionFilters;
+		if (subType === "lure") return lureFilters;
 		return subFilters;
 	}
 
@@ -601,6 +628,15 @@
 				);
 			}
 			if (f.confirmedOnly) parts.push("confirmed only");
+		} else if (type === "lure") {
+			const f = filters as LureSubscriptionFilters;
+			if (!f.lureIds || f.lureIds.length === 0) {
+				parts.push("Any lure type");
+			} else {
+				parts.push(
+					f.lureIds.length === 1 ? `Lure #${f.lureIds[0]}` : `${f.lureIds.length} lure types`
+				);
+			}
 		} else {
 			const f = filters as PokemonSubscriptionFilters;
 			if (!f.pokemonIds || f.pokemonIds.length === 0) {
@@ -820,6 +856,13 @@
 							{:else if subType === "invasion"}
 								<InvasionFilterEditor
 									bind:filters={invasionFilters}
+									ownAreas={scanAreasState.areas}
+									kojiAreas={kojiGeofences}
+									notificationAreas={notificationAreasState.areas}
+								/>
+							{:else if subType === "lure"}
+								<LureFilterEditor
+									bind:filters={lureFilters}
 									ownAreas={scanAreasState.areas}
 									kojiAreas={kojiGeofences}
 									notificationAreas={notificationAreasState.areas}
