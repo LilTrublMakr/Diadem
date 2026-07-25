@@ -1,4 +1,5 @@
 import { DAY_TOKENS } from "@/lib/features/notifications/scheduleTypes";
+import type { NotificationType } from "@/lib/features/notifications/types";
 import { z } from "zod";
 
 export const notificationNameSchema = z.string().trim().min(1).max(64);
@@ -54,6 +55,7 @@ export const embedTemplateSchema = z.object({
 
 export const createTemplateSchema = z.object({
 	name: notificationNameSchema,
+	type: z.enum(["pokemon", "raid"]),
 	embed: embedTemplateSchema
 });
 
@@ -65,6 +67,12 @@ export const patchTemplateSchema = z
 	.refine((patch) => Object.values(patch).some((v) => v !== undefined), {
 		message: "At least one field must be provided"
 	});
+
+// Shared by every type's filters schema — see BaseSubscriptionFilters in types.ts.
+const baseFiltersShape = {
+	areaSource: z.enum(["own", "koji", "notificationArea"]).optional(),
+	areaId: z.number().int().positive().optional()
+};
 
 export const pokemonFiltersSchema = z.object({
 	pokemonIds: z.array(z.number().int().positive()).max(50).optional(),
@@ -89,25 +97,50 @@ export const pokemonFiltersSchema = z.object({
 		.max(3)
 		.optional(),
 	pvpMaxRank: z.number().int().min(1).max(4096).optional(),
-	areaSource: z.enum(["own", "koji", "notificationArea"]).optional(),
-	areaId: z.number().int().positive().optional()
+	...baseFiltersShape
 });
 
+export const raidFiltersSchema = z.object({
+	bossPokemonIds: z.array(z.number().int().positive()).max(50).optional(),
+	form: z.number().int().min(0).optional(),
+	minLevel: z.number().int().min(1).max(6).optional(),
+	maxLevel: z.number().int().min(1).max(6).optional(),
+	teams: z
+		.array(z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]))
+		.max(4)
+		.optional(),
+	exRaidOnly: z.boolean().optional(),
+	notifyOnEgg: z.boolean().optional(),
+	notifyOnBoss: z.boolean().optional(),
+	...baseFiltersShape
+});
+
+/** Picks the right filters schema for a subscription's type — used for both create and patch. */
+export function filtersSchemaForType(type: NotificationType) {
+	return type === "raid" ? raidFiltersSchema : pokemonFiltersSchema;
+}
+
+// `filters` is intentionally loose here (validated for real against the type-specific schema —
+// see filtersSchemaForType — inside service.ts, once the subscription's `type` is known) so this
+// one schema works for every notification type without a discriminated union at the API boundary.
 export const createSubscriptionSchema = z.object({
 	name: notificationNameSchema,
+	type: z.enum(["pokemon", "raid"]),
 	templateId: z.number().int().positive().nullable().optional(),
 	enabled: z.boolean().optional(),
-	filters: pokemonFiltersSchema,
+	filters: z.record(z.string(), z.unknown()),
 	mode: z.enum(["manual", "scheduled"]).optional(),
 	schedule: notificationScheduleSchema.nullable().optional()
 });
 
+// No `type` — a subscription's type is immutable after creation (each type has different
+// filters/context, so "changing type" isn't a meaningful patch operation).
 export const patchSubscriptionSchema = z
 	.object({
 		name: notificationNameSchema.optional(),
 		templateId: z.number().int().positive().nullable().optional(),
 		enabled: z.boolean().optional(),
-		filters: pokemonFiltersSchema.optional(),
+		filters: z.record(z.string(), z.unknown()).optional(),
 		mode: z.enum(["manual", "scheduled"]).optional(),
 		schedule: notificationScheduleSchema.nullable().optional()
 	})

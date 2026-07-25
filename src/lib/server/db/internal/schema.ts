@@ -204,7 +204,7 @@ export const notificationSubscription = mysqlTable(
 		name: varchar("name", { length: 64 }).notNull(),
 		enabled: boolean("enabled").default(true).notNull(),
 		filters: json("filters")
-			.$type<import("@/lib/features/notifications/types").PokemonSubscriptionFilters>()
+			.$type<import("@/lib/features/notifications/types").AnySubscriptionFilters>()
 			.notNull(),
 		// "manual" = active whenever enabled; "scheduled" = active only within schedule's windows.
 		// Unlike scan_area, there's no allotment to protect, so schedules aren't conflict-checked.

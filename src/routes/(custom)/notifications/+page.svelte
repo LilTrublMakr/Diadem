@@ -5,6 +5,7 @@
 	import AreaPicker from "@/components/custom/notifications/AreaPicker.svelte";
 	import PokemonPicker from "@/components/custom/notifications/PokemonPicker.svelte";
 	import PokemonFormPicker from "@/components/custom/notifications/PokemonFormPicker.svelte";
+	import RaidFilterEditor from "@/components/custom/notifications/RaidFilterEditor.svelte";
 	import type {
 		NotificationSchedule,
 		SubscriptionMode
@@ -21,10 +22,13 @@
 		removeTemplate
 	} from "@/lib/features/notifications/notificationsState.svelte";
 	import type {
+		AnySubscriptionFilters,
 		EmbedTemplate,
 		NotificationSubscriptionDto,
 		NotificationTemplateDto,
-		PokemonSubscriptionFilters
+		NotificationType,
+		PokemonSubscriptionFilters,
+		RaidSubscriptionFilters
 	} from "@/lib/features/notifications/types";
 	import { getUserDetails } from "@/lib/services/user/userDetails.svelte";
 	import { getScanAreasState, loadScanAreas } from "@/lib/features/scanAreas/scanAreasState.svelte";
@@ -112,9 +116,30 @@
 		};
 	}
 
+	function defaultRaidEmbed(): EmbedTemplate {
+		return {
+			content: "{{#if isEgg}}Level {{level}} egg{{else}}{{pokemonName}} raid{{/if}} at {{gymName}}",
+			title: "{{#if isEgg}}Level {{level}} Egg{{else}}{{pokemonName}} Raid{{/if}}",
+			description: "{{gymName}}",
+			color: "#5865F2",
+			thumbnailUrl: "{{{pokemonImageUrl}}}",
+			imageUrl: "",
+			footerText:
+				"{{#if isEgg}}Hatches at {{hatchTime}}{{else}}Despawns at {{raidEndTime}}{{/if}} ({{minutesLeft}}m left)",
+			url: "{{{googleMapsUrl}}}",
+			fields: []
+		};
+	}
+
 	function defaultFilters(): PokemonSubscriptionFilters {
 		return { pokemonIds: [] };
 	}
+
+	function defaultRaidFilters(): RaidSubscriptionFilters {
+		return {};
+	}
+
+	const CATEGORY_LABELS: Record<NotificationType, string> = { pokemon: "Pokemon", raid: "Raid" };
 
 	const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 	function defaultSchedule(): NotificationSchedule {
@@ -200,20 +225,29 @@
 		if (result) showError(result.message);
 	}
 
+	// Shared between Subscriptions and Templates sections — switching category in one
+	// switches the other too.
+	let categoryFilter = $state<NotificationType>("pokemon");
+
 	// --- Template editing ---
+	let visibleTemplates = $derived(notifState.templates.filter((t) => t.type === categoryFilter));
+
 	let templateMode = $state<"idle" | "creating" | number>("idle");
+	let templateType = $state<NotificationType>("pokemon");
 	let templateName = $state("");
 	let templateEmbed = $state<EmbedTemplate>(defaultEmbed());
 	let savingTemplate = $state(false);
 
 	function startCreateTemplate() {
 		templateMode = "creating";
+		templateType = categoryFilter;
 		templateName = "";
-		templateEmbed = defaultEmbed();
+		templateEmbed = templateType === "raid" ? defaultRaidEmbed() : defaultEmbed();
 	}
 
 	function startEditTemplate(template: NotificationTemplateDto) {
 		templateMode = template.id;
+		templateType = template.type;
 		templateName = template.name;
 		// `fields`/`content` predate existing saved templates — default them if the saved row lacks them
 		templateEmbed = {
@@ -237,7 +271,7 @@
 		try {
 			const result =
 				templateMode === "creating"
-					? await createTemplate({ name, embed: templateEmbed })
+					? await createTemplate({ name, type: templateType, embed: templateEmbed })
 					: await patchTemplate(templateMode as number, { name, embed: templateEmbed });
 			if (isApiError(result)) {
 				showError(result.message);
@@ -255,31 +289,47 @@
 	}
 
 	// --- Subscription editing ---
+	// "New subscription" always creates one in the currently-selected tab (categoryFilter,
+	// shared with the Templates section above).
+	let visibleSubscriptions = $derived(
+		notifState.subscriptions.filter((s) => s.type === categoryFilter)
+	);
+
 	let subscriptionMode = $state<"idle" | "creating" | number>("idle");
+	let subType = $state<NotificationType>("pokemon");
 	let subName = $state("");
 	let subEnabled = $state(true);
 	let subTemplateId = $state<number | null>(null);
 	let subFilters = $state<PokemonSubscriptionFilters>(defaultFilters());
+	let raidFilters = $state<RaidSubscriptionFilters>(defaultRaidFilters());
 	let subMode = $state<SubscriptionMode>("manual");
 	let subSchedule = $state<NotificationSchedule>(defaultSchedule());
 	let savingSubscription = $state(false);
 
 	function startCreateSubscription() {
 		subscriptionMode = "creating";
+		subType = categoryFilter;
 		subName = "";
 		subEnabled = true;
 		subTemplateId = null;
 		subFilters = defaultFilters();
+		raidFilters = defaultRaidFilters();
 		subMode = "manual";
 		subSchedule = defaultSchedule();
 	}
 
 	function startEditSubscription(sub: NotificationSubscriptionDto) {
 		subscriptionMode = sub.id;
+		subType = sub.type;
 		subName = sub.name;
 		subEnabled = sub.enabled;
 		subTemplateId = sub.templateId;
-		subFilters = { ...sub.filters, pokemonIds: sub.filters.pokemonIds ?? [] };
+		if (sub.type === "raid") {
+			raidFilters = { ...(sub.filters as RaidSubscriptionFilters) };
+		} else {
+			const filters = sub.filters as PokemonSubscriptionFilters;
+			subFilters = { ...filters, pokemonIds: filters.pokemonIds ?? [] };
+		}
 		subMode = sub.mode;
 		subSchedule = sub.schedule ? JSON.parse(JSON.stringify(sub.schedule)) : defaultSchedule();
 	}
@@ -307,9 +357,10 @@
 		try {
 			const input = {
 				name,
+				type: subType,
 				enabled: subEnabled,
 				templateId: subTemplateId,
-				filters: subFilters,
+				filters: (subType === "raid" ? raidFilters : subFilters) as AnySubscriptionFilters,
 				mode: subMode,
 				schedule: subMode === "scheduled" ? { ...subSchedule, tz: browserTz } : null
 			};
@@ -363,7 +414,7 @@
 		return notifState.templates.find((t) => t.id === id)?.name ?? "Unknown template";
 	}
 
-	function areaLabel(filters: PokemonSubscriptionFilters): string | null {
+	function areaLabel(filters: AnySubscriptionFilters): string | null {
 		if (!filters.areaId) return null;
 		if (filters.areaSource === "koji") {
 			const area = kojiGeofences.find((a) => a.properties.id === filters.areaId);
@@ -377,23 +428,44 @@
 		return area ? area.name : "Unknown area";
 	}
 
-	function filterSummary(filters: PokemonSubscriptionFilters): string {
+	function filterSummary(type: NotificationType, filters: AnySubscriptionFilters): string {
 		const parts: string[] = [];
-		if (!filters.pokemonIds || filters.pokemonIds.length === 0) {
-			parts.push("Any species");
-		} else if (filters.pokemonIds.length === 1) {
-			parts.push(`Pokemon #${filters.pokemonIds[0]}`);
+
+		if (type === "raid") {
+			const f = filters as RaidSubscriptionFilters;
+			if (!f.bossPokemonIds || f.bossPokemonIds.length === 0) {
+				parts.push("Any boss");
+			} else if (f.bossPokemonIds.length === 1) {
+				parts.push(`Boss #${f.bossPokemonIds[0]}`);
+			} else {
+				parts.push(`${f.bossPokemonIds.length} bosses`);
+			}
+			if (f.minLevel !== undefined || f.maxLevel !== undefined) {
+				parts.push(`Level ${f.minLevel ?? 1}–${f.maxLevel ?? 6}`);
+			}
+			if (f.teams && f.teams.length > 0) parts.push(`Team ${f.teams.join("/")}`);
+			if (f.exRaidOnly) parts.push("EX only");
+			if (f.notifyOnEgg === false) parts.push("bosses only");
+			if (f.notifyOnBoss === false) parts.push("eggs only");
 		} else {
-			parts.push(`${filters.pokemonIds.length} species`);
+			const f = filters as PokemonSubscriptionFilters;
+			if (!f.pokemonIds || f.pokemonIds.length === 0) {
+				parts.push("Any species");
+			} else if (f.pokemonIds.length === 1) {
+				parts.push(`Pokemon #${f.pokemonIds[0]}`);
+			} else {
+				parts.push(`${f.pokemonIds.length} species`);
+			}
+			if (f.minIv !== undefined || f.maxIv !== undefined) {
+				parts.push(`IV ${f.minIv ?? 0}–${f.maxIv ?? 100}%`);
+			}
+			if (f.minCp !== undefined || f.maxCp !== undefined) {
+				parts.push(`CP ${f.minCp ?? 0}–${f.maxCp ?? "∞"}`);
+			}
+			if (f.pvpLeagues && f.pvpLeagues.length > 0)
+				parts.push(`${f.pvpLeagues.join("/")} rank ≤ ${f.pvpMaxRank ?? "?"}`);
 		}
-		if (filters.minIv !== undefined || filters.maxIv !== undefined) {
-			parts.push(`IV ${filters.minIv ?? 0}–${filters.maxIv ?? 100}%`);
-		}
-		if (filters.minCp !== undefined || filters.maxCp !== undefined) {
-			parts.push(`CP ${filters.minCp ?? 0}–${filters.maxCp ?? "∞"}`);
-		}
-		if (filters.pvpLeagues && filters.pvpLeagues.length > 0)
-			parts.push(`${filters.pvpLeagues.join("/")} rank ≤ ${filters.pvpMaxRank ?? "?"}`);
+
 		const area = areaLabel(filters);
 		if (area) parts.push(`in ${area}`);
 		return parts.join(" · ");
@@ -465,6 +537,22 @@
 	</div>
 {/snippet}
 
+{#snippet categoryTabs(selected: NotificationType, onSelect: (t: NotificationType) => void)}
+	<div class="flex gap-1">
+		{#each Object.entries(CATEGORY_LABELS) as [value, label] (value)}
+			<button
+				type="button"
+				class="rounded px-2.5 py-1 text-xs font-medium {selected === value
+					? 'bg-blue-600 text-white'
+					: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'}"
+				onclick={() => onSelect(value as NotificationType)}
+			>
+				{label}
+			</button>
+		{/each}
+	</div>
+{/snippet}
+
 <svelte:head>
 	<title>My Notifications — PoGo Map VT</title>
 </svelte:head>
@@ -517,10 +605,12 @@
 							class="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-sm text-white"
 							onclick={startCreateSubscription}
 						>
-							<Plus size={14} /> New subscription
+							<Plus size={14} /> New {CATEGORY_LABELS[categoryFilter]} subscription
 						</button>
 					{/if}
 				</div>
+
+				{@render categoryTabs(categoryFilter, (t) => (categoryFilter = t))}
 
 				<Dialog.Root
 					open={subscriptionMode !== "idle"}
@@ -539,7 +629,8 @@
 							<Dialog.Title
 								class="flex items-center justify-between text-lg font-semibold text-zinc-900 dark:text-zinc-100"
 							>
-								{subscriptionMode === "creating" ? "New subscription" : "Edit subscription"}
+								{subscriptionMode === "creating" ? "New" : "Edit"}
+								{CATEGORY_LABELS[subType]} subscription
 								<CloseButton onclick={cancelSubscriptionEdit} />
 							</Dialog.Title>
 
@@ -551,97 +642,106 @@
 								class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
 							/>
 
-							<label class="flex flex-col gap-1 text-sm">
-								<span class="text-zinc-500 dark:text-zinc-400"
-									>Species (optional, pick any number)</span
-								>
-								<PokemonPicker bind:selected={subFilters.pokemonIds} />
-							</label>
-
-							{#if subFilters.pokemonIds?.length === 1}
-								<PokemonFormPicker
-									pokemonId={subFilters.pokemonIds[0]}
-									bind:form={subFilters.form}
-								/>
-							{/if}
-
-							<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-								{@render minMax("IV %", "minIv", "maxIv")}
-								{@render minMax("CP", "minCp", "maxCp")}
-								{@render minMax("Level", "minLevel", "maxLevel")}
-								{@render minMax("Attack IV", "minAtk", "maxAtk")}
-								{@render minMax("Defense IV", "minDef", "maxDef")}
-								{@render minMax("Stamina IV", "minSta", "maxSta")}
-								{@render minMax("Size (1-5, XXS-XXL)", "minSize", "maxSize")}
-							</div>
-
-							<label class="flex flex-col gap-1 text-sm">
-								<span class="text-zinc-500 dark:text-zinc-400">Gender</span>
-								<select
-									value={subFilters.gender ?? ""}
-									onchange={(e) =>
-										(subFilters.gender = e.currentTarget.value
-											? (Number(e.currentTarget.value) as 1 | 2 | 3)
-											: undefined)}
-									class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
-								>
-									<option value="">Any gender</option>
-									<option value="1">Male</option>
-									<option value="2">Female</option>
-									<option value="3">Genderless</option>
-								</select>
-							</label>
-
-							<label class="flex flex-col gap-1 text-sm">
-								<span class="text-zinc-500 dark:text-zinc-400">PVP League (optional)</span>
-								<div class="flex items-center gap-3 flex-wrap">
-									{#each [["little", "Little Cup"], ["great", "Great League"], ["ultra", "Ultra League"]] as [value, label] (value)}
-										<label class="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
-											<input
-												type="checkbox"
-												checked={subFilters.pvpLeagues?.includes(
-													value as "little" | "great" | "ultra"
-												) ?? false}
-												onchange={(e) =>
-													togglePvpLeague(
-														value as "little" | "great" | "ultra",
-														e.currentTarget.checked
-													)}
-											/>
-											{label}
-										</label>
-									{/each}
-								</div>
-								{#if subFilters.pvpLeagues && subFilters.pvpLeagues.length > 0}
-									<div class="flex items-center gap-2 mt-1">
-										<input
-											type="number"
-											min="1"
-											placeholder="Max rank"
-											value={subFilters.pvpMaxRank ?? 25}
-											oninput={(e) => {
-												const v = e.currentTarget.value;
-												subFilters.pvpMaxRank = v ? Number(v) : undefined;
-											}}
-											class="w-24 rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
-										/>
-										<span class="text-xs text-zinc-400 shrink-0"
-											>rank or better in any checked league</span
-										>
-									</div>
-								{/if}
-							</label>
-
-							<label class="flex flex-col gap-1 text-sm">
-								<span class="text-zinc-500 dark:text-zinc-400">Area (optional)</span>
-								<AreaPicker
+							{#if subType === "raid"}
+								<RaidFilterEditor
+									bind:filters={raidFilters}
 									ownAreas={scanAreasState.areas}
 									kojiAreas={kojiGeofences}
 									notificationAreas={notificationAreasState.areas}
-									bind:areaSource={subFilters.areaSource}
-									bind:areaId={subFilters.areaId}
 								/>
-							</label>
+							{:else}
+								<label class="flex flex-col gap-1 text-sm">
+									<span class="text-zinc-500 dark:text-zinc-400"
+										>Species (optional, pick any number)</span
+									>
+									<PokemonPicker bind:selected={subFilters.pokemonIds} />
+								</label>
+
+								{#if subFilters.pokemonIds?.length === 1}
+									<PokemonFormPicker
+										pokemonId={subFilters.pokemonIds[0]}
+										bind:form={subFilters.form}
+									/>
+								{/if}
+
+								<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+									{@render minMax("IV %", "minIv", "maxIv")}
+									{@render minMax("CP", "minCp", "maxCp")}
+									{@render minMax("Level", "minLevel", "maxLevel")}
+									{@render minMax("Attack IV", "minAtk", "maxAtk")}
+									{@render minMax("Defense IV", "minDef", "maxDef")}
+									{@render minMax("Stamina IV", "minSta", "maxSta")}
+									{@render minMax("Size (1-5, XXS-XXL)", "minSize", "maxSize")}
+								</div>
+
+								<label class="flex flex-col gap-1 text-sm">
+									<span class="text-zinc-500 dark:text-zinc-400">Gender</span>
+									<select
+										value={subFilters.gender ?? ""}
+										onchange={(e) =>
+											(subFilters.gender = e.currentTarget.value
+												? (Number(e.currentTarget.value) as 1 | 2 | 3)
+												: undefined)}
+										class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
+									>
+										<option value="">Any gender</option>
+										<option value="1">Male</option>
+										<option value="2">Female</option>
+										<option value="3">Genderless</option>
+									</select>
+								</label>
+
+								<label class="flex flex-col gap-1 text-sm">
+									<span class="text-zinc-500 dark:text-zinc-400">PVP League (optional)</span>
+									<div class="flex items-center gap-3 flex-wrap">
+										{#each [["little", "Little Cup"], ["great", "Great League"], ["ultra", "Ultra League"]] as [value, label] (value)}
+											<label class="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+												<input
+													type="checkbox"
+													checked={subFilters.pvpLeagues?.includes(
+														value as "little" | "great" | "ultra"
+													) ?? false}
+													onchange={(e) =>
+														togglePvpLeague(
+															value as "little" | "great" | "ultra",
+															e.currentTarget.checked
+														)}
+												/>
+												{label}
+											</label>
+										{/each}
+									</div>
+									{#if subFilters.pvpLeagues && subFilters.pvpLeagues.length > 0}
+										<div class="flex items-center gap-2 mt-1">
+											<input
+												type="number"
+												min="1"
+												placeholder="Max rank"
+												value={subFilters.pvpMaxRank ?? 25}
+												oninput={(e) => {
+													const v = e.currentTarget.value;
+													subFilters.pvpMaxRank = v ? Number(v) : undefined;
+												}}
+												class="w-24 rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
+											/>
+											<span class="text-xs text-zinc-400 shrink-0"
+												>rank or better in any checked league</span
+											>
+										</div>
+									{/if}
+								</label>
+
+								<label class="flex flex-col gap-1 text-sm">
+									<span class="text-zinc-500 dark:text-zinc-400">Area (optional)</span>
+									<AreaPicker
+										ownAreas={scanAreasState.areas}
+										kojiAreas={kojiGeofences}
+										notificationAreas={notificationAreasState.areas}
+										bind:areaSource={subFilters.areaSource}
+										bind:areaId={subFilters.areaId}
+									/>
+								</label>
+							{/if}
 
 							<label class="flex flex-col gap-1 text-sm">
 								<span class="text-zinc-500 dark:text-zinc-400">Template</span>
@@ -652,7 +752,7 @@
 									class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
 								>
 									<option value="">Default template</option>
-									{#each notifState.templates as t (t.id)}
+									{#each notifState.templates.filter((t) => t.type === subType) as t (t.id)}
 										<option value={t.id}>{t.name}</option>
 									{/each}
 								</select>
@@ -711,19 +811,19 @@
 				</Dialog.Root>
 
 				<div class="flex flex-col gap-2">
-					{#if notifState.subscriptions.length === 0 && subscriptionMode === "idle"}
+					{#if visibleSubscriptions.length === 0 && subscriptionMode === "idle"}
 						<p class="text-sm text-zinc-500 dark:text-zinc-400 text-center py-6">
-							No subscriptions yet — create your first one.
+							No {CATEGORY_LABELS[categoryFilter]} subscriptions yet — create your first one.
 						</p>
 					{/if}
-					{#each notifState.subscriptions as sub (sub.id)}
+					{#each visibleSubscriptions as sub (sub.id)}
 						<div
 							class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 flex items-center justify-between gap-3"
 						>
 							<div class="min-w-0">
 								<p class="font-medium text-zinc-900 dark:text-zinc-100 truncate">{sub.name}</p>
 								<p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-									{filterSummary(sub.filters)} · {templateName_(sub.templateId)}
+									{filterSummary(sub.type, sub.filters)} · {templateName_(sub.templateId)}
 									{#if sub.mode === "scheduled"}
 										· Scheduled
 									{/if}
@@ -773,10 +873,12 @@
 							class="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-sm text-white"
 							onclick={startCreateTemplate}
 						>
-							<Plus size={14} /> New template
+							<Plus size={14} /> New {CATEGORY_LABELS[categoryFilter]} template
 						</button>
 					{/if}
 				</div>
+
+				{@render categoryTabs(categoryFilter, (t) => (categoryFilter = t))}
 
 				<Dialog.Root
 					open={templateMode !== "idle"}
@@ -795,7 +897,8 @@
 							<Dialog.Title
 								class="flex items-center justify-between text-lg font-semibold text-zinc-900 dark:text-zinc-100"
 							>
-								{templateMode === "creating" ? "New template" : "Edit template"}
+								{templateMode === "creating" ? "New" : "Edit"}
+								{CATEGORY_LABELS[templateType]} template
 								<CloseButton onclick={cancelTemplateEdit} />
 							</Dialog.Title>
 
@@ -807,7 +910,7 @@
 								class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
 							/>
 
-							<TemplateEditor bind:embed={templateEmbed} />
+							<TemplateEditor type={templateType} bind:embed={templateEmbed} />
 
 							<div class="flex gap-2">
 								<button
@@ -829,12 +932,13 @@
 				</Dialog.Root>
 
 				<div class="flex flex-col gap-2">
-					{#if notifState.templates.length === 0 && templateMode === "idle"}
+					{#if visibleTemplates.length === 0 && templateMode === "idle"}
 						<p class="text-sm text-zinc-500 dark:text-zinc-400 text-center py-6">
-							No templates yet — subscriptions without one use a plain default embed.
+							No {CATEGORY_LABELS[categoryFilter]} templates yet — subscriptions without one use a plain
+							default embed.
 						</p>
 					{/if}
-					{#each notifState.templates as template (template.id)}
+					{#each visibleTemplates as template (template.id)}
 						<div
 							class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 flex items-center justify-between gap-3"
 						>

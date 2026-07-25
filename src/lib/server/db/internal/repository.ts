@@ -7,10 +7,7 @@ import type {
 	PokemonTracker,
 	ScanArea
 } from "@/lib/server/db/internal/schema";
-import type {
-	NotificationType,
-	PokemonSubscriptionFilters
-} from "@/lib/features/notifications/types";
+import type { AnySubscriptionFilters, NotificationType } from "@/lib/features/notifications/types";
 import type {
 	NotificationSchedule,
 	SubscriptionMode
@@ -91,9 +88,21 @@ export async function upsertTracker(
 	userId: string,
 	pokemonId: number,
 	form: number,
-	data: { shiny?: boolean; hundo?: boolean; nundo?: boolean; shundo?: boolean; legacyMoves?: string[] }
+	data: {
+		shiny?: boolean;
+		hundo?: boolean;
+		nundo?: boolean;
+		shundo?: boolean;
+		legacyMoves?: string[];
+	}
 ): Promise<ParsedTracker | null> {
-	const updateSet: { shiny?: boolean; hundo?: boolean; nundo?: boolean; shundo?: boolean; legacyMoves?: string } = {};
+	const updateSet: {
+		shiny?: boolean;
+		hundo?: boolean;
+		nundo?: boolean;
+		shundo?: boolean;
+		legacyMoves?: string;
+	} = {};
 	if (data.shiny !== undefined) updateSet.shiny = data.shiny;
 	if (data.hundo !== undefined) updateSet.hundo = data.hundo;
 	if (data.nundo !== undefined) updateSet.nundo = data.nundo;
@@ -289,7 +298,7 @@ export async function insertNotificationSubscription(row: {
 	templateId: number | null;
 	name: string;
 	enabled: boolean;
-	filters: PokemonSubscriptionFilters;
+	filters: AnySubscriptionFilters;
 	mode: SubscriptionMode;
 	schedule: NotificationSchedule | null;
 }): Promise<NotificationSubscription> {

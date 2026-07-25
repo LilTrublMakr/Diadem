@@ -4,7 +4,8 @@ import type { TemplateField } from "@/lib/features/notifications/types";
 /**
  * Field registry for the "pokemon" notification type. Drives both the client-side
  * TagPicker palette and documents the shape buildPokemonContext() (render.ts) produces.
- * Phase 2 will add a registry per additional Golbat event type.
+ * Each notification type gets its own registry (see RAID_TEMPLATE_FIELDS below) so the tag
+ * picker only ever offers tags that exist for the type being edited.
  */
 export const POKEMON_TEMPLATE_FIELDS: TemplateField[] = [
 	{ tag: "pokemonName", label: "Pokemon Name", category: "Identity", sample: "Dratini ✨" },
@@ -199,6 +200,142 @@ export const POKEMON_TEMPLATE_FIELDS: TemplateField[] = [
 ];
 
 /**
+ * Field registry for the "raid" notification type — covers both the egg and hatched-boss
+ * phases (see buildRaidContext in render.ts). Deliberately has no IV/CP/atk/def/sta/weather
+ * tags — raid bosses don't have rollable IVs the way wild spawns do, so those don't exist here.
+ */
+export const RAID_TEMPLATE_FIELDS: TemplateField[] = [
+	{ tag: "isEgg", label: "Is Egg (true/false)", category: "Raid", sample: "false" },
+	{ tag: "level", label: "Raid Level", category: "Raid", sample: "5" },
+	{ tag: "levelName", label: "Raid Level Name", category: "Raid", sample: "Level 5" },
+	{
+		tag: "exRaidEligible",
+		label: "EX Raid Eligible (true/false)",
+		category: "Raid",
+		sample: "false"
+	},
+	{ tag: "hatchTime", label: "Hatch Time (egg phase)", category: "Raid", sample: "3:45:12 PM" },
+	{
+		tag: "raidEndTime",
+		label: "Raid End Time (boss phase)",
+		category: "Raid",
+		sample: "4:45:12 PM"
+	},
+
+	{ tag: "gymId", label: "Gym ID", category: "Gym", sample: "abc123.16" },
+	{ tag: "gymName", label: "Gym Name", category: "Gym", sample: "City Hall" },
+	{ tag: "gymUrl", label: "Gym Photo URL", category: "Gym", sample: "", unescaped: true },
+	{ tag: "teamName", label: "Controlling Team", category: "Gym", sample: "Instinct" },
+	{
+		tag: "teamEmoji",
+		label: "Controlling Team Emoji",
+		category: "Gym",
+		sample: "<:team_instinct:...>",
+		unescaped: true
+	},
+
+	{
+		tag: "pokemonName",
+		label: "Boss Name (empty during egg phase)",
+		category: "Boss",
+		sample: "Tyranitar"
+	},
+	{ tag: "pokemonId", label: "Boss Pokemon ID", category: "Boss", sample: "248" },
+	{ tag: "form", label: "Boss Form ID", category: "Boss", sample: "0" },
+	{ tag: "formName", label: "Boss Form Name", category: "Boss", sample: "" },
+	{ tag: "gender", label: "Boss Gender", category: "Boss", sample: "Male" },
+	{ tag: "type1", label: "Boss Primary Type", category: "Boss", sample: "Rock" },
+	{ tag: "type2", label: "Boss Secondary Type", category: "Boss", sample: "Dark" },
+	{
+		tag: "type1Emoji",
+		label: "Boss Primary Type Emoji",
+		category: "Boss",
+		sample: "<:type_rock:...>",
+		unescaped: true
+	},
+	{
+		tag: "type2Emoji",
+		label: "Boss Secondary Type Emoji",
+		category: "Boss",
+		sample: "<:type_dark:...>",
+		unescaped: true
+	},
+	{ tag: "quickMove", label: "Boss Quick Move", category: "Boss", sample: "Bite" },
+	{ tag: "chargeMove", label: "Boss Charge Move", category: "Boss", sample: "Stone Edge" },
+	{
+		tag: "quickMoveEmoji",
+		label: "Boss Quick Move Type Emoji",
+		category: "Boss",
+		sample: "<:type_dark:...>",
+		unescaped: true
+	},
+	{
+		tag: "chargeMoveEmoji",
+		label: "Boss Charge Move Type Emoji",
+		category: "Boss",
+		sample: "<:type_rock:...>",
+		unescaped: true
+	},
+	{
+		tag: "shinyRatePercent",
+		label: "Boss All-Time Shiny Rate (%)",
+		category: "Boss",
+		sample: "1.2%"
+	},
+	{
+		tag: "shinyRateFraction",
+		label: "Boss All-Time Shiny Rate (full fraction)",
+		category: "Boss",
+		sample: "3/250"
+	},
+	{
+		tag: "shinyRateReduced",
+		label: "Boss All-Time Shiny Rate (reduced, ~1 in N)",
+		category: "Boss",
+		sample: "~1 in 83"
+	},
+
+	{
+		tag: "despawnUnix",
+		label: "Countdown Unix Time (for Discord <t:...> tags)",
+		category: "Time",
+		sample: "1700000000"
+	},
+	{ tag: "minutesLeft", label: "Minutes Left", category: "Time", sample: "42" },
+
+	{ tag: "latitude", label: "Latitude", category: "Location", sample: "44.4759" },
+	{ tag: "longitude", label: "Longitude", category: "Location", sample: "-73.2121" },
+	{
+		tag: "googleMapsUrl",
+		label: "Google Maps Link",
+		category: "Location",
+		sample: "https://maps.google.com/maps?q=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "appleMapsUrl",
+		label: "Apple Maps Link",
+		category: "Location",
+		sample: "https://maps.apple.com/?ll=44.4759,-73.2121",
+		unescaped: true
+	},
+	{
+		tag: "wazeMapUrl",
+		label: "Waze Link",
+		category: "Location",
+		sample: "https://waze.com/ul?ll=44.4759,-73.2121&navigate=yes",
+		unescaped: true
+	},
+	{
+		tag: "pokemonImageUrl",
+		label: "Boss Sprite (use in Thumbnail or Image field, empty during egg phase)",
+		category: "Location",
+		sample: "attachment://pokemon.png",
+		unescaped: true
+	}
+];
+
+/**
  * Clickable conditional-block/helper skeletons — inserted literally (not wrapped
  * in {{ }}) via TemplateField.raw. %CURSOR% marks where the caret lands after
  * insertion so the user can fill in the condition/args immediately.
@@ -273,6 +410,18 @@ export const PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 	{
 		tag: "{{#if (or trackedShundo trackedHundo trackedShiny trackedNundo)}}Have:{{#if trackedShundoEmoji}} {{trackedShundoEmoji}}{{/if}}{{#if trackedHundoEmoji}} {{trackedHundoEmoji}}{{/if}}{{#if trackedShinyEmoji}} {{trackedShinyEmoji}}{{/if}}{{#if trackedNundoEmoji}} {{trackedNundoEmoji}}{{/if}}{{/if}}",
 		label: "Have: badges (your collection)",
+		category: "Presets",
+		sample: "",
+		raw: true
+	}
+];
+
+/** Preset snippets for the "raid" type — separate from PRESET_TEMPLATE_FIELDS since those
+ * reference pokemon-only context fields (weather, evolutions, pvp, tracked badges). */
+export const RAID_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
+	{
+		tag: "{{#if isEgg}}Hatches {{minutesLeft}}m from now{{else}}{{pokemonName}} — despawns in {{minutesLeft}}m{{/if}}",
+		label: "Egg vs boss summary",
 		category: "Presets",
 		sample: "",
 		raw: true

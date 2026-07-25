@@ -130,7 +130,9 @@ export async function importBackup(
 
 	for (const template of backup.templates ?? []) {
 		try {
-			await createTemplate(userId, { name: template.name, embed: template.embed });
+			// Backup/restore only covers "pokemon" templates/subscriptions for now — Raid support
+			// here is a fast-follow once the export/import UI grows a category selector too.
+			await createTemplate(userId, { name: template.name, type: "pokemon", embed: template.embed });
 			summary.templates.created++;
 		} catch (error) {
 			if (isNameTaken(error)) summary.templates.skipped++;
@@ -181,6 +183,7 @@ export async function importBackup(
 			try {
 				await createSubscription(userId, {
 					name: sub.name,
+					type: "pokemon",
 					templateId,
 					enabled: sub.enabled,
 					filters,

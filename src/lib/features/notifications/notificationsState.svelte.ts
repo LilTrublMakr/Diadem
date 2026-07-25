@@ -1,9 +1,10 @@
 import type {
+	AnySubscriptionFilters,
 	EmbedTemplate,
 	NotificationErrorResponse,
 	NotificationSubscriptionDto,
 	NotificationTemplateDto,
-	PokemonSubscriptionFilters
+	NotificationType
 } from "@/lib/features/notifications/types";
 import type {
 	NotificationSchedule,
@@ -91,6 +92,7 @@ export async function loadNotifications(): Promise<void> {
 
 export async function createTemplate(input: {
 	name: string;
+	type: NotificationType;
 	embed: EmbedTemplate;
 }): Promise<NotificationTemplateDto | NotificationApiError> {
 	const res = await fetch("/api/custom/notifications/templates", {
@@ -128,9 +130,10 @@ export async function removeTemplate(id: number): Promise<NotificationApiError |
 
 export async function createSubscription(input: {
 	name: string;
+	type: NotificationType;
 	templateId?: number | null;
 	enabled?: boolean;
-	filters: PokemonSubscriptionFilters;
+	filters: AnySubscriptionFilters;
 	mode?: SubscriptionMode;
 	schedule?: NotificationSchedule | null;
 }): Promise<NotificationSubscriptionDto | NotificationApiError> {
@@ -151,7 +154,7 @@ export async function patchSubscription(
 		name?: string;
 		templateId?: number | null;
 		enabled?: boolean;
-		filters?: PokemonSubscriptionFilters;
+		filters?: AnySubscriptionFilters;
 		mode?: SubscriptionMode;
 		schedule?: NotificationSchedule | null;
 	}

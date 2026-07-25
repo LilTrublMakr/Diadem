@@ -5,29 +5,59 @@
 		CONDITIONAL_TEMPLATE_FIELDS,
 		EMOJI_TEMPLATE_FIELDS,
 		POKEMON_TEMPLATE_FIELDS,
-		PRESET_TEMPLATE_FIELDS
+		PRESET_TEMPLATE_FIELDS,
+		RAID_PRESET_TEMPLATE_FIELDS,
+		RAID_TEMPLATE_FIELDS
 	} from "@/lib/features/notifications/templateFields";
 	import {
 		randomDespawnUnix,
 		randomizePokemonContext,
 		TEST_SCENARIOS
 	} from "@/lib/features/notifications/testData";
+	import {
+		RAID_TEST_SCENARIOS,
+		randomizeRaidContext
+	} from "@/lib/features/notifications/raidTestData";
 	import type {
 		EmbedTemplate,
+		NotificationType,
 		PokemonTemplateContext,
+		RaidTemplateContext,
 		TemplateField
 	} from "@/lib/features/notifications/types";
 	import { X } from "@lucide/svelte";
-	import { tick } from "svelte";
+	import { tick, untrack } from "svelte";
 
-	let { embed = $bindable() }: { embed: EmbedTemplate } = $props();
+	type PreviewContext = PokemonTemplateContext | RaidTemplateContext;
+
+	let { type = "pokemon", embed = $bindable() }: { type?: NotificationType; embed: EmbedTemplate } =
+		$props();
+
+	// Which tag registry/presets/test-data this editor offers — kept type-scoped so the tag
+	// picker never shows a tag that doesn't exist for the category being edited (e.g. no
+	// {{iv}}/{{quickMove}}-as-pokemon-move confusion on a raid template).
+	// `type` never actually changes after mount (the editor remounts fresh each time its dialog
+	// opens) — untrack() makes that one-time capture explicit instead of implying reactivity.
+	const typeFields = untrack(() =>
+		type === "raid" ? RAID_TEMPLATE_FIELDS : POKEMON_TEMPLATE_FIELDS
+	);
+	const typePresets = untrack(() =>
+		type === "raid" ? RAID_PRESET_TEMPLATE_FIELDS : PRESET_TEMPLATE_FIELDS
+	);
+	const scenarios: { id: string; label: string; context: PreviewContext }[] = untrack(() =>
+		type === "raid" ? RAID_TEST_SCENARIOS : TEST_SCENARIOS
+	);
+
+	function randomizeContext(): PreviewContext {
+		return type === "raid" ? randomizeRaidContext() : randomizePokemonContext();
+	}
 
 	type PreviewMode = "scenario" | "random" | "custom";
 	let previewMode = $state<PreviewMode>("scenario");
-	let scenarioId = $state(TEST_SCENARIOS[0].id);
-	let randomContext = $state<PokemonTemplateContext>(randomizePokemonContext());
-	let customContext = $state<PokemonTemplateContext>(TEST_SCENARIOS[0].context);
-	let customJson = $state(JSON.stringify(TEST_SCENARIOS[0].context, null, 2));
+	let scenarioId = $state(scenarios[0].id);
+	let randomContext = $state<PreviewContext>(randomizeContext());
+	let customContext = $state<PreviewContext>(scenarios[0].context);
+	let customJson = $state(JSON.stringify(scenarios[0].context, null, 2));
 	let customError = $state<string | null>(null);
 	// Canned scenarios have a fixed despawnUnix baked in — overlay something realistic
 	// (2-30 min out) instead. Random/custom modes already carry their own sensible value.
@@ -36,12 +66,12 @@
 	let previewContext = $derived.by(() => {
 		if (previewMode === "random") return randomContext;
 		if (previewMode === "custom") return customContext;
-		const scenario = TEST_SCENARIOS.find((s) => s.id === scenarioId) ?? TEST_SCENARIOS[0];
+		const scenario = scenarios.find((s) => s.id === scenarioId) ?? scenarios[0];
 		return { ...scenario.context, despawnUnix: scenarioDespawnUnix };
 	});
 
 	function reroll() {
-		randomContext = randomizePokemonContext();
+		randomContext = randomizeContext();
 		previewMode = "random";
 	}
 
@@ -69,7 +99,7 @@
 			const res = await fetch("/api/custom/notifications/test-send", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ embed, context: previewContext })
+				body: JSON.stringify({ type, embed, context: previewContext })
 			});
 			if (res.ok) {
 				const body = await res.json().catch(() => ({}) as { emojiWarnings?: string[] });
@@ -318,9 +348,9 @@
 			</p>
 			<TagPicker
 				fields={[
-					...POKEMON_TEMPLATE_FIELDS,
+					...typeFields,
 					...CONDITIONAL_TEMPLATE_FIELDS,
-					...PRESET_TEMPLATE_FIELDS,
+					...typePresets,
 					...EMOJI_TEMPLATE_FIELDS
 				]}
 				onInsert={insertTag}
@@ -336,7 +366,7 @@
 				onchange={() => (previewMode = "scenario")}
 				class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1 text-sm text-zinc-900 dark:text-zinc-100"
 			>
-				{#each TEST_SCENARIOS as s (s.id)}
+				{#each scenarios as s (s.id)}
 					<option value={s.id}>{s.label}</option>
 				{/each}
 			</select>

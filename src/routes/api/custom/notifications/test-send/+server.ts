@@ -8,7 +8,10 @@ import { getTracker } from "@/lib/server/db/internal/repository";
 import { guardNotificationRequest } from "@/lib/server/notifications/endpointUtils";
 import { embedTemplateSchema } from "@/lib/server/notifications/validation";
 import type { GolbatPokemonMessage } from "@/lib/server/notifications/golbatTypes";
-import type { PokemonTemplateContext } from "@/lib/features/notifications/types";
+import type {
+	PokemonTemplateContext,
+	RaidTemplateContext
+} from "@/lib/features/notifications/types";
 import { extractEmojiTags } from "@/lib/features/notifications/discordEmoji";
 import { getLogger } from "@/lib/utils/logger";
 import { json } from "@sveltejs/kit";
@@ -23,6 +26,7 @@ const POKEMON_IMAGE_TAG = "attachment://pokemon.png";
 // Loosely validated — this only ever renders into a DM sent back to the requesting
 // user's own Discord account, so a malformed/adversarial context can't affect anyone else.
 const testSendSchema = z.object({
+	type: z.enum(["pokemon", "raid"]).default("pokemon"),
 	embed: embedTemplateSchema,
 	context: z.record(z.string(), z.unknown())
 });
@@ -49,45 +53,69 @@ export const POST: RequestHandler = async ({ locals, request, fetch }) => {
 	}
 
 	try {
-		const rawContext = parsed.data.context as unknown as PokemonTemplateContext;
-		// Real tracked-collection status for the requesting user, not whatever the client's
-		// preview state happened to fake — a test send should match what a real DM would show.
-		const tracker = await getTracker(guard.userId, rawContext.pokemonId, rawContext.form);
-		const context = applyTrackedBadges(rawContext, tracker);
-		const rendered = renderEmbed(parsed.data.embed, context);
-		rendered.title = `🧪 TEST — ${rendered.title}`.trim();
-		if (rendered.content) rendered.content = `🧪 TEST — ${rendered.content}`;
-
-		const usesMapImage =
-			rendered.imageUrl === MAP_IMAGE_TAG || rendered.thumbnailUrl === MAP_IMAGE_TAG;
-		const usesSpriteImage =
-			rendered.imageUrl === POKEMON_IMAGE_TAG || rendered.thumbnailUrl === POKEMON_IMAGE_TAG;
-
+		let rendered;
 		let mapImage: Buffer | null = null;
 		let spriteImage: Buffer | null = null;
-		if (usesMapImage || usesSpriteImage) {
-			const nowSeconds = Math.floor(Date.now() / 1000);
-			const syntheticMessage: GolbatPokemonMessage = {
-				encounter_id: `test-${nowSeconds}`,
-				pokemon_id: context.pokemonId,
-				latitude: context.latitude,
-				longitude: context.longitude,
-				disappear_time: context.despawnUnix,
-				disappear_time_verified: true,
-				first_seen: nowSeconds,
-				last_modified_time: nowSeconds,
-				form: context.form,
-				costume: context.costume,
-				gender: genderToNumber(context.gender),
-				shiny: context.shiny,
-				seen_type: "test"
-			};
-			[mapImage, spriteImage] = await Promise.all([
-				usesMapImage ? generatePokemonMapImage(syntheticMessage, fetch) : Promise.resolve(null),
-				usesSpriteImage
-					? generatePokemonSpriteImage(syntheticMessage, fetch)
-					: Promise.resolve(null)
-			]);
+
+		if (parsed.data.type === "raid") {
+			const context = parsed.data.context as unknown as RaidTemplateContext;
+			rendered = renderEmbed(parsed.data.embed, context);
+			rendered.title = `🧪 TEST — ${rendered.title}`.trim();
+			if (rendered.content) rendered.content = `🧪 TEST — ${rendered.content}`;
+
+			const usesSpriteImage =
+				rendered.imageUrl === POKEMON_IMAGE_TAG || rendered.thumbnailUrl === POKEMON_IMAGE_TAG;
+			if (usesSpriteImage && !context.isEgg) {
+				spriteImage = await generatePokemonSpriteImage(
+					{
+						pokemon_id: context.pokemonId,
+						form: context.form,
+						costume: context.costume,
+						gender: context.genderValue,
+						shiny: false
+					},
+					fetch
+				);
+			}
+		} else {
+			const rawContext = parsed.data.context as unknown as PokemonTemplateContext;
+			// Real tracked-collection status for the requesting user, not whatever the client's
+			// preview state happened to fake — a test send should match what a real DM would show.
+			const tracker = await getTracker(guard.userId, rawContext.pokemonId, rawContext.form);
+			const context = applyTrackedBadges(rawContext, tracker);
+			rendered = renderEmbed(parsed.data.embed, context);
+			rendered.title = `🧪 TEST — ${rendered.title}`.trim();
+			if (rendered.content) rendered.content = `🧪 TEST — ${rendered.content}`;
+
+			const usesMapImage =
+				rendered.imageUrl === MAP_IMAGE_TAG || rendered.thumbnailUrl === MAP_IMAGE_TAG;
+			const usesSpriteImage =
+				rendered.imageUrl === POKEMON_IMAGE_TAG || rendered.thumbnailUrl === POKEMON_IMAGE_TAG;
+
+			if (usesMapImage || usesSpriteImage) {
+				const nowSeconds = Math.floor(Date.now() / 1000);
+				const syntheticMessage: GolbatPokemonMessage = {
+					encounter_id: `test-${nowSeconds}`,
+					pokemon_id: context.pokemonId,
+					latitude: context.latitude,
+					longitude: context.longitude,
+					disappear_time: context.despawnUnix,
+					disappear_time_verified: true,
+					first_seen: nowSeconds,
+					last_modified_time: nowSeconds,
+					form: context.form,
+					costume: context.costume,
+					gender: genderToNumber(context.gender),
+					shiny: context.shiny,
+					seen_type: "test"
+				};
+				[mapImage, spriteImage] = await Promise.all([
+					usesMapImage ? generatePokemonMapImage(syntheticMessage, fetch) : Promise.resolve(null),
+					usesSpriteImage
+						? generatePokemonSpriteImage(syntheticMessage, fetch)
+						: Promise.resolve(null)
+				]);
+			}
 		}
 
 		await sendDirectMessage(discordId, {

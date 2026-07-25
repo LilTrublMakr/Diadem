@@ -84,7 +84,15 @@ export async function generatePokemonMapImage(
  * so this works whether or not the app is actually public-facing.
  */
 export async function generatePokemonSpriteImage(
-	message: GolbatPokemonMessage,
+	// Structural — only these fields are ever read, so a raid boss (or any other species-bearing
+	// event) can pass a plain object literal instead of a full GolbatPokemonMessage.
+	message: {
+		pokemon_id: number;
+		form?: number | null;
+		costume?: number | null;
+		gender?: number | null;
+		shiny?: boolean | null;
+	},
 	thisFetch: typeof fetch = fetch
 ): Promise<Buffer | null> {
 	try {

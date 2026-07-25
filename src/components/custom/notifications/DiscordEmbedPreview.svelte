@@ -1,12 +1,19 @@
 <script lang="ts">
-	import type { EmbedTemplate, PokemonTemplateContext } from "@/lib/features/notifications/types";
+	import type {
+		EmbedTemplate,
+		PokemonTemplateContext,
+		RaidTemplateContext
+	} from "@/lib/features/notifications/types";
 	import { registerNotificationHelpers } from "@/lib/features/notifications/handlebarsHelpers";
 	import { Map } from "@lucide/svelte";
 	import Handlebars from "handlebars";
 
 	registerNotificationHelpers(Handlebars);
 
-	let { embed, context }: { embed: EmbedTemplate; context: PokemonTemplateContext } = $props();
+	let {
+		embed,
+		context
+	}: { embed: EmbedTemplate; context: PokemonTemplateContext | RaidTemplateContext } = $props();
 
 	function render(source: string): string {
 		try {

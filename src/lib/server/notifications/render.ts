@@ -8,11 +8,17 @@ import { formatShinyRate } from "@/lib/features/notifications/shinyRateFormat";
 import { isMapImageConfigured } from "@/lib/server/notifications/mapImage";
 import { getShinyRate } from "@/lib/server/provider/shinyRateProvider";
 import { registerNotificationHelpers } from "@/lib/features/notifications/handlebarsHelpers";
-import type { GolbatPokemonMessage, GolbatPvpEntry } from "@/lib/server/notifications/golbatTypes";
+import type {
+	GolbatPokemonMessage,
+	GolbatPvpEntry,
+	GolbatRaidMessage
+} from "@/lib/server/notifications/golbatTypes";
 import type {
 	EmbedTemplate,
 	PokemonTemplateContext,
-	PvpEntryContext
+	PvpEntryContext,
+	RaidTeam,
+	RaidTemplateContext
 } from "@/lib/features/notifications/types";
 import Handlebars from "handlebars";
 
@@ -244,6 +250,103 @@ export async function buildPokemonContext(
 	};
 }
 
+const RAID_TEAM_NAMES: Record<number, string> = {
+	0: "Neutral",
+	1: "Mystic",
+	2: "Valor",
+	3: "Instinct"
+};
+const RAID_TEAM_SLUGS: Record<number, string> = {
+	0: "neutral",
+	1: "mystic",
+	2: "valor",
+	3: "instinct"
+};
+const RAID_LEVEL_NAMES: Record<number, string> = {
+	1: "Level 1",
+	2: "Level 2",
+	3: "Level 3",
+	4: "Level 4",
+	5: "Level 5",
+	6: "Mega"
+};
+
+/**
+ * Covers both the unhatched-egg phase (pokemon_id: 0) and the hatched-boss phase — same Golbat
+ * wire type, differentiated only by `isEgg`. Egg-phase pokemon/type/move/evolution/shiny-rate
+ * fields are all empty — the boss species isn't known yet.
+ */
+export async function buildRaidContext(
+	message: GolbatRaidMessage,
+	thisFetch: typeof fetch = fetch
+): Promise<RaidTemplateContext> {
+	const clientConfig = getClientConfig();
+	await loadRemoteLocale(clientConfig.general.defaultLocale, thisFetch);
+
+	const isEgg = !message.pokemon_id;
+	const form = isEgg ? 0 : getNormalizedForm(message.pokemon_id, message.form ?? 0);
+	const master = isEgg ? undefined : getMasterPokemon(message.pokemon_id, form);
+	const formName = !isEgg && form ? (master?.name ?? "") : "";
+	const type1 = isEgg ? "" : typeIdToText(master?.types?.[0]);
+	const type2 = !isEgg && master?.types?.[1] ? typeIdToText(master.types[1]) : "";
+	const shinyRate = isEgg
+		? { percent: "?", fraction: "?", reduced: "?" }
+		: formatShinyRate(await getShinyRate(message.pokemon_id, form));
+
+	const teamId = (message.team_id ?? 0) as RaidTeam;
+	const hatch = new Date(message.start * 1000);
+	const raidEnd = new Date(message.end * 1000);
+	const despawnUnix = Math.floor(isEgg ? message.start : message.end);
+	const minutesLeft = Math.max(0, Math.round((despawnUnix * 1000 - Date.now()) / 60000));
+
+	return {
+		isEgg,
+		gymId: message.gym_id,
+		gymName: message.gym_name ?? "",
+		gymUrl: message.gym_url ?? "",
+		teamId,
+		teamName: RAID_TEAM_NAMES[teamId] ?? "Neutral",
+		teamEmoji: discordEmojiTag(`team_${RAID_TEAM_SLUGS[teamId] ?? "neutral"}`),
+		level: message.level,
+		levelName: RAID_LEVEL_NAMES[message.level] ?? `Level ${message.level}`,
+		exRaidEligible: !!message.ex_raid_eligible,
+		pokemonName: isEgg ? "" : mPokemon({ pokemon_id: message.pokemon_id, form }),
+		pokemonId: isEgg ? 0 : message.pokemon_id,
+		form,
+		formName,
+		costume: message.costume ?? 0,
+		gender: isEgg ? "" : genderLabel(message.gender),
+		genderValue: isEgg ? null : normalizeGenderValue(message.gender),
+		type1,
+		type2,
+		type1Emoji: type1 ? discordEmojiTag(`type_${type1}`) : "",
+		type2Emoji: type2 ? discordEmojiTag(`type_${type2}`) : "",
+		quickMove: isEgg ? "" : mMove(message.move_1),
+		chargeMove: isEgg ? "" : mMove(message.move_2),
+		quickMoveEmoji: isEgg ? "" : moveTypeEmoji(master?.quickMoves, message.move_1),
+		chargeMoveEmoji: isEgg ? "" : moveTypeEmoji(master?.chargedMoves, message.move_2),
+		shinyRatePercent: shinyRate.percent,
+		shinyRateFraction: shinyRate.fraction,
+		shinyRateReduced: shinyRate.reduced,
+		evolutions: isEgg ? [] : buildEvolutionFamily(message.pokemon_id),
+		// Fetched as a Discord file attachment (see webhook/golbat/+server.ts's deliverRaid),
+		// same as pokemon's own sprite — reuses generatePokemonSpriteImage since it's species-only.
+		pokemonImageUrl: isEgg ? "" : "attachment://pokemon.png",
+		hatchTime: isEgg ? hatch.toLocaleTimeString() : "",
+		raidEndTime: isEgg ? "" : raidEnd.toLocaleTimeString(),
+		despawnUnix,
+		minutesLeft,
+		latitude: message.latitude,
+		longitude: message.longitude,
+		googleMapsUrl: `https://maps.google.com/maps?q=${message.latitude},${message.longitude}`,
+		appleMapsUrl: `https://maps.apple.com/?ll=${message.latitude},${message.longitude}`,
+		wazeMapUrl: `https://waze.com/ul?ll=${message.latitude},${message.longitude}&navigate=yes`,
+		mapImageUrl: "",
+		// No gym detail page exists in this app yet — nothing to link to.
+		diademUrl: ""
+	};
+}
+
 export type TrackedStatus = { shiny: boolean; hundo: boolean; nundo: boolean; shundo: boolean };
 
 /**
@@ -287,7 +390,7 @@ function compile(source: string): Handlebars.TemplateDelegate {
 
 export function renderEmbed(
 	template: EmbedTemplate,
-	context: PokemonTemplateContext
+	context: PokemonTemplateContext | RaidTemplateContext
 ): EmbedTemplate {
 	return {
 		// template.content ?? "" — older saved templates predate this field

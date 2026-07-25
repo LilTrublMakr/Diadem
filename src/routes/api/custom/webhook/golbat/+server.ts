@@ -7,7 +7,10 @@ import {
 import type { NotificationSubscription } from "@/lib/server/db/internal/schema";
 import { getServerConfig } from "@/lib/services/config/config.server";
 import { sendDirectMessage } from "@/lib/server/notifications/bot";
-import { getPokemonSubscriptionCandidates } from "@/lib/server/notifications/matchCache";
+import {
+	getPokemonSubscriptionCandidates,
+	getSubscriptionsByType
+} from "@/lib/server/notifications/matchCache";
 import { isScheduleActiveNow } from "@/lib/features/notifications/scheduleActive";
 import { getKojiAreaById } from "@/lib/server/notifications/kojiAreaCache";
 import {
@@ -17,16 +20,20 @@ import {
 import {
 	applyTrackedBadges,
 	buildPokemonContext,
+	buildRaidContext,
 	renderEmbed
 } from "@/lib/server/notifications/render";
 import { getNotificationTemplate } from "@/lib/server/db/internal/repository";
 import type {
 	GolbatPokemonMessage,
+	GolbatRaidMessage,
 	GolbatWebhookEnvelope
 } from "@/lib/server/notifications/golbatTypes";
 import type {
 	PokemonSubscriptionFilters,
-	PokemonTemplateContext
+	PokemonTemplateContext,
+	RaidSubscriptionFilters,
+	RaidTemplateContext
 } from "@/lib/features/notifications/types";
 import { getLogger } from "@/lib/utils/logger";
 import { booleanPointInPolygon, point } from "@turf/turf";
@@ -64,6 +71,30 @@ function isDuplicate(message: GolbatPokemonMessage): boolean {
 	const fp = fingerprint(message);
 	const existing = seen.get(message.encounter_id);
 	seen.set(message.encounter_id, { fingerprint: fp, expiresAt: message.disappear_time * 1000 });
+	return existing?.fingerprint === fp;
+}
+
+// Same idea as pokemon's dedup above, keyed on gym instead of encounter. Fingerprinting on
+// isEgg+pokemonId+level+end means the egg->boss transition (same raid lifecycle, same gym)
+// fires a fresh notification once the boss is known.
+const seenRaids = new Map<string, { fingerprint: string; expiresAt: number }>();
+
+function raidFingerprint(message: GolbatRaidMessage): string {
+	const isEgg = !message.pokemon_id;
+	return [isEgg, message.pokemon_id, message.level, message.end].join(":");
+}
+
+function isDuplicateRaid(message: GolbatRaidMessage): boolean {
+	const now = Date.now();
+	if (seenRaids.size > 5000) {
+		for (const [key, entry] of seenRaids) {
+			if (entry.expiresAt < now) seenRaids.delete(key);
+		}
+	}
+
+	const fp = raidFingerprint(message);
+	const existing = seenRaids.get(message.gym_id);
+	seenRaids.set(message.gym_id, { fingerprint: fp, expiresAt: message.end * 1000 });
 	return existing?.fingerprint === fp;
 }
 
@@ -134,6 +165,33 @@ function matchesFilters(context: PokemonTemplateContext, filters: PokemonSubscri
 	return true;
 }
 
+function matchesRaidFilters(
+	context: RaidTemplateContext,
+	filters: RaidSubscriptionFilters
+): boolean {
+	if (context.isEgg && filters.notifyOnEgg === false) return false;
+	if (!context.isEgg && filters.notifyOnBoss === false) return false;
+
+	if (filters.minLevel !== undefined && context.level < filters.minLevel) return false;
+	if (filters.maxLevel !== undefined && context.level > filters.maxLevel) return false;
+	if (filters.teams && filters.teams.length > 0 && !filters.teams.includes(context.teamId))
+		return false;
+
+	// Boss-only filters — an egg's eventual species/form isn't known yet, so these can't apply.
+	if (!context.isEgg) {
+		if (
+			filters.bossPokemonIds &&
+			filters.bossPokemonIds.length > 0 &&
+			!filters.bossPokemonIds.includes(context.pokemonId)
+		)
+			return false;
+		if (filters.form !== undefined && filters.form !== context.form) return false;
+		if (filters.exRaidOnly && !context.exRaidEligible) return false;
+	}
+
+	return true;
+}
+
 function isSubscriptionActiveNow(subscription: NotificationSubscription): boolean {
 	if (subscription.mode !== "scheduled") return true;
 	return !!subscription.schedule && isScheduleActiveNow(subscription.schedule);
@@ -141,7 +199,8 @@ function isSubscriptionActiveNow(subscription: NotificationSubscription): boolea
 
 async function matchesArea(
 	subscription: NotificationSubscription,
-	context: PokemonTemplateContext,
+	// Structural — only latitude/longitude are ever read, so any type's context satisfies this.
+	context: { latitude: number; longitude: number },
 	thisFetch: typeof fetch
 ) {
 	const { areaId, areaSource } = subscription.filters;
@@ -236,7 +295,9 @@ async function handlePokemon(message: GolbatPokemonMessage, thisFetch: typeof fe
 	const context = await buildPokemonContext(message, thisFetch);
 	const candidates = await getPokemonSubscriptionCandidates(message.pokemon_id);
 	const matches = candidates.filter(
-		(sub) => isSubscriptionActiveNow(sub) && matchesFilters(context, sub.filters)
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesFilters(context, sub.filters as PokemonSubscriptionFilters)
 	);
 
 	// Generated at most once per event, regardless of how many subscriptions use it.
@@ -255,6 +316,94 @@ async function handlePokemon(message: GolbatPokemonMessage, thisFetch: typeof fe
 	await Promise.all(
 		matches.map((sub) => deliver(sub, context, getMapImage, getSpriteImage, thisFetch))
 	);
+}
+
+// No tracked-badges overlay (pokemon-only) and no map thumbnail yet (no verified Rampardos raid
+// template — see buildRaidContext's mapImageUrl comment) — otherwise the same shape as deliver()
+// above: area check, render, resolve Discord id, send. Boss sprite reuses the same
+// attachment-based sprite fetch pokemon spawns use (species-only, no wild-encounter dependency).
+async function deliverRaid(
+	subscription: NotificationSubscription,
+	context: RaidTemplateContext,
+	getSpriteImage: () => Promise<Buffer | null>,
+	thisFetch: typeof fetch
+) {
+	if (!(await matchesArea(subscription, context, thisFetch))) return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.userId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return; // template was deleted, skip silently
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(
+				{
+					content:
+						"{{#if isEgg}}Level {{level}} egg{{else}}{{pokemonName}} raid{{/if}} at {{gymName}}",
+					title: "{{#if isEgg}}Level {{level}} Egg{{else}}{{pokemonName}} Raid{{/if}}",
+					description:
+						"{{gymName}}{{#unless isEgg}}\nCP/Moves: {{quickMove}} / {{chargeMove}}{{/unless}}",
+					color: "3447003",
+					thumbnailUrl: "{{{pokemonImageUrl}}}",
+					imageUrl: "",
+					footerText:
+						"{{#if isEgg}}Hatches at {{hatchTime}}{{else}}Despawns at {{raidEndTime}}{{/if}} ({{minutesLeft}}m left)",
+					url: "{{{googleMapsUrl}}}",
+					fields: []
+				},
+				context
+			);
+
+	const usesSpriteImage =
+		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
+	const spriteImage = usesSpriteImage ? await getSpriteImage() : null;
+
+	const discordId = await getUserDiscordId(subscription.userId);
+	if (!discordId) {
+		log.warning(`No Discord id found for user ${subscription.userId}, skipping delivery`);
+		return;
+	}
+
+	await sendDirectMessage(discordId, {
+		content: embed.content,
+		embed,
+		attachments: [spriteImage ? { filename: "pokemon.png", data: spriteImage } : null]
+	});
+}
+
+async function handleRaid(message: GolbatRaidMessage, thisFetch: typeof fetch) {
+	if (isDuplicateRaid(message)) return;
+
+	const context = await buildRaidContext(message, thisFetch);
+	const candidates = await getSubscriptionsByType("raid");
+	const matches = candidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesRaidFilters(context, sub.filters as RaidSubscriptionFilters)
+	);
+
+	// Generated at most once per event, regardless of how many subscriptions use it. Only
+	// meaningful once the boss has hatched — an egg has no species to render a sprite for.
+	let spriteImage: Buffer | null | undefined;
+	const getSpriteImage = async () => {
+		if (context.isEgg) return null;
+		if (spriteImage === undefined) {
+			spriteImage = await generatePokemonSpriteImage(
+				{
+					pokemon_id: context.pokemonId,
+					form: context.form,
+					costume: context.costume,
+					gender: context.genderValue,
+					shiny: false
+				},
+				thisFetch
+			);
+		}
+		return spriteImage;
+	};
+
+	await Promise.all(matches.map((sub) => deliverRaid(sub, context, getSpriteImage, thisFetch)));
 }
 
 export const POST: RequestHandler = async ({ request, fetch }) => {
@@ -292,11 +441,15 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 	);
 
 	for (const envelope of envelopes) {
-		if (envelope.type !== "pokemon") continue; // Phase 2: other Golbat event types
 		try {
-			await handlePokemon(envelope.message as GolbatPokemonMessage, fetch);
+			if (envelope.type === "pokemon") {
+				await handlePokemon(envelope.message as GolbatPokemonMessage, fetch);
+			} else if (envelope.type === "raid") {
+				await handleRaid(envelope.message as GolbatRaidMessage, fetch);
+			}
+			// else: not yet supported (quest, invasion, lure, gym, fort) — ignored for now.
 		} catch (error) {
-			log.warning(`Failed to process pokemon webhook event: ${error}`);
+			log.warning(`Failed to process ${envelope.type} webhook event: ${error}`);
 		}
 	}
 

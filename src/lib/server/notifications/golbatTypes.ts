@@ -1,4 +1,4 @@
-// Shape of a single Golbat webhook envelope's `message` for type "pokemon".
+// Shapes of Golbat webhook envelopes' `message` field, one type per Golbat wire `type`.
 // See https://github.com/UnownHash/Golbat/blob/main/webhooks.md
 export type GolbatPvpEntry = {
 	pokemon: number;
@@ -50,6 +50,30 @@ export type GolbatPokemonMessage = {
 	is_event?: boolean;
 	seen_type: string;
 	pvp?: GolbatPvpRankings | null;
+};
+
+// Shape of a Golbat webhook envelope's `message` for type "raid" — covers both the unhatched
+// egg phase (pokemon_id: 0) and the hatched-boss phase (same wire type, PoracleNG's own receiver
+// treats them identically — see processor/internal/webhook/types.go's RaidWebhook).
+export type GolbatRaidMessage = {
+	gym_id: string;
+	gym_name: string;
+	gym_url: string;
+	latitude: number;
+	longitude: number;
+	pokemon_id: number; // 0 during egg phase
+	form: number;
+	gender: number;
+	costume: number;
+	evolution: number;
+	alignment: number;
+	level: number;
+	team_id: number;
+	start: number; // unix seconds — hatch time
+	end: number; // unix seconds — raid end time
+	move_1: number;
+	move_2: number;
+	ex_raid_eligible: boolean;
 };
 
 export type GolbatWebhookEnvelope = {

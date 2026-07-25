@@ -21,8 +21,13 @@ import type {
 	NotificationTemplate
 } from "@/lib/server/db/internal/schema";
 import { invalidateSubscriptionCache } from "@/lib/server/notifications/matchCache";
+import { filtersSchemaForType } from "@/lib/server/notifications/validation";
 import { validatePolygonGeometry } from "@/lib/server/scanAreas/validation";
-import type { EmbedTemplate, PokemonSubscriptionFilters } from "@/lib/features/notifications/types";
+import type {
+	AnySubscriptionFilters,
+	EmbedTemplate,
+	NotificationType
+} from "@/lib/features/notifications/types";
 import type {
 	NotificationSchedule,
 	SubscriptionMode
@@ -33,6 +38,7 @@ export type NotificationErrorCode =
 	| "not_found"
 	| "name_taken"
 	| "invalid_template"
+	| "invalid_filters"
 	| "too_large"
 	| "invalid_polygon";
 
@@ -50,6 +56,21 @@ export class NotificationError extends Error {
 		super(message);
 		this.name = "NotificationError";
 	}
+}
+
+// Real shape validation for a subscription's filters, deferred here (rather than the API route)
+// since the right schema depends on the subscription's `type` — for create that's given
+// explicitly, for update it comes from the already-loaded row (see updateSubscription below).
+function parseFilters(type: NotificationType, filters: unknown): AnySubscriptionFilters {
+	const result = filtersSchemaForType(type).safeParse(filters);
+	if (!result.success) {
+		throw new NotificationError(
+			"invalid_filters",
+			400,
+			result.error.issues[0]?.message ?? "Invalid filters"
+		);
+	}
+	return result.data as AnySubscriptionFilters;
 }
 
 function isDuplicateKeyError(error: unknown): boolean {
@@ -83,13 +104,13 @@ export async function listTemplates(userId: string): Promise<NotificationTemplat
 
 export async function createTemplate(
 	userId: string,
-	input: { name: string; embed: EmbedTemplate }
+	input: { name: string; type: NotificationType; embed: EmbedTemplate }
 ): Promise<NotificationTemplate> {
 	try {
 		return await insertNotificationTemplate({
 			userId,
 			name: input.name,
-			type: "pokemon",
+			type: input.type,
 			embed: input.embed
 		});
 	} catch (error) {
@@ -145,24 +166,26 @@ export async function createSubscription(
 	userId: string,
 	input: {
 		name: string;
+		type: NotificationType;
 		templateId?: number | null;
 		enabled?: boolean;
-		filters: PokemonSubscriptionFilters;
+		filters: unknown;
 		mode?: SubscriptionMode;
 		schedule?: NotificationSchedule | null;
 	}
 ): Promise<NotificationSubscription> {
 	return withUserLock(userId, async () => {
 		await requireTemplateOwnership(userId, input.templateId);
+		const filters = parseFilters(input.type, input.filters);
 
 		try {
 			return await insertNotificationSubscription({
 				userId,
-				type: "pokemon",
+				type: input.type,
 				templateId: input.templateId ?? null,
 				name: input.name,
 				enabled: input.enabled ?? true,
-				filters: input.filters,
+				filters,
 				mode: input.mode ?? "manual",
 				schedule: input.schedule ?? null
 			});
@@ -188,7 +211,7 @@ export async function updateSubscription(
 		name?: string;
 		templateId?: number | null;
 		enabled?: boolean;
-		filters?: PokemonSubscriptionFilters;
+		filters?: unknown;
 		mode?: SubscriptionMode;
 		schedule?: NotificationSchedule | null;
 	}
@@ -198,9 +221,10 @@ export async function updateSubscription(
 		if (!row) throw new NotificationError("not_found", 404, "Subscription not found");
 
 		await requireTemplateOwnership(userId, patch.templateId);
+		const filters = patch.filters !== undefined ? parseFilters(row.type, patch.filters) : undefined;
 
 		try {
-			await updateNotificationSubscriptionRow(userId, id, patch);
+			await updateNotificationSubscriptionRow(userId, id, { ...patch, filters });
 		} catch (error) {
 			if (isDuplicateKeyError(error)) {
 				throw new NotificationError(

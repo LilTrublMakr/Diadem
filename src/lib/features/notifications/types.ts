@@ -12,9 +12,10 @@ export type NotificationAreaDto = {
 	updatedAt: string;
 };
 
-// Phase 1 only supports "pokemon" — remaining Golbat event types (raid, quest, invasion,
-// pokestop, gym_details, weather, fort_update, max_battle) are Phase 2 follow-up work.
-export type NotificationType = "pokemon";
+// Phase 1 shipped "pokemon". Phase 2 adds the rest one at a time — "raid" is next; quest,
+// invasion, lure, gym, and fort follow the same pattern (nests are deferred indefinitely,
+// Golbat has no live "nest changed" event to key off).
+export type NotificationType = "pokemon" | "raid";
 
 export type EmbedFieldTemplate = {
 	name: string;
@@ -45,7 +46,18 @@ export type PvpEntryContext = {
 	levelWithCap: string;
 };
 
-export type PokemonSubscriptionFilters = {
+// Shared by every notification type's filter shape — geofence scoping is a type-agnostic
+// concept (lat/lng in, polygon test), unlike the rest of a type's filters.
+export type BaseSubscriptionFilters = {
+	// Optional area scope: "own" (default) = one of the user's own scan_area rows;
+	// "koji" = a named Koji geofence ("coverage map" area); "notificationArea" = one of the
+	// user's own notification-only areas (separate from scan_area). areaId is a scan_area.id,
+	// Koji feature id, or notification_area.id depending on areaSource — three unrelated id spaces.
+	areaSource?: "own" | "koji" | "notificationArea";
+	areaId?: number;
+};
+
+export type PokemonSubscriptionFilters = BaseSubscriptionFilters & {
 	// Empty/absent = any species. Multiple ids = OR match (notify for any of these species).
 	pokemonIds?: number[];
 	form?: number;
@@ -70,13 +82,29 @@ export type PokemonSubscriptionFilters = {
 	// pvpMaxRank in ANY of these leagues) — one shared rank threshold across all of them.
 	pvpLeagues?: PvpLeagueFilter[];
 	pvpMaxRank?: number;
-	// Optional area scope: "own" (default) = one of the user's own scan_area rows;
-	// "koji" = a named Koji geofence ("coverage map" area); "notificationArea" = one of the
-	// user's own notification-only areas (separate from scan_area). areaId is a scan_area.id,
-	// Koji feature id, or notification_area.id depending on areaSource — three unrelated id spaces.
-	areaSource?: "own" | "koji" | "notificationArea";
-	areaId?: number;
 };
+
+export type RaidTeam = 0 | 1 | 2 | 3; // 0=neutral/uncontested, 1=Mystic, 2=Valor, 3=Instinct
+
+export type RaidSubscriptionFilters = BaseSubscriptionFilters & {
+	// Empty/absent = any boss species. Only applies once the raid has hatched (isEgg===false) —
+	// an egg's eventual boss is unknown, so this can't gate egg-phase notifications.
+	bossPokemonIds?: number[];
+	form?: number;
+	minLevel?: number; // 1-6, applies to both egg level and hatched-boss level (same wire field)
+	maxLevel?: number;
+	// Gym's current controlling team, empty/absent = any. Known even during egg phase.
+	teams?: RaidTeam[];
+	exRaidOnly?: boolean;
+	notifyOnEgg?: boolean; // default true
+	notifyOnBoss?: boolean; // default true
+};
+
+// Every notification type's filters, keyed loosely by NotificationType — not a TS discriminated
+// union (that would need every call site to narrow via a type guard for marginal safety gain);
+// callers narrow by checking subscription.type instead, matching this codebase's existing
+// light-touch typing style (see schema.ts's $type<>() cast on the `filters` column).
+export type AnySubscriptionFilters = PokemonSubscriptionFilters | RaidSubscriptionFilters;
 
 export type NotificationTemplateDto = {
 	id: number;
@@ -93,7 +121,7 @@ export type NotificationSubscriptionDto = {
 	templateId: number | null;
 	name: string;
 	enabled: boolean;
-	filters: PokemonSubscriptionFilters;
+	filters: AnySubscriptionFilters;
 	// "manual" = active whenever enabled; "scheduled" = active only within schedule's windows
 	mode: SubscriptionMode;
 	schedule: NotificationSchedule | null;
@@ -194,4 +222,56 @@ export type PokemonTemplateContext = {
 	username: string;
 	evolutions: { fullName: string; pokemonId: number }[];
 	pokemonImageUrl: string;
+};
+
+// Rendering context for the "raid" type (covers both egg and hatched-boss phases — see
+// buildRaidContext in render.ts). No IV/CP/atk/def/sta fields — raid bosses don't have rollable
+// IVs the way wild spawns do, so those tags simply don't exist here (this is the concrete case
+// of "only show tags that make sense for this category").
+export type RaidTemplateContext = {
+	isEgg: boolean;
+	gymId: string;
+	gymName: string;
+	gymUrl: string;
+	teamId: RaidTeam;
+	teamName: string;
+	teamEmoji: string;
+	level: number;
+	levelName: string; // "Level 5", "Mega", "Legendary" etc. per known level->tier naming
+	exRaidEligible: boolean;
+	// Egg phase: pokemonName/type/moves/etc. are all empty/null (boss unknown yet).
+	pokemonName: string;
+	pokemonId: number;
+	form: number;
+	formName: string;
+	costume: number;
+	gender: string;
+	genderValue: 1 | 2 | 3 | null;
+	type1: string;
+	type2: string;
+	type1Emoji: string;
+	type2Emoji: string;
+	quickMove: string;
+	chargeMove: string;
+	quickMoveEmoji: string;
+	chargeMoveEmoji: string;
+	shinyRatePercent: string;
+	shinyRateFraction: string;
+	shinyRateReduced: string;
+	evolutions: { fullName: string; pokemonId: number }[];
+	pokemonImageUrl: string;
+	// Egg phase counts down to `hatchTime`; boss phase counts down to `raidEndTime`. Only one of
+	// the two times is meaningful per phase, but both fields are always present (empty string for
+	// the inapplicable one) so a template doesn't need an {{#if isEgg}} just to pick the label.
+	hatchTime: string;
+	raidEndTime: string;
+	despawnUnix: number; // hatch time (egg) or raid end time (boss), whichever is upcoming
+	minutesLeft: number;
+	latitude: number;
+	longitude: number;
+	googleMapsUrl: string;
+	appleMapsUrl: string;
+	wazeMapUrl: string;
+	mapImageUrl: string;
+	diademUrl: string;
 };
