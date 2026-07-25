@@ -3,7 +3,7 @@ import {
 	embedTemplateSchema,
 	notificationNameSchema,
 	notificationScheduleSchema,
-	pokemonFiltersSchema
+	notificationTypeSchema
 } from "@/lib/server/notifications/validation";
 import { z } from "zod";
 
@@ -14,6 +14,7 @@ export const backupAreaSchema = z.object({
 
 export const backupTemplateSchema = z.object({
 	name: notificationNameSchema,
+	type: notificationTypeSchema,
 	embed: embedTemplateSchema
 });
 
@@ -22,14 +23,15 @@ const backupAreaRefSchema = z.union([
 	z.object({ source: z.literal("koji"), id: z.number().int().positive() })
 ]);
 
-// Same as pokemonFiltersSchema but with the raw areaId/areaSource replaced by a name-based
-// reference (see backupTypes.ts) — IDs don't survive an export/import round-trip.
-const backupFiltersSchema = pokemonFiltersSchema.omit({ areaSource: true, areaId: true }).extend({
-	areaRef: backupAreaRefSchema.optional()
-});
+// Intentionally loose here (validated for real against the type-specific schema — see
+// filtersSchemaForType — inside service.ts, once the subscription's `type` is known), same
+// reasoning as createSubscriptionSchema's own `filters` field. `areaRef` replaces the raw
+// areaId/areaSource (see backupTypes.ts) — IDs don't survive an export/import round-trip.
+const backupFiltersSchema = z.object({ areaRef: backupAreaRefSchema.optional() }).passthrough();
 
 export const backupSubscriptionSchema = z.object({
 	name: notificationNameSchema,
+	type: notificationTypeSchema,
 	enabled: z.boolean(),
 	mode: z.enum(["manual", "scheduled"]),
 	schedule: notificationScheduleSchema.nullable(),

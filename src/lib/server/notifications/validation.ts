@@ -4,6 +4,18 @@ import { z } from "zod";
 
 export const notificationNameSchema = z.string().trim().min(1).max(64);
 
+// Shared by every place a subscription/template's category needs validating (createTemplateSchema,
+// createSubscriptionSchema, backupValidation.ts) — one list to keep in sync as categories are added.
+export const notificationTypeSchema = z.enum([
+	"pokemon",
+	"raid",
+	"maxbattle",
+	"quest",
+	"invasion",
+	"lure",
+	"gym"
+]);
+
 const timeSchema = z.string().regex(/^([01]\d|2[0-4]):[0-5]\d$/, "Expected HH:MM (24h)");
 
 export const weeklyWindowSchema = z.object({
@@ -55,7 +67,7 @@ export const embedTemplateSchema = z.object({
 
 export const createTemplateSchema = z.object({
 	name: notificationNameSchema,
-	type: z.enum(["pokemon", "raid", "maxbattle", "quest", "invasion", "lure", "gym"]),
+	type: notificationTypeSchema,
 	embed: embedTemplateSchema
 });
 
@@ -175,7 +187,7 @@ export function filtersSchemaForType(type: NotificationType) {
 // one schema works for every notification type without a discriminated union at the API boundary.
 export const createSubscriptionSchema = z.object({
 	name: notificationNameSchema,
-	type: z.enum(["pokemon", "raid", "maxbattle", "quest", "invasion", "lure", "gym"]),
+	type: notificationTypeSchema,
 	templateId: z.number().int().positive().nullable().optional(),
 	enabled: z.boolean().optional(),
 	filters: z.record(z.string(), z.unknown()),

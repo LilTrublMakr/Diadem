@@ -13,7 +13,7 @@ import type {
 	BackupImportSummary,
 	NotificationsBackup
 } from "@/lib/features/notifications/backupTypes";
-import type { PokemonSubscriptionFilters } from "@/lib/features/notifications/types";
+import type { AnySubscriptionFilters } from "@/lib/features/notifications/types";
 
 // "all" = every row in the section; a number[] = only those ids (single-item export passes a
 // one-element array); absent = skip the section entirely.
@@ -69,6 +69,7 @@ export async function exportBackup(
 	if (include.templates) {
 		backup.templates = selected(templates, include.templates).map((t) => ({
 			name: t.name,
+			type: t.type,
 			embed: t.embed
 		}));
 	}
@@ -90,6 +91,7 @@ export async function exportBackup(
 
 			return {
 				name: s.name,
+				type: s.type,
 				enabled: s.enabled,
 				mode: s.mode,
 				schedule: s.schedule,
@@ -130,9 +132,11 @@ export async function importBackup(
 
 	for (const template of backup.templates ?? []) {
 		try {
-			// Backup/restore only covers "pokemon" templates/subscriptions for now — Raid support
-			// here is a fast-follow once the export/import UI grows a category selector too.
-			await createTemplate(userId, { name: template.name, type: "pokemon", embed: template.embed });
+			await createTemplate(userId, {
+				name: template.name,
+				type: template.type,
+				embed: template.embed
+			});
 			summary.templates.created++;
 		} catch (error) {
 			if (isNameTaken(error)) summary.templates.skipped++;
@@ -150,14 +154,17 @@ export async function importBackup(
 		]);
 		const notificationAreaIdByName = new Map(notificationAreas.map((a) => [a.name, a.id]));
 		const scanAreaIdByName = new Map(scanAreas.map((a) => [a.name, a.id]));
-		const templateIdByName = new Map(templates.map((t) => [t.name, t.id]));
+		// Keyed by (type, name) — not name alone. A template name is only unique per-type (the
+		// db's own unique constraint is on (userId, type, name)), so two categories can share a
+		// name (e.g. a "Default" template for both pokemon and raid) without colliding here.
+		const templateIdByTypeAndName = new Map(templates.map((t) => [`${t.type}:${t.name}`, t.id]));
 
 		for (const sub of backup.subscriptions) {
 			const { areaRef, ...restFilters } = sub.filters;
 			let hadRefButUnresolved = false;
 
 			let areaId: number | undefined;
-			let areaSource: PokemonSubscriptionFilters["areaSource"];
+			let areaSource: AnySubscriptionFilters["areaSource"];
 			if (areaRef?.source === "koji") {
 				areaId = areaRef.id;
 				areaSource = "koji";
@@ -171,10 +178,12 @@ export async function importBackup(
 				hadRefButUnresolved = areaId === undefined;
 			}
 
-			const templateId = sub.templateRef ? (templateIdByName.get(sub.templateRef) ?? null) : null;
+			const templateId = sub.templateRef
+				? (templateIdByTypeAndName.get(`${sub.type}:${sub.templateRef}`) ?? null)
+				: null;
 			if (sub.templateRef && templateId === null) hadRefButUnresolved = true;
 
-			const filters: PokemonSubscriptionFilters = { ...restFilters };
+			const filters: AnySubscriptionFilters = { ...restFilters };
 			if (areaId !== undefined) {
 				filters.areaId = areaId;
 				filters.areaSource = areaSource;
@@ -183,7 +192,7 @@ export async function importBackup(
 			try {
 				await createSubscription(userId, {
 					name: sub.name,
-					type: "pokemon",
+					type: sub.type,
 					templateId,
 					enabled: sub.enabled,
 					filters,

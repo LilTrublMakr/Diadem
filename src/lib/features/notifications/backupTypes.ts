@@ -1,4 +1,8 @@
-import type { EmbedTemplate, PokemonSubscriptionFilters } from "@/lib/features/notifications/types";
+import type {
+	AnySubscriptionFilters,
+	EmbedTemplate,
+	NotificationType
+} from "@/lib/features/notifications/types";
 import type {
 	NotificationSchedule,
 	SubscriptionMode
@@ -17,6 +21,7 @@ export type BackupArea = {
 
 export type BackupTemplate = {
 	name: string;
+	type: NotificationType;
 	embed: EmbedTemplate;
 };
 
@@ -24,17 +29,18 @@ export type BackupAreaRef =
 	| { source: "own" | "notificationArea"; name: string }
 	| { source: "koji"; id: number };
 
-// Same shape as PokemonSubscriptionFilters but with the raw areaId/areaSource replaced by a
+// Same shape as the type's own filters but with the raw areaId/areaSource replaced by a
 // name-based reference that can be re-resolved against whatever the target account currently has.
-export type BackupSubscriptionFilters = Omit<
-	PokemonSubscriptionFilters,
-	"areaSource" | "areaId"
-> & {
+// Loose (not narrowed per `type`) same as AnySubscriptionFilters itself — the real per-type shape
+// is validated server-side (backupValidation.ts / service.ts's filtersSchemaForType) once `type`
+// is known, matching how createSubscriptionSchema stays loose at this same boundary.
+export type BackupSubscriptionFilters = Omit<AnySubscriptionFilters, "areaSource" | "areaId"> & {
 	areaRef?: BackupAreaRef;
 };
 
 export type BackupSubscription = {
 	name: string;
+	type: NotificationType;
 	enabled: boolean;
 	mode: SubscriptionMode;
 	schedule: NotificationSchedule | null;
