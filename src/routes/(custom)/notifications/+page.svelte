@@ -114,15 +114,30 @@
 
 	function defaultEmbed(): EmbedTemplate {
 		return {
-			content: "{{pokemonName}}",
-			title: "{{pokemonName}}",
-			description: "IV: {{iv}}% • CP: {{cp}} • Level: {{level}}",
-			color: "#5865F2",
+			content:
+				'{{pokemonName}} · {{iv}}% · {{cp}}  CP{{#if (isnt weather "None")}} {{{weatherEmoji}}}{{/if}}',
+			title: "{{{type1Emoji}}}{{{type2Emoji}}} {{pokemonName}}",
+			description:
+				'Despawns <t:{{despawnUnix}}:R> at {{despawnTime}}\n{{#if (or trackedShundo trackedHundo trackedShiny trackedNundo)}}\nYour Collection:{{#if trackedShundoEmoji}} {{trackedShundoEmoji}}{{/if}}{{#if trackedHundoEmoji}} {{trackedHundoEmoji}}{{/if}}{{#if trackedShinyEmoji}} {{trackedShinyEmoji}}{{/if}}{{#if trackedNundoEmoji}} {{trackedNundoEmoji}}{{/if}}\n{{/if}}\n{{#if (isnt weather "None")}}\nWeather boosted: {{weather}} {{{weatherEmoji}}}\n{{/if}}\n{{#if evolutions.length}}\nCan evolve into: {{#each evolutions}}[{{fullName}}](https://pogovt.com/pokedex/{{pokemonId}}){{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}\nQuick: {{{quickMoveEmoji}}} {{quickMove}}, Charge: {{{chargeMoveEmoji}}} {{chargeMove}}\nShiny Rate: {{shinyRateReduced}} ({{shinyRatePercent}})\n{{#with (filterRank pvpLittle 25) as |ranked|}}\n{{#if ranked.length}}\n**Little League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}\n{{#with (filterRank pvpGreat 25) as |ranked|}}\n{{#if ranked.length}}\n**Great League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}\n{{#with (filterRank pvpUltra 25) as |ranked|}}\n{{#if ranked.length}}\n**Ultra League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}',
+			color: "#FF8000",
 			thumbnailUrl: "{{{pokemonImageUrl}}}",
 			imageUrl: "{{{mapImageUrl}}}",
-			footerText: "Despawns at {{despawnTime}} ({{minutesLeft}}m left)",
-			url: "{{{googleMapsUrl}}}",
-			fields: []
+			footerText: "",
+			url: "",
+			fields: [
+				{
+					name: "Directions",
+					value:
+						"[Waze]({{{wazeMapUrl}}}) | [Google]({{{googleMapsUrl}}}) | [Apple]({{{appleMapsUrl}}})",
+					inline: false
+				},
+				{
+					name: "Links",
+					value:
+						"[View on Map]({{{diademUrl}}}) | [Pokemon Page](https://pogovt.com/pokemon/{{pokemonId}})",
+					inline: false
+				}
+			]
 		};
 	}
 
