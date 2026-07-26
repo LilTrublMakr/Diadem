@@ -38,7 +38,7 @@ export async function generatePokemonMapImage(
 				gender: message.gender,
 				shiny: message.shiny
 			},
-			iconSetId
+			{ iconSet: iconSetId }
 		);
 
 		const payload = {
@@ -106,7 +106,7 @@ export async function generatePokemonSpriteImage(
 				gender: message.gender,
 				shiny: message.shiny
 			},
-			iconSetId
+			{ iconSet: iconSetId }
 		);
 
 		const response = await thisFetch(resize(iconPath, { width: 64 }), {
