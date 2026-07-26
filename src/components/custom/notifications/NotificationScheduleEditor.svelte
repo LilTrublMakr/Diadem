@@ -111,43 +111,52 @@
 			>Specific dates</span
 		>
 		{#each schedule.dated as window, i (i)}
-			<div class="flex flex-wrap items-center gap-2">
-				<input
-					type="date"
-					bind:value={window.date}
-					min={today}
-					class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-1.5 py-0.5 text-sm text-zinc-900 dark:text-zinc-100"
-				/>
-				<span class="text-xs text-zinc-400">to</span>
-				<input
-					type="date"
-					value={window.endDate ?? ""}
-					min={window.date}
-					title="Optional — leave blank for a single date"
-					oninput={(e) => {
-						window.endDate = e.currentTarget.value || undefined;
-					}}
-					class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-1.5 py-0.5 text-sm text-zinc-900 dark:text-zinc-100"
-				/>
-				<input
-					type="time"
-					bind:value={window.start}
-					class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-1.5 py-0.5 text-sm text-zinc-900 dark:text-zinc-100"
-				/>
-				<span class="text-xs text-zinc-400">to</span>
-				<input
-					type="time"
-					bind:value={window.end}
-					class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-1.5 py-0.5 text-sm text-zinc-900 dark:text-zinc-100"
-				/>
-				<button
-					type="button"
-					class="text-zinc-400 hover:text-red-500"
-					onclick={() => (schedule.dated = schedule.dated.filter((_, idx) => idx !== i))}
-					title="Remove date"
-				>
-					<X size={14} />
-				</button>
+			<div class="flex flex-col gap-1.5 rounded border border-zinc-200 dark:border-zinc-700 p-2">
+				<div class="flex flex-wrap items-center gap-2">
+					<span class="text-xs text-zinc-500 dark:text-zinc-400 w-32 shrink-0"
+						>Start Date &amp; Time:</span
+					>
+					<input
+						type="date"
+						bind:value={window.date}
+						min={today}
+						class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-1.5 py-0.5 text-sm text-zinc-900 dark:text-zinc-100"
+					/>
+					<input
+						type="time"
+						bind:value={window.start}
+						class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-1.5 py-0.5 text-sm text-zinc-900 dark:text-zinc-100"
+					/>
+					<button
+						type="button"
+						class="ml-auto text-zinc-400 hover:text-red-500"
+						onclick={() => (schedule.dated = schedule.dated.filter((_, idx) => idx !== i))}
+						title="Remove date"
+					>
+						<X size={14} />
+					</button>
+				</div>
+				<div class="flex flex-wrap items-center gap-2">
+					<span class="text-xs text-zinc-500 dark:text-zinc-400 w-32 shrink-0"
+						>End Date &amp; Time:</span
+					>
+					<input
+						type="date"
+						value={window.endDate ?? window.date}
+						min={window.date}
+						title="Same as start date = single date; pick a later date for a range"
+						oninput={(e) => {
+							const v = e.currentTarget.value;
+							window.endDate = v && v !== window.date ? v : undefined;
+						}}
+						class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-1.5 py-0.5 text-sm text-zinc-900 dark:text-zinc-100"
+					/>
+					<input
+						type="time"
+						bind:value={window.end}
+						class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-1.5 py-0.5 text-sm text-zinc-900 dark:text-zinc-100"
+					/>
+				</div>
 			</div>
 			{#if window.endDate}
 				<p class="text-xs text-zinc-400 -mt-1">
