@@ -141,7 +141,7 @@ export const POKEMON_TEMPLATE_FIELDS: TemplateField[] = [
 	{ tag: "despawnTime", label: "Despawn Time", category: "Time", sample: "3:45:12 PM" },
 	{
 		tag: "despawnUnix",
-		label: "Despawn Unix Time (for Discord <t:...> tags)",
+		label: "Despawn Unix Time",
 		category: "Time",
 		sample: "1700000000"
 	},
@@ -297,7 +297,7 @@ export const RAID_TEMPLATE_FIELDS: TemplateField[] = [
 
 	{
 		tag: "despawnUnix",
-		label: "Countdown Unix Time (for Discord <t:...> tags)",
+		label: "Countdown Unix Time",
 		category: "Time",
 		sample: "1700000000"
 	},
@@ -410,7 +410,7 @@ export const MAXBATTLE_TEMPLATE_FIELDS: TemplateField[] = [
 	{ tag: "battleEndTime", label: "Battle End Time", category: "Time", sample: "4:45:12 PM" },
 	{
 		tag: "despawnUnix",
-		label: "Countdown Unix Time (for Discord <t:...> tags)",
+		label: "Countdown Unix Time",
 		category: "Time",
 		sample: "1700000000"
 	},
@@ -585,7 +585,7 @@ export const INVASION_TEMPLATE_FIELDS: TemplateField[] = [
 
 	{
 		tag: "expireUnix",
-		label: "Countdown Unix Time (for Discord <t:...> tags)",
+		label: "Countdown Unix Time",
 		category: "Time",
 		sample: "1700000000"
 	},
@@ -644,7 +644,7 @@ export const LURE_TEMPLATE_FIELDS: TemplateField[] = [
 
 	{
 		tag: "expireUnix",
-		label: "Countdown Unix Time (for Discord <t:...> tags)",
+		label: "Countdown Unix Time",
 		category: "Time",
 		sample: "1700000000"
 	},
@@ -788,6 +788,13 @@ export const CONDITIONAL_TEMPLATE_FIELDS: TemplateField[] = [
  */
 export const PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 	{
+		tag: "<t:{{despawnUnix}}:R>",
+		label: 'Discord relative time (e.g. "in 12 minutes")',
+		category: "Time",
+		sample: "",
+		raw: true
+	},
+	{
 		tag: '{{#if (isnt weather "None")}}☁️ Weather boosted: {{weather}}\n{{/if}}',
 		label: "Weather boost note",
 		category: "Presets",
@@ -835,6 +842,13 @@ export const PRESET_TEMPLATE_FIELDS: TemplateField[] = [
  * reference pokemon-only context fields (weather, evolutions, pvp, tracked badges). */
 export const RAID_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 	{
+		tag: "<t:{{despawnUnix}}:R>",
+		label: 'Discord relative time (e.g. "in 12 minutes")',
+		category: "Time",
+		sample: "",
+		raw: true
+	},
+	{
 		tag: "{{#if isEgg}}Hatches {{minutesLeft}}m from now{{else}}{{pokemonName}} — despawns in {{minutesLeft}}m{{/if}}",
 		label: "Egg vs boss summary",
 		category: "Presets",
@@ -845,6 +859,13 @@ export const RAID_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 
 /** Preset snippets for the "maxbattle" type. */
 export const MAXBATTLE_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
+	{
+		tag: "<t:{{despawnUnix}}:R>",
+		label: 'Discord relative time (e.g. "in 12 minutes")',
+		category: "Time",
+		sample: "",
+		raw: true
+	},
 	{
 		tag: "{{#if gmax}}⚡ Gigantamax! {{/if}}{{pokemonName}} — ends in {{minutesLeft}}m",
 		label: "Gigantamax callout summary",
@@ -868,6 +889,13 @@ export const QUEST_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 /** Preset snippets for the "invasion" type. */
 export const INVASION_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 	{
+		tag: "<t:{{expireUnix}}:R>",
+		label: 'Discord relative time (e.g. "in 12 minutes")',
+		category: "Time",
+		sample: "",
+		raw: true
+	},
+	{
 		tag: '{{#if (eq kind "grunt")}}{{characterName}}{{else}}{{kind}} incident{{/if}} at {{pokestopName}}',
 		label: "Kind-aware summary",
 		category: "Presets",
@@ -885,6 +913,13 @@ export const INVASION_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 
 /** Preset snippets for the "lure" type. */
 export const LURE_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
+	{
+		tag: "<t:{{expireUnix}}:R>",
+		label: 'Discord relative time (e.g. "in 12 minutes")',
+		category: "Time",
+		sample: "",
+		raw: true
+	},
 	{
 		tag: "{{lureTypeEmoji}} {{lureTypeName}} at {{pokestopName}} — expires in {{minutesLeft}}m",
 		label: "Lure summary",
