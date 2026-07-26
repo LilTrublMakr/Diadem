@@ -42,9 +42,27 @@ const paraglideHandle: Handle = ({ event, resolve }) =>
 
 const authLog = getServerLogger("auth");
 
+const publicRoutePrefixes = ["/api/locale/", "/assets/"];
+const publicRoutes = new Set(["/api/config", "/api/pogodata", "/api/koji", "/api/stats"]);
+
+function isPublicRoute(pathname: string) {
+	return (
+		publicRoutes.has(pathname) || publicRoutePrefixes.some((prefix) => pathname.startsWith(prefix))
+	);
+}
+
 const handleAuth: Handle = async ({ event, resolve }) => {
 	if (auth && event.url.pathname.startsWith(`${AUTH_BASE_PATH}/`)) {
 		return auth.handler(event.request);
+	}
+
+	// These endpoints never use request-specific permissions. Avoid a session, database,
+	// and Koji lookup so they remain safe and useful CDN cache candidates.
+	if (isPublicRoute(event.url.pathname)) {
+		event.locals.perms = { everywhere: [], areas: [] };
+		event.locals.user = null;
+		event.locals.session = null;
+		return resolve(event);
 	}
 
 	event.locals.perms = await getEveryonePerms(event.fetch);

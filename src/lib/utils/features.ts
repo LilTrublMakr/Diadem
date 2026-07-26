@@ -127,3 +127,8 @@ export type Perms = {
 	// User scan-area worker allotment: undefined/0 = feature off, -1 = unlimited
 	scanWorkers?: number;
 };
+
+export function removeRedundantPermissionAreas(perms: Perms): Perms {
+	if (!perms.everywhere.includes(Features.ALL)) return perms;
+	return { ...perms, areas: [] };
+}

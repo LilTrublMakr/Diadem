@@ -8,13 +8,13 @@ const config = {
 	kit: {
 		adapter: adapter(),
 		alias: {
-			"@": "src"
+			"@": "./src"
 		},
 		files: {
 			serviceWorker: "src/lib/serviceWorker/index.ts"
 		},
-		alias: {
-			"@": "./src"
+		serviceWorker: {
+			register: false
 		}
 	},
 
