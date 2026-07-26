@@ -795,42 +795,42 @@ export const PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 		raw: true
 	},
 	{
-		tag: '{{#if (isnt weather "None")}}☁️ Weather boosted: {{weather}}\n{{/if}}',
+		tag: '{{#if (isnt weather "None")}}\n☁️ Weather boosted: {{weather}}\n{{/if}}',
 		label: "Weather boost note",
 		category: "Presets",
 		sample: "",
 		raw: true
 	},
 	{
-		tag: "{{#if evolutions.length}}Evolution family: {{#each evolutions}}{{fullName}}{{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}",
+		tag: "{{#if evolutions.length}}\nEvolution family: {{#each evolutions}}{{fullName}}{{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}",
 		label: "Evolution family list",
 		category: "Presets",
 		sample: "",
 		raw: true
 	},
 	{
-		tag: "{{#with (filterRank pvpLittle 25) as |ranked|}}{{#if ranked.length}}**Little League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}{{/if}}{{/with}}",
+		tag: "{{#with (filterRank pvpLittle 25) as |ranked|}}\n{{#if ranked.length}}\n**Little League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}",
 		label: "Little League rankings (rank 25 or better)",
 		category: "Presets",
 		sample: "",
 		raw: true
 	},
 	{
-		tag: "{{#with (filterRank pvpGreat 25) as |ranked|}}{{#if ranked.length}}**Great League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}{{/if}}{{/with}}",
+		tag: "{{#with (filterRank pvpGreat 25) as |ranked|}}\n{{#if ranked.length}}\n**Great League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}",
 		label: "Great League rankings (rank 25 or better)",
 		category: "Presets",
 		sample: "",
 		raw: true
 	},
 	{
-		tag: "{{#with (filterRank pvpUltra 25) as |ranked|}}{{#if ranked.length}}**Ultra League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}{{/if}}{{/with}}",
+		tag: "{{#with (filterRank pvpUltra 25) as |ranked|}}\n{{#if ranked.length}}\n**Ultra League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}",
 		label: "Ultra League rankings (rank 25 or better)",
 		category: "Presets",
 		sample: "",
 		raw: true
 	},
 	{
-		tag: "{{#if (or trackedShundo trackedHundo trackedShiny trackedNundo)}}Have:{{#if trackedShundoEmoji}} {{trackedShundoEmoji}}{{/if}}{{#if trackedHundoEmoji}} {{trackedHundoEmoji}}{{/if}}{{#if trackedShinyEmoji}} {{trackedShinyEmoji}}{{/if}}{{#if trackedNundoEmoji}} {{trackedNundoEmoji}}{{/if}}{{/if}}",
+		tag: "{{#if (or trackedShundo trackedHundo trackedShiny trackedNundo)}}\nHave:{{#if trackedShundoEmoji}} {{trackedShundoEmoji}}{{/if}}{{#if trackedHundoEmoji}} {{trackedHundoEmoji}}{{/if}}{{#if trackedShinyEmoji}} {{trackedShinyEmoji}}{{/if}}{{#if trackedNundoEmoji}} {{trackedNundoEmoji}}{{/if}}\n{{/if}}",
 		label: "Have: badges (your collection)",
 		category: "Presets",
 		sample: "",
@@ -903,7 +903,7 @@ export const INVASION_PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 		raw: true
 	},
 	{
-		tag: "{{#if lineup.length}}Confirmed catches: {{#each lineup}}{{pokemonName}}{{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}",
+		tag: "{{#if lineup.length}}\nConfirmed catches: {{#each lineup}}{{pokemonName}}{{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}",
 		label: "Confirmed catches list (lineup)",
 		category: "Presets",
 		sample: "",
