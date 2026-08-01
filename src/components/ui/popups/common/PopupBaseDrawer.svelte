@@ -11,6 +11,11 @@
 	import type { Coords } from "$lib/utils/coordinates";
 	import PopupBaseStatic, { type MapObjectPopupProps } from "@/components/ui/popups/common/PopupBaseStatic.svelte";
 	import type { MapData } from "$lib/mapObjects/mapObjectTypes";
+	import {
+		centerRequestedMapObjectIfPopupCovers,
+		getPopupVisibilityRequest,
+		type PopupVisibilityRequest
+	} from "$lib/mapObjects/popupVisibility.svelte";
 
 	let {
 		open = $bindable(false),
@@ -28,6 +33,7 @@
 
 	let snapPoints: SnapPoint[] = $derived([initialSnapPoint, 1]);
 	let activeSnapPoint: SnapPoint = $state(untrack(() => initialSnapPoint));
+	let pendingVisibilityRequest: PopupVisibilityRequest | undefined;
 
 	function updateInitialSnapPoint() {
 		if (typeof document === "undefined") return;
@@ -39,7 +45,8 @@
 		const distance = endElement.getBoundingClientRect().bottom - drawerElement.getBoundingClientRect().top;
 		if (distance <= 0) return;
 
-		const nextSnapPoint = `${Math.ceil(distance + 16)}px`;
+		const popupHeight = Math.ceil(distance + 16);
+		const nextSnapPoint = `${popupHeight}px`;
 		const wasAtInitialSnapPoint = activeSnapPoint === initialSnapPoint;
 
 		initialSnapPoint = nextSnapPoint;
@@ -49,16 +56,33 @@
 				activeSnapPoint = nextSnapPoint;
 			})
 		}
+
+		if (pendingVisibilityRequest) {
+			const request = pendingVisibilityRequest;
+			pendingVisibilityRequest = undefined;
+			centerRequestedMapObjectIfPopupCovers(request, { height: popupHeight });
+		}
+	}
+
+	function updatePopupLayout() {
+		tick().then(() => {
+			if (open) updateInitialSnapPoint();
+		});
 	}
 
 	watch(
 		() => [data, props, open],
 		() => {
 			if (!open) return;
+			updatePopupLayout();
+		}
+	);
 
-			tick().then(() => {
-				updateInitialSnapPoint();
-			});
+	watch(
+		() => getPopupVisibilityRequest(),
+		(request) => {
+			pendingVisibilityRequest = request;
+			if (request) updatePopupLayout();
 		}
 	);
 
