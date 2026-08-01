@@ -224,6 +224,13 @@ All custom code lives in paths that Diadem treats as extension points:
 | `src/routes/(custom)/areas/+page.svelte` | User scan-area page at `/areas` — draw polygons (terra-draw), worker steppers, active toggles, allotment meter |
 | `src/lib/features/scanAreas/` | Client state (`scanAreasState.svelte.ts`), shared DTO types (`types.ts`), schedule types (`scheduleTypes.ts`), overlap validator (`scheduleOverlap.ts` — pure, shared server+client) |
 | `src/components/custom/scanAreas/` | `ScanAreaMap.svelte` (local MapLibre + terra-draw), `ScanAreaCard.svelte` (mode switch + toggle + workers), `ScheduleEditor.svelte` (weekly/dated windows, live conflict pre-check), `AllotmentMeter.svelte` |
+| `src/routes/(custom)/notifications/+page.svelte` | Discord DM notifications UI at `/notifications` — subscriptions + templates lists, category tabs, create/edit dialogs, schedule editor, backup/restore panel |
+| `src/routes/api/custom/webhook/golbat/+server.ts` | Golbat webhook ingestion — per-category dedup map, filter matcher, `deliverX`/`handleX`, dispatch loop; gym's in-memory team/slot/battle state tracker also lives here |
+| `src/routes/api/custom/notifications/` | REST API — `templates/`, `subscriptions/`, `areas/` CRUD; `test-send/+server.ts` (send a real DM from the template editor); `backup/+server.ts` (export/import) |
+| `src/lib/server/notifications/` | `service.ts` (CRUD + validation + per-user mutex), `validation.ts` (zod schemas, one per type, `filtersSchemaForType()`), `render.ts` (`buildXContext()` per type + `renderEmbed()`), `golbatTypes.ts` (`GolbatXMessage` wire types), `matchCache.ts` (subscription cache incl. pokemon-specific index), `kojiAreaCache.ts`, `mapImage.ts` (map/sprite image generation), `bot.ts` (Discord DM sending), `backupService.ts`/`backupValidation.ts` |
+| `src/lib/features/notifications/` | `types.ts` (`NotificationType`, per-type filters/context types), `templateFields.ts` (per-type `X_TEMPLATE_FIELDS`/`X_PRESET_TEMPLATE_FIELDS` tag-picker registries), `discordEmoji.ts` (uploaded custom emoji ids), `handlebarsHelpers.ts` (`eq`/`isnt`/`gt`/`lt`/`gte`/`lte`/`and`/`or`/`oneOf`/`filterRank`), `scheduleTypes.ts`/`scheduleActive.ts`, `notificationsState.svelte.ts`/`notificationAreasState.svelte.ts`, `backupState.ts`/`backupTypes.ts`, per-type `xTestData.ts` (hand-authored preview scenarios + `randomizeXContext()`) |
+| `src/components/custom/notifications/` | `TemplateEditor.svelte` (tag picker + live preview + test-send), `DiscordEmbedPreview.svelte`, `TagPicker.svelte`, `PokemonPicker.svelte`/`PokemonFormPicker.svelte`, `AreaPicker.svelte`, `NotificationScheduleEditor.svelte`, `NotificationAreaMap.svelte`, per-type `XFilterEditor.svelte` (Raid/MaxBattle/Quest/Invasion/Lure/Gym) |
+| `src/lib/server/db/internal/schema.ts` | `notification_template`, `notification_subscription` (unique on `(userId, type, name)`), `notification_area` tables |
 
 ---
 
@@ -268,6 +275,35 @@ For charts/history using `stats_workers`, a direct MariaDB connection is availab
 
 `stats_workers` columns: `datetime`, `drago_worker`, `mode`, `api_worker`, `loc_avg`, `loc_count`, `loc_success`, `mons_seen`, `mons_enc`, `stops`, `quests`, `distance`, `retries`, `timeElapsed`, `locationDelay`, `gmos`, `gmoInitialSuccess`, `gmo0fail`–`gmo8fail`, `gmoNoCell`, `gmoGivingUp`, `gmoDelay`
 
+### Discord Notifications System (`/notifications`)
+
+Self-service Discord DM alerts — a user picks what they want to be notified about, designs their own message template (Handlebars, live preview), and the app DMs them directly when a matching Golbat webhook event arrives. 7 categories are live: **pokemon, raid, maxbattle, quest, invasion, lure, gym**. Nests are deferred indefinitely (Golbat has no live "nest changed" event); fort_update and a predictive AccuWeather-based "possible weather change" alert are both designed but not built (see `C:\Users\Matt\.claude\plans\i-would-like-to-cryptic-wren.md` for the weather plan if picked back up).
+
+**Per-category pattern** — every category touches the same set of files; use this as the recipe for adding a new one:
+
+1. Verify exact Golbat webhook wire field names by reading PoracleNG's Go source directly (`D:\GIT\PoracleNG\processor\internal\webhook\types.go` + the matching `internal/matching/<type>.go` + `internal/enrichment/<type>.go`) — **never** trust a summarized field-name list from memory. PoracleNG is a read-only reference codebase, never modified.
+2. `src/lib/features/notifications/types.ts` — add to `NotificationType`, add `XSubscriptionFilters extends BaseSubscriptionFilters`, add `XTemplateContext`, add to `AnySubscriptionFilters`.
+3. `src/lib/server/notifications/golbatTypes.ts` — `GolbatXMessage` (the webhook `message` shape).
+4. `src/lib/server/notifications/validation.ts` — `xFiltersSchema`, wired into `filtersSchemaForType()` and the shared `notificationTypeSchema` enum.
+5. `src/lib/server/notifications/render.ts` — `buildXContext()`, widen `renderEmbed()`'s context union.
+6. `src/routes/api/custom/webhook/golbat/+server.ts` — dedup map, `matchesXFilters()`, `deliverX()`/`handleX()`, dispatch branch.
+7. `src/lib/features/notifications/templateFields.ts` — `X_TEMPLATE_FIELDS` + `X_PRESET_TEMPLATE_FIELDS` (only tags that make sense for that category — e.g. raid bosses have no IV/CP, quest/gym have no despawn/countdown field at all).
+8. `src/lib/features/notifications/xTestData.ts` (new) — hand-authored preview scenarios + `randomizeXContext()`.
+9. `src/components/custom/notifications/XFilterEditor.svelte` (new) — reuses `PokemonPicker`/`AreaPicker` where relevant.
+10. Wire into `+page.svelte` (`CATEGORY_LABELS`, `defaultXEmbed/Filters`, dialog branch, `filterSummary`), `TemplateEditor.svelte`, `DiscordEmbedPreview.svelte`, `test-send/+server.ts`.
+11. `backupService.ts`/`backupTypes.ts`/`backupValidation.ts` need **zero** changes — already fully generic across every `NotificationType` via the shared `notificationTypeSchema`/`AnySubscriptionFilters`.
+12. `pnpm run check` + `pnpm run build` clean, `pnpm exec prettier --write` on touched files.
+
+**Gotchas discovered building all 7:**
+
+- **Golbat's own wire format is internally inconsistent** across envelope variants for the same concept — confirmed twice (gym: `gym_id`/`id`, `team_id`/`team`, `is_in_battle`/`in_battle`; invasion/lure: `pokestop_name`/`name` for the same underlying "pokestop" envelope). Read both fields defensively (`a ?? b`) rather than trusting one struct's tag over another's.
+- **Lure has no dedicated Golbat wire type** — it always arrives bundled on a `"pokestop"` envelope alongside optional invasion data (sniffed via `lure_expiration > 0` / `incident_expiration > 0`), both dispatched independently since a stop can have both at once.
+- **Gym is the only category needing real cross-webhook state** (team/slot/battle deltas aren't derivable from a single webhook) — an in-memory `gymStates` Map in the webhook route mirrors PoracleNG's `GymStateTracker`, no disk persistence (a restart just causes one cold-start burst of "first sighting" updates, not a correctness issue).
+- **Handlebars "standalone tag" whitespace rule** — a `{{#if}}`/`{{/if}}`/`{{#with}}` block tag alone on its own line (nothing else, just whitespace) contributes no newline of its own regardless of whether the block renders; put the opening tag, content, and closing tag each on their own line for any conditional that should hide a *whole line* when false. Getting this wrong (gluing `{{/if}}` directly onto following text, or putting the newline *inside* the conditional instead of around it) either glues unrelated lines together or leaves a stray blank line. Verified empirically against the project's real `handlebars`/`filterRank` helpers before shipping any preset that relies on this.
+- **This app's own existing map-filter code already solved several things PoracleNG solves differently** — `pokestopUtils.ts`'s `Character`/`INVASION_CHARACTER_LEADERS` + `ingameLocale.ts`'s `mCharacter()`/`mPokemon()`/`mItem()` for grunt numbering and quest reward text. Prefer reusing this app's own conventions over porting PoracleNG's string-keyed schemes when both exist for the same concept.
+- Template `name` uniqueness is per `(userId, type, name)`, not globally per user — two categories can share a template name; backup/restore's name-based re-linking on import must key on `(type, name)`, not name alone.
+- The Discord relative-time preset (`<t:{{despawnUnix}}:R>` / `<t:{{expireUnix}}:R>`) only applies to pokemon/raid/maxbattle (`despawnUnix`) and invasion/lure (`expireUnix`) — quest and gym have no despawn/expiry concept at all.
+
 ---
 
 ## Planned Features
@@ -285,7 +321,12 @@ For charts/history using `stats_workers`, a direct MariaDB connection is availab
 - [x] NavBar username → dropdown with avatar, Profile link, Logout
 - [x] User scan areas (`/areas`) — per-user drawn geofences, worker allotment per Discord role (`scanWorkers` on permission sets, -1/admin = unlimited), mirror-all lifecycle against Dragonite v2 area API, 5 km² hard / 2.5 km² recommended size limits
 - [x] Per-area schedules — Dragonite scheduler engine; manual|scheduled mode per area; weekly windows + one-off dates in the user's browser tz; overlap-aware allotment (sum of workers at any instant ≤ allotment; manual-active counts 24/7)
+- [x] Personal Discord DM notifications (`/notifications`) — custom Handlebars templates with live preview + test-send, area/schedule scoping, 7 categories: pokemon, raid, maxbattle, quest, invasion, lure, gym
+- [x] Notification backup/restore — export/import areas, templates, and subscriptions as a portable JSON file, covers all 7 categories
 - [ ] Worker history charts — using `stats_workers` from Dragonite DB
+- [ ] Fort/pokestop metadata-change notifications (name/description/image/location changes) — designed, not built
+- [ ] Predictive "possible weather change" notifications (AccuWeather forecast vs. Golbat's current per-cell weather) — designed and backburnered, see `C:\Users\Matt\.claude\plans\i-would-like-to-cryptic-wren.md`
+- [ ] Nest notifications — deferred indefinitely, Golbat has no live "nest changed" event to key off
 
 ---
 
