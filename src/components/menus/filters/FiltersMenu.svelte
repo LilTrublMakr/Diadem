@@ -3,6 +3,7 @@
 	import { getUserSettings, updateUserSettings } from "@/lib/services/userSettings.svelte.js";
 	import FilterSection from "@/components/menus/filters/FilterSection.svelte";
 	import SignInButton from "@/components/ui/user/SignInButton.svelte";
+	import { mapObjectLabels } from "@/lib/mapObjects/mapObjectLabels";
 	import { MapObjectType } from "@/lib/mapObjects/mapObjectTypes";
 	import { featureFamily, Features } from "@/lib/utils/features";
 </script>
@@ -14,7 +15,7 @@
 	<SignInButton />
 	<FilterSection
 		requiredPermission={featureFamily[MapObjectType.POKEMON]}
-		title={m.pogo_pokemon()}
+		title={mapObjectLabels[MapObjectType.POKEMON]()}
 		category="pokemon"
 		mapObject={MapObjectType.POKEMON}
 		filterModal="filtersetPokemon"
@@ -23,7 +24,7 @@
 
 	<FilterSection
 		requiredPermission={Features.POKESTOP}
-		title={m.pogo_pokestops()}
+		title={mapObjectLabels[MapObjectType.POKESTOP]()}
 		category="pokestop"
 		mapObject={MapObjectType.POKESTOP}
 		isFilterable={false}
@@ -70,7 +71,7 @@
 
 	<FilterSection
 		requiredPermission={Features.GYM}
-		title={m.pogo_gyms()}
+		title={mapObjectLabels[MapObjectType.GYM]()}
 		category="gym"
 		mapObject={MapObjectType.GYM}
 		isFilterable={false}
@@ -92,7 +93,7 @@
 
 	<FilterSection
 		requiredPermission={Features.STATION}
-		title={m.pogo_stations()}
+		title={mapObjectLabels[MapObjectType.STATION]()}
 		category={MapObjectType.STATION}
 		mapObject={MapObjectType.STATION}
 		isFilterable={false}
@@ -114,7 +115,7 @@
 
 	<FilterSection
 		requiredPermission={MapObjectType.NEST}
-		title={m.nests()}
+		title={mapObjectLabels[MapObjectType.NEST]()}
 		mapObject={MapObjectType.NEST}
 		category="nest"
 		isFilterable={false}
@@ -122,7 +123,7 @@
 
 	<FilterSection
 		requiredPermission={MapObjectType.TAPPABLE}
-		title={m.tappables()}
+		title={mapObjectLabels[MapObjectType.TAPPABLE]()}
 		mapObject={MapObjectType.TAPPABLE}
 		category="tappable"
 		isFilterable={false}
@@ -138,7 +139,7 @@
 
 	<FilterSection
 		requiredPermission={MapObjectType.S2_CELL}
-		title={m.s2_cells()}
+		title={mapObjectLabels[MapObjectType.S2_CELL]()}
 		mapObject={MapObjectType.S2_CELL}
 		category="s2cell"
 		isFilterable={false}
@@ -146,7 +147,7 @@
 
 	<FilterSection
 		requiredPermission={MapObjectType.SPAWNPOINT}
-		title={m.spawnpoints()}
+		title={mapObjectLabels[MapObjectType.SPAWNPOINT]()}
 		mapObject={MapObjectType.SPAWNPOINT}
 		category="spawnpoint"
 		isFilterable={false}

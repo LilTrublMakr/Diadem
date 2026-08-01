@@ -3,6 +3,13 @@ import type { AnyFilter, FilterPokemon, FilterS2Cell } from "@/lib/features/filt
 import { checkAndFirePokemonNotifications } from "@/lib/features/notifications/browserNotifications";
 import type { PokemonData } from "@/lib/types/mapObjectData/pokemon";
 import { updateFeatures } from "@/lib/map/featuresGen.svelte";
+import { getMap } from "@/lib/map/map.svelte";
+import {
+	clearAllDataLimits,
+	clearDataLimit,
+	getDataLimit,
+	setDataLimit
+} from "@/lib/mapObjects/dataLimitState.svelte";
 import { type Bounds, getBounds } from "@/lib/mapObjects/mapBounds";
 import {
 	addMapObjects,
@@ -40,6 +47,7 @@ export function clearMap() {
 	// TODO: Also do this on login
 	clearAllMapObjects();
 	resetLastQueryTimestamps();
+	clearAllDataLimits();
 	updateFeatures(getMapObjects());
 }
 
@@ -113,8 +121,17 @@ export async function updateMapObject(
 
 	if (!filter || !filter.enabled) {
 		clearMapObjects(type);
+		clearDataLimit(type);
 		if (!signal) updateFeatures(getMapObjects());
 		return;
+	}
+
+	const limitInfo = getDataLimit(type);
+	if (limitInfo) {
+		// don't refetch a limited type until the map was zoomed in or its filters changed
+		const zoomedIn = (getMap()?.getZoom() ?? 0) > limitInfo.zoom + 0.01;
+		const filterChanged = JSON.stringify(filter) !== limitInfo.filterJson;
+		if (!zoomedIn && !filterChanged) return;
 	}
 
 	const since = onlyChanged ? lastQueryTimestamps.get(type) : undefined;
@@ -123,6 +140,7 @@ export async function updateMapObject(
 
 	let examined: number = 0;
 	let data: MapData[] | undefined = undefined;
+	let clearLimitAfterRender = false;
 	if (type === MapObjectType.S2_CELL) {
 		data = getS2CellMapObjects(getBounds(), filter as FilterS2Cell);
 		examined = data.length;
@@ -130,7 +148,16 @@ export async function updateMapObject(
 		const response = await fetchMapObjects(type, getBounds(), filter, signal, since);
 		if (signal?.aborted) return;
 		if (response) {
-			data = response.data;
+			if (response.limitReached) {
+				setDataLimit(type, {
+					zoom: getMap()?.getZoom() ?? 0,
+					filterJson: JSON.stringify(filter)
+				});
+				data = [];
+			} else {
+				data = response.data;
+				clearLimitAfterRender = Boolean(limitInfo);
+			}
 			examined = response.examined;
 		}
 	}
@@ -155,11 +182,17 @@ export async function updateMapObject(
 			addMapObjects(data, type, examined, isDelta);
 		}
 	} catch (e) {
+		clearLimitAfterRender = false;
 		console.log(data);
 		console.error(e);
 	}
 
-	if (!signal) updateFeatures(getMapObjects());
+	if (!signal) {
+		updateFeatures(getMapObjects());
+		if (clearLimitAfterRender) clearDataLimit(type);
+	}
+
+	return clearLimitAfterRender ? type : undefined;
 }
 
 export async function updateAllMapObjects(removeOld: boolean = true, onlyChanged: boolean = false) {
@@ -170,28 +203,34 @@ export async function updateAllMapObjects(removeOld: boolean = true, onlyChanged
 	currentController = controller;
 
 	const activeSearch = getActiveSearch();
+	let limitsToClear: MapObjectType[] = [];
 
 	if (activeSearch) {
 		for (const mapObjectType of allMapObjectTypes) {
 			if (mapObjectType !== activeSearch.mapObject) clearMapObjects(mapObjectType);
 		}
-		await updateMapObject(
+		const limitToClear = await updateMapObject(
 			activeSearch.mapObject,
 			removeOld,
 			activeSearch.filter,
 			controller.signal,
 			onlyChanged
 		);
+		if (limitToClear) limitsToClear.push(limitToClear);
 	} else {
-		await Promise.all([
-			...allMapObjectTypes.map((type) =>
-				updateMapObject(type, removeOld, undefined, controller.signal, onlyChanged)
+		const [limitResults] = await Promise.all([
+			Promise.all(
+				allMapObjectTypes.map((type) =>
+					updateMapObject(type, removeOld, undefined, controller.signal, onlyChanged)
+				)
 			),
 			updateWeather()
 		]);
+		limitsToClear = limitResults.filter((type) => type !== undefined);
 	}
 
 	if (controller.signal.aborted) return;
 	currentController = undefined;
 	updateFeatures(getMapObjects());
+	for (const type of limitsToClear) clearDataLimit(type);
 }

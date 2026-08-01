@@ -4,6 +4,7 @@
 	import { getConfig } from "@/lib/services/config/config";
 	import { getCurrentSelectedData } from "@/lib/mapObjects/currentSelectedState.svelte.js";
 	import WeatherOverview from "@/components/map/WeatherOverview.svelte";
+	import DataLimitNotice from "@/components/map/DataLimitNotice.svelte";
 	import { isSupportedFeature } from "@/lib/services/supportedFeatures";
 	import { closeMenu, getOpenedMenu } from "@/lib/ui/menus.svelte.js";
 	import Fabs from "@/components/ui/fab/Fabs.svelte";
@@ -112,8 +113,9 @@
 			{/if}
 		{/snippet}
 		{#snippet desktopRight()}
-			<div class="mb-auto mx-2 mt-safe-inset-top">
+			<div class="mb-auto mx-2 mt-safe-inset-top flex flex-col items-end gap-2">
 				<WeatherOverview />
+				<DataLimitNotice />
 			</div>
 			<div class="flex">
 				{#if !isSearchViewActive()}
@@ -127,10 +129,13 @@
 
 		{#snippet mobileTop()}
 			<div
-				class="fixed top-safe-inset-top z-10"
+				class="fixed top-safe-inset-top z-10 flex flex-col gap-2"
 				class:right-2={!isUiLeft() || isMenuSidebar()}
 				class:left-2={isUiLeft() && !isMenuSidebar()}
+				class:items-end={!isUiLeft() || isMenuSidebar()}
+				class:items-start={isUiLeft() && !isMenuSidebar()}
 			>
+				<DataLimitNotice />
 				<WeatherOverview />
 			</div>
 		{/snippet}
