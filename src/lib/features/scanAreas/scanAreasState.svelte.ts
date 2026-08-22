@@ -126,6 +126,16 @@ export async function setActive(
 	return dto;
 }
 
+/** Clears a scheduled area's manual override, handing control back to the schedule. */
+export async function clearOverride(id: number): Promise<ScanAreaDto | ScanAreaApiError> {
+	const res = await fetch(`/api/custom/scan-areas/${id}/resume`, { method: "POST" });
+	if (!res.ok) return parseError(res);
+	const dto = (await res.json()) as ScanAreaDto;
+	state.areas = state.areas.map((a) => (a.id === id ? dto : a));
+	recomputeUsed();
+	return dto;
+}
+
 export async function setMode(
 	id: number,
 	mode: ScanAreaMode

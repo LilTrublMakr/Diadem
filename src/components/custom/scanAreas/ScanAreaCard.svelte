@@ -1,5 +1,6 @@
 <script lang="ts">
 	import {
+		clearOverride,
 		isApiError,
 		patchArea,
 		removeArea,
@@ -53,8 +54,11 @@
 
 	let sizeKm2 = $derived((area.areaSqM / 1_000_000).toFixed(2));
 	let oversized = $derived(area.areaSqM > recommendedAreaSqM);
+	let currentlyOccupying = $derived(
+		area.mode === "manual" ? area.active : area.overrideActive === true
+	);
 	let canIncreaseWorkers = $derived(
-		!area.active || allotment.total === -1 || allotment.used < allotment.total
+		!currentlyOccupying || allotment.total === -1 || allotment.used < allotment.total
 	);
 
 	async function run<T>(action: () => Promise<T | { code: string; message: string }>) {
@@ -76,6 +80,17 @@
 
 	function toggleActive() {
 		void run(() => setActive(area.id, !area.active));
+	}
+
+	// Scheduled-area manual override: null = schedule decides, true/false = forced on/off
+	// (setActive's activate/deactivate endpoints double as the force-on/force-off actions for a
+	// scheduled area — see activateScanArea/deactivateScanArea's scheduled-mode branches).
+	function setOverride(value: boolean | null) {
+		if (value === null) {
+			void run(() => clearOverride(area.id));
+		} else {
+			void run(() => setActive(area.id, value));
+		}
 	}
 
 	function changeMode(mode: ScanAreaMode) {
@@ -219,12 +234,40 @@
 					></span>
 				</button>
 			{:else}
-				<span
-					class="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1"
-					title="Controlled by schedule"
+				<div
+					class="flex rounded border border-zinc-200 dark:border-zinc-700 overflow-hidden text-xs"
 				>
-					<CalendarClock size={14} />
-				</span>
+					<button
+						class="px-1.5 py-0.5 flex items-center transition-colors {area.overrideActive == null
+							? 'bg-blue-600 text-white'
+							: 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}"
+						onclick={() => setOverride(null)}
+						disabled={busy}
+						title="Schedule-controlled"
+					>
+						<CalendarClock size={12} />
+					</button>
+					<button
+						class="px-1.5 py-0.5 transition-colors {area.overrideActive === true
+							? 'bg-emerald-500 text-white font-medium'
+							: 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}"
+						onclick={() => setOverride(true)}
+						disabled={busy}
+						title="Force on — overrides the schedule until cleared"
+					>
+						On
+					</button>
+					<button
+						class="px-1.5 py-0.5 transition-colors {area.overrideActive === false
+							? 'bg-zinc-700 dark:bg-zinc-200 text-white dark:text-zinc-900 font-medium'
+							: 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}"
+						onclick={() => setOverride(false)}
+						disabled={busy}
+						title="Force off — overrides the schedule until cleared"
+					>
+						Off
+					</button>
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -257,17 +300,28 @@
 			</button>
 		</div>
 		{#if area.mode === "scheduled"}
-			<button
-				class="flex items-center gap-1 text-xs {scheduleSummary
-					? 'text-zinc-500 dark:text-zinc-400'
-					: 'text-amber-600 dark:text-amber-500'} hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-50"
-				onclick={onEditSchedule}
-				disabled={busy || editingSchedule}
-				title="Edit schedule"
-			>
-				<CalendarClock size={13} />
-				{scheduleSummary ?? "No schedule set"}
-			</button>
+			<div class="flex items-center gap-2">
+				{#if area.overrideActive != null}
+					<span
+						class="text-xs font-medium {area.overrideActive
+							? 'text-emerald-600 dark:text-emerald-500'
+							: 'text-zinc-500 dark:text-zinc-400'}"
+					>
+						{area.overrideActive ? "Forced on" : "Forced off"}
+					</span>
+				{/if}
+				<button
+					class="flex items-center gap-1 text-xs {scheduleSummary
+						? 'text-zinc-500 dark:text-zinc-400'
+						: 'text-amber-600 dark:text-amber-500'} hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-50"
+					onclick={onEditSchedule}
+					disabled={busy || editingSchedule}
+					title="Edit schedule"
+				>
+					<CalendarClock size={13} />
+					{scheduleSummary ?? "No schedule set"}
+				</button>
+			</div>
 		{/if}
 	</div>
 
@@ -303,7 +357,7 @@
 		</div>
 
 		<div class="flex items-center gap-2 text-zinc-400">
-			{#if (area.mode === "manual" && area.active) || area.mode === "scheduled"}
+			{#if (area.mode === "manual" && area.active) || (area.mode === "scheduled" && area.overrideActive !== false)}
 				{#if questStarted}
 					<span class="text-xs text-emerald-600 dark:text-emerald-500">Quest scan started</span>
 				{:else}

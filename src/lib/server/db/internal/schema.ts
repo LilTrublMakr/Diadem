@@ -144,6 +144,10 @@ export const scanArea = mysqlTable(
 			.notNull(),
 		schedule:
 			json("schedule").$type<import("@/lib/features/scanAreas/scheduleTypes").AreaSchedule>(),
+		// Manual override for a mode === "scheduled" area: null (default) = the schedule decides;
+		// true/false = forced on/off, persisting across schedule window boundaries until explicitly
+		// cleared (see clearScanAreaOverride in service.ts). Meaningless when mode === "manual".
+		overrideActive: boolean("override_active"),
 		// vtsched_ doc ids currently in Dragonite for this area
 		dragoniteScheduleIds: json("dragonite_schedule_ids").$type<number[]>(),
 		// Dragonite area id — mirror-all lifecycle: non-null after creation, null only

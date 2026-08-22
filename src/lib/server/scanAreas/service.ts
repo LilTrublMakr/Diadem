@@ -30,6 +30,7 @@ import {
 } from "@/lib/server/scanAreas/constants";
 import { validatePolygonGeometry } from "@/lib/server/scanAreas/validation";
 import {
+	computeInstantUsage,
 	findIntraAreaOverlap,
 	toOccupancySources,
 	validateAllotment
@@ -100,11 +101,14 @@ export function dragoniteName(dbId: number, name: string): string {
 
 /**
  * Occupancy baseline pushed to Dragonite's pokemon_mode.workers.
- * Manual-active = N; everything else (manual-inactive, scheduled) = 0 —
- * scheduled areas get their workers from vtsched_ scale docs during windows.
+ * Manual-active = N; scheduled-forced-on (overrideActive true) = N; everything else
+ * (manual-inactive, scheduled-forced-off, scheduled-no-override) = 0 — a scheduled area with
+ * no override gets its workers from vtsched_ scale docs during windows instead.
  */
 function baselineWorkers(row: ScanArea): number {
-	return row.mode === "manual" && row.active ? row.workers : 0;
+	if (row.mode === "manual") return row.active ? row.workers : 0;
+	if (row.mode === "scheduled" && row.overrideActive === true) return row.workers;
+	return 0;
 }
 
 /**
@@ -284,6 +288,7 @@ async function assertAllotment(
 		active: boolean;
 		mode: ScanAreaMode;
 		schedule: AreaSchedule | null;
+		overrideActive: boolean | null;
 	}>
 ): Promise<void> {
 	if (allotment === -1) return;
@@ -345,13 +350,29 @@ export async function activateScanArea(
 ): Promise<ScanArea> {
 	return withUserLock(userId, async () => {
 		const row = await requireScanArea(userId, id);
-		if (row.mode !== "manual") {
-			throw new ScanAreaError(
-				"invalid_mode",
-				409,
-				"This area is schedule-controlled — switch it to manual mode to toggle it"
-			);
+
+		if (row.mode === "scheduled") {
+			if (row.overrideActive === true) return row;
+
+			await assertAllotment(userId, allotment, id, { overrideActive: true });
+
+			try {
+				const areaId = await ensureDragoniteArea(row);
+				await patchDragoniteArea(areaId, buildModes(row.workers, row.workers));
+				// Suspend the schedule so it can't silently re-assert control at the next window
+				// boundary — the override stays in effect until clearScanAreaOverride runs.
+				for (const scheduleId of row.dragoniteScheduleIds ?? []) {
+					await deleteDragoniteSchedule(scheduleId); // 404-tolerated
+				}
+				bestEffortReload();
+			} catch (error) {
+				throw dragoniteUnavailable(error);
+			}
+
+			await updateScanAreaRow(userId, id, { overrideActive: true, dragoniteScheduleIds: [] });
+			return { ...row, overrideActive: true, dragoniteScheduleIds: [] };
 		}
+
 		if (row.active) return row;
 
 		await assertAllotment(userId, allotment, id, { active: true });
@@ -372,6 +393,31 @@ export async function activateScanArea(
 export async function deactivateScanArea(userId: string, id: number): Promise<ScanArea> {
 	return withUserLock(userId, async () => {
 		const row = await requireScanArea(userId, id);
+
+		if (row.mode === "scheduled") {
+			if (row.overrideActive === false) return row;
+
+			if (row.dragoniteAreaId != null) {
+				try {
+					await patchDragoniteArea(row.dragoniteAreaId, buildModes(0, row.workers));
+					for (const scheduleId of row.dragoniteScheduleIds ?? []) {
+						await deleteDragoniteSchedule(scheduleId); // 404-tolerated
+					}
+					bestEffortReload();
+				} catch (error) {
+					if (String(error).includes(" 404")) {
+						await updateScanAreaRow(userId, id, { dragoniteAreaId: null });
+						row.dragoniteAreaId = null;
+					} else {
+						throw dragoniteUnavailable(error);
+					}
+				}
+			}
+
+			await updateScanAreaRow(userId, id, { overrideActive: false, dragoniteScheduleIds: [] });
+			return { ...row, overrideActive: false, dragoniteScheduleIds: [] };
+		}
+
 		if (!row.active) return row;
 
 		if (row.dragoniteAreaId != null) {
@@ -391,6 +437,39 @@ export async function deactivateScanArea(userId: string, id: number): Promise<Sc
 
 		await updateScanAreaRow(userId, id, { active: false });
 		return { ...row, active: false };
+	});
+}
+
+/**
+ * Clears a scheduled area's manual override (see `activateScanArea`/`deactivateScanArea`'s
+ * scheduled-mode branches) and hands control back to the schedule — rebuilds the vtsched_ docs
+ * and immediately sets the worker count to whatever the schedule says *right now* (rather than
+ * waiting for the next window boundary to correct it).
+ */
+export async function clearScanAreaOverride(
+	userId: string,
+	id: number,
+	allotment: number
+): Promise<ScanArea> {
+	return withUserLock(userId, async () => {
+		const row = await requireScanArea(userId, id);
+		if (row.mode !== "scheduled" || row.overrideActive == null) return row;
+
+		await assertAllotment(userId, allotment, id, { overrideActive: null });
+
+		try {
+			const ids = await rebuildDragoniteSchedules({ ...row, mode: "scheduled" });
+			const activeNow =
+				computeInstantUsage(toOccupancySources([{ ...row, overrideActive: null }]), new Date()) > 0;
+			const areaId = await ensureDragoniteArea(row);
+			await patchDragoniteArea(areaId, buildModes(activeNow ? row.workers : 0, row.workers));
+			bestEffortReload();
+
+			await updateScanAreaRow(userId, id, { overrideActive: null, dragoniteScheduleIds: ids });
+			return { ...row, overrideActive: null, dragoniteScheduleIds: ids };
+		} catch (error) {
+			throw dragoniteUnavailable(error);
+		}
 	});
 }
 
@@ -503,6 +582,7 @@ export async function setScanAreaMode(
 			await assertAllotment(userId, allotment, id, {
 				mode: "scheduled",
 				active: false,
+				overrideActive: null,
 				schedule: row.schedule ?? null
 			});
 			try {
@@ -512,17 +592,25 @@ export async function setScanAreaMode(
 				await updateScanAreaRow(userId, id, {
 					mode: "scheduled",
 					active: false,
+					overrideActive: null,
 					dragoniteScheduleIds: ids
 				});
 				bestEffortReload();
-				return { ...row, mode: "scheduled" as const, active: false, dragoniteScheduleIds: ids };
+				return {
+					...row,
+					mode: "scheduled" as const,
+					active: false,
+					overrideActive: null,
+					dragoniteScheduleIds: ids
+				};
 			} catch (error) {
 				if (error instanceof ScanAreaError) throw error;
 				throw dragoniteUnavailable(error);
 			}
 		}
 
-		// -> manual: drop all schedule docs; area stays at 0 workers until toggled on
+		// -> manual: drop all schedule docs (and any override, which is meaningless in manual
+		// mode); area stays at 0 workers until toggled on
 		try {
 			await rebuildDragoniteSchedules({ ...row, mode: "manual" });
 		} catch (error) {
@@ -531,9 +619,16 @@ export async function setScanAreaMode(
 		await updateScanAreaRow(userId, id, {
 			mode: "manual",
 			active: false,
+			overrideActive: null,
 			dragoniteScheduleIds: []
 		});
-		return { ...row, mode: "manual" as const, active: false, dragoniteScheduleIds: [] };
+		return {
+			...row,
+			mode: "manual" as const,
+			active: false,
+			overrideActive: null,
+			dragoniteScheduleIds: []
+		};
 	});
 }
 
@@ -568,7 +663,10 @@ export async function setScanAreaSchedule(
 		await updateScanAreaRow(userId, id, { schedule });
 		const updated = { ...row, schedule };
 
-		if (row.mode === "scheduled") {
+		// Skip while a manual override is active — the docs are intentionally absent (see
+		// activateScanArea/deactivateScanArea's scheduled-mode branches); the new schedule is
+		// still persisted above, and clearScanAreaOverride will build docs from it later.
+		if (row.mode === "scheduled" && row.overrideActive == null) {
 			try {
 				await ensureDragoniteArea(updated);
 				const ids = await rebuildDragoniteSchedules(updated);
@@ -601,7 +699,9 @@ export async function deleteScanArea(userId: string, id: number): Promise<void> 
 
 export async function startQuestScan(userId: string, id: number): Promise<void> {
 	const row = await requireScanArea(userId, id);
-	const occupies = (row.mode === "manual" && row.active) || row.mode === "scheduled";
+	const occupies =
+		(row.mode === "manual" && row.active) ||
+		(row.mode === "scheduled" && row.overrideActive !== false);
 	if (!occupies || row.dragoniteAreaId == null) {
 		throw new ScanAreaError(
 			"not_active",
@@ -675,10 +775,11 @@ export async function reconcileScanAreas(): Promise<void> {
 			}
 		}
 
-		// 4. scheduled rows missing docs → rebuild
+		// 4. scheduled rows missing docs → rebuild (skip rows under a manual override — their
+		// docs are intentionally absent, see activateScanArea/deactivateScanArea)
 		const remoteScheduleIds = new Set(remoteSchedules.map((s) => s.id));
 		for (const row of rows) {
-			if (row.mode !== "scheduled" || !row.schedule) continue;
+			if (row.mode !== "scheduled" || !row.schedule || row.overrideActive != null) continue;
 			const ids = row.dragoniteScheduleIds ?? [];
 			const expectedDocs = buildScheduleDocs(row).length;
 			const allPresent =

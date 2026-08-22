@@ -9,6 +9,9 @@ export type ScanAreaDto = {
 	workers: number;
 	active: boolean;
 	mode: ScanAreaMode;
+	// Manual override on a scheduled area — null = the schedule decides, true/false = forced
+	// on/off (persists across window boundaries until cleared). Always null in manual mode.
+	overrideActive: boolean | null;
 	schedule: AreaSchedule | null;
 	createdAt: string;
 	updatedAt: string;

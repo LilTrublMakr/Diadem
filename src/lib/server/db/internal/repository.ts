@@ -177,6 +177,7 @@ export async function updateScanAreaRow(
 			| "mode"
 			| "schedule"
 			| "dragoniteScheduleIds"
+			| "overrideActive"
 		>
 	>
 ): Promise<void> {

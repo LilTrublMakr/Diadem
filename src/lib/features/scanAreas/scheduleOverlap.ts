@@ -363,6 +363,10 @@ export function computeInstantUsage(sources: OccupancySource[], now: Date): numb
 /**
  * Map areas to occupancy sources; `override` replaces the entry for `overrideId`
  * (used to validate a pending mutation before persisting it).
+ *
+ * `overrideActive` is the persistent manual override on a scheduled area (see
+ * `scan_area.overrideActive` / `clearScanAreaOverride` in service.ts) — true/false forces
+ * "always"/"none" regardless of the schedule, null (default) lets the schedule decide.
  */
 export function toOccupancySources(
 	areas: {
@@ -372,6 +376,7 @@ export function toOccupancySources(
 		active: boolean;
 		mode: "manual" | "scheduled";
 		schedule: AreaSchedule | null;
+		overrideActive?: boolean | null;
 	}[],
 	overrideId?: number,
 	override?: Partial<{
@@ -379,14 +384,17 @@ export function toOccupancySources(
 		active: boolean;
 		mode: "manual" | "scheduled";
 		schedule: AreaSchedule | null;
+		overrideActive: boolean | null;
 	}>
 ): OccupancySource[] {
 	return areas.map((area) => {
 		const a = area.id === overrideId ? { ...area, ...override } : area;
 		const base = { areaId: a.id, name: a.name, workers: a.workers };
 		if (a.mode === "manual" && a.active) return { ...base, kind: "always" as const };
-		if (a.mode === "scheduled" && a.schedule) {
-			return { ...base, kind: "scheduled" as const, schedule: a.schedule };
+		if (a.mode === "scheduled") {
+			if (a.overrideActive === true) return { ...base, kind: "always" as const };
+			if (a.overrideActive === false) return { ...base, kind: "none" as const };
+			if (a.schedule) return { ...base, kind: "scheduled" as const, schedule: a.schedule };
 		}
 		return { ...base, kind: "none" as const };
 	});

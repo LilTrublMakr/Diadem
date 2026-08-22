@@ -40,6 +40,7 @@ export function toScanAreaDto(row: ScanArea): ScanAreaDto {
 		workers: row.workers,
 		active: row.active,
 		mode: row.mode,
+		overrideActive: row.overrideActive ?? null,
 		schedule: row.schedule ?? null,
 		createdAt: (row.createdAt instanceof Date
 			? row.createdAt
