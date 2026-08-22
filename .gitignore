@@ -37,3 +37,6 @@ config/config.dev.toml
 
 #icons
 uicons
+
+#exclude folder
+exclude
