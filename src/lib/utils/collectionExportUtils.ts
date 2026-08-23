@@ -63,6 +63,13 @@ export function getGenderSymbol(gender: number): string {
 	return "";
 }
 
+// PokemonDisplayProto.alignment: 0 = normal, 1 = shadow, 2 = purified
+export function getAlignmentLabel(alignment: number): string {
+	if (alignment === 1) return "Shadow";
+	if (alignment === 2) return "Purified";
+	return "";
+}
+
 export function buildMoveNameMap(): Map<number, string> {
 	const map = new Map<number, string>();
 	const masterFile = getMasterFile();
@@ -166,7 +173,7 @@ export function buildPokeGenieCsv(
 				"", // Weight
 				"", // Height
 				p.lucky ? 1 : 0,
-				"", // Shadow/Purified - not present in source export
+				getAlignmentLabel(p.alignment),
 				p.favorite ? 1 : 0,
 				"", // Dust
 				"", "", "", "", "", "", "", "", // Great League rank columns
@@ -206,7 +213,7 @@ export function buildCalcyIvCsv(
 				"", // Ancestor?
 				catchDate, // Scan date - not distinct from catch date in source export
 				p.dex,
-				getSpeciesName(p.dex),
+				p.alignment === 1 ? `${getSpeciesName(p.dex)} Shadow` : getSpeciesName(p.dex),
 				"", // Temp Evo
 				getGenderSymbol(p.gender),
 				p.nickname,
@@ -239,7 +246,7 @@ export function buildCalcyIvCsv(
 				p.favorite ? 1 : 0,
 				"", // BuddyBoosted
 				getFormName(p.dex, p.form),
-				"", // ShadowForm - not present in source export
+				p.alignment === 1 ? 1 : 0, // ShadowForm
 				"", // MultiForm?
 				"", // Dynamax
 				"", // Height (cm)
