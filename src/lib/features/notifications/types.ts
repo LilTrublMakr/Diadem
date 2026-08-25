@@ -39,6 +39,10 @@ export type EmbedTemplate = {
 	color: string;
 	thumbnailUrl: string;
 	imageUrl: string;
+	// Which Rampardos static-map style renders the map thumbnail (pokemon type only — see
+	// mapImage.ts's generatePokemonMapImage/generateMapStylePreview). undefined = fall back to the
+	// server's global [server.staticMap].style default.
+	mapStyle?: string;
 	footerText: string;
 	url: string;
 	fields: EmbedFieldTemplate[];

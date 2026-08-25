@@ -510,7 +510,7 @@ const POKEMON_IMAGE_TAG = "attachment://pokemon.png";
 async function deliver(
 	subscription: NotificationSubscription,
 	context: PokemonTemplateContext,
-	getMapImage: () => Promise<Buffer | null>,
+	getMapImage: (style: string | undefined) => Promise<Buffer | null>,
 	getSpriteImage: () => Promise<Buffer | null>,
 	thisFetch: typeof fetch
 ) {
@@ -562,7 +562,7 @@ async function deliver(
 	const usesSpriteImage =
 		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
 	const [mapImage, spriteImage] = await Promise.all([
-		usesMapImage ? getMapImage() : Promise.resolve(null),
+		usesMapImage ? getMapImage(embed.mapStyle) : Promise.resolve(null),
 		usesSpriteImage ? getSpriteImage() : Promise.resolve(null)
 	]);
 
@@ -595,11 +595,19 @@ async function handlePokemon(message: GolbatPokemonMessage, thisFetch: typeof fe
 			matchesFilters(context, sub.filters as PokemonSubscriptionFilters)
 	);
 
-	// Generated at most once per event, regardless of how many subscriptions use it.
-	let mapImage: Buffer | null | undefined;
-	const getMapImage = async () => {
-		if (mapImage === undefined) mapImage = await generatePokemonMapImage(message, thisFetch);
-		return mapImage;
+	// Memoized per resolved style (undefined = global default) within this one event — so N
+	// subscribers sharing the same style still only trigger one Rampardos call, but two
+	// subscribers with different per-template styles each get their own correctly-styled image.
+	// The cache stores promises, and get/set happens synchronously (no await in between), so
+	// concurrent same-style callers (via the Promise.all below) always share one in-flight request.
+	const mapImageCache = new Map<string | undefined, Promise<Buffer | null>>();
+	const getMapImage = (style: string | undefined) => {
+		let pending = mapImageCache.get(style);
+		if (!pending) {
+			pending = generatePokemonMapImage(message, thisFetch, style);
+			mapImageCache.set(style, pending);
+		}
+		return pending;
 	};
 	let spriteImage: Buffer | null | undefined;
 	const getSpriteImage = async () => {

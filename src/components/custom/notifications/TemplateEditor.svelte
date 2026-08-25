@@ -48,6 +48,7 @@
 		GYM_TEST_SCENARIOS,
 		randomizeGymContext
 	} from "@/lib/features/notifications/gymTestData";
+	import type { MapStyleOption } from "@/lib/features/notifications/mapStyles";
 	import type {
 		EmbedTemplate,
 		GymTemplateContext,
@@ -60,8 +61,8 @@
 		RaidTemplateContext,
 		TemplateField
 	} from "@/lib/features/notifications/types";
-	import { X } from "@lucide/svelte";
-	import { tick, untrack } from "svelte";
+	import { Map, X } from "@lucide/svelte";
+	import { onMount, tick, untrack } from "svelte";
 
 	type PreviewContext =
 		| PokemonTemplateContext
@@ -106,6 +107,27 @@
 		if (type === "lure") return LURE_TEST_SCENARIOS;
 		if (type === "gym") return GYM_TEST_SCENARIOS;
 		return TEST_SCENARIOS;
+	});
+
+	// Pokemon-only (see the {#if type === "pokemon"} Map Style section below) — fetched from
+	// Rampardos (via our own server, which already has the [server.staticMap] url) rather than
+	// hardcoded, since the set of installed styles is operator-specific. "Default" (id undefined)
+	// means "fall back to the server's global [server.staticMap].style config".
+	let mapStyles = $state<MapStyleOption[]>([]);
+	let mapStylesLoading = $state(false);
+	let mapStyleOptions: { id: string | undefined; label: string }[] = $derived([
+		{ id: undefined, label: "Default (server setting)" },
+		...mapStyles
+	]);
+
+	onMount(() => {
+		if (type !== "pokemon") return;
+		mapStylesLoading = true;
+		fetch("/api/custom/notifications/map-styles")
+			.then((res) => (res.ok ? res.json() : []))
+			.then((styles: MapStyleOption[]) => (mapStyles = styles))
+			.catch(() => (mapStyles = []))
+			.finally(() => (mapStylesLoading = false));
 	});
 
 	function randomizeContext(): PreviewContext {
@@ -407,6 +429,55 @@
 				</div>
 			{/each}
 		</div>
+
+		{#if type === "pokemon"}
+			<div class="flex flex-col gap-1.5">
+				<span class="text-sm text-zinc-500 dark:text-zinc-400">Map Style</span>
+				<p class="text-xs text-zinc-400">
+					Used when a field references the mapImageUrl tag — leave on Default to use the server's
+					configured style.
+				</p>
+				{#if mapStylesLoading}
+					<p class="text-xs text-zinc-400">Loading styles…</p>
+				{:else if mapStyles.length === 0}
+					<p class="text-xs text-amber-600 dark:text-amber-500">
+						No styles found — check the server's [server.staticMap] configuration.
+					</p>
+				{/if}
+				<div class="flex flex-wrap gap-3 max-h-80 overflow-y-auto p-1">
+					{#each mapStyleOptions as opt (opt.id ?? "default")}
+						<button
+							type="button"
+							class="flex flex-col items-center gap-1 rounded border p-2 w-32 cursor-pointer {embed.mapStyle ===
+							opt.id
+								? 'border-blue-500 ring-1 ring-blue-500'
+								: 'border-zinc-300 dark:border-zinc-600'}"
+							onclick={() => (embed.mapStyle = opt.id)}
+							title={opt.label}
+						>
+							{#if opt.id}
+								<img
+									src="/api/custom/notifications/map-style-preview/{opt.id}"
+									alt={opt.label}
+									class="size-28 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
+									loading="lazy"
+									onerror={(e) => e.currentTarget.classList.add("opacity-30")}
+								/>
+							{:else}
+								<div
+									class="size-28 rounded bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400"
+								>
+									<Map size={28} />
+								</div>
+							{/if}
+							<span class="text-xs text-zinc-600 dark:text-zinc-300 truncate w-full text-center">
+								{opt.label}
+							</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
 
 		<div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
 			<p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">

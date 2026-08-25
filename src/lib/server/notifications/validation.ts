@@ -60,6 +60,10 @@ export const embedTemplateSchema = z.object({
 	color: z.string().max(16),
 	thumbnailUrl: z.string().max(512),
 	imageUrl: z.string().max(512),
+	// Not validated against a fixed list — the set of installed Rampardos styles is dynamic (see
+	// rampardosStylesProvider.ts) and operator-specific. A bogus value just fails gracefully at
+	// render time (generateMapStylePreview/generatePokemonMapImage return null, never throw).
+	mapStyle: z.string().min(1).max(64).optional(),
 	footerText: z.string().max(2048),
 	url: z.string().max(512),
 	fields: z.array(embedFieldTemplateSchema).max(25)

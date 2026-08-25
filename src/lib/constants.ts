@@ -71,3 +71,4 @@ export const REFRESH_UICON_INDEX = 12 * 60 * 60;
 export const REFRESH_MASTER_STATS = 60 * 60;
 // pokemon_stats DB rebuilds every 5 minutes (see CLAUDE.md) — no point refreshing more often.
 export const REFRESH_SHINY_RATE = 5 * 60;
+export const REFRESH_RAMPARDOS_STYLES = 60 * 60;

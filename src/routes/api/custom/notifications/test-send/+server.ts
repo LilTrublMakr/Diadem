@@ -160,7 +160,9 @@ export const POST: RequestHandler = async ({ locals, request, fetch }) => {
 					seen_type: "test"
 				};
 				[mapImage, spriteImage] = await Promise.all([
-					usesMapImage ? generatePokemonMapImage(syntheticMessage, fetch) : Promise.resolve(null),
+					usesMapImage
+						? generatePokemonMapImage(syntheticMessage, fetch, rendered.mapStyle)
+						: Promise.resolve(null),
 					usesSpriteImage
 						? generatePokemonSpriteImage(syntheticMessage, fetch)
 						: Promise.resolve(null)

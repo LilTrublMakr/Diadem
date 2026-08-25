@@ -1,5 +1,5 @@
 import { resize } from "@/lib/services/assets";
-import { getServerConfig } from "@/lib/services/config/config.server";
+import { getClientConfig, getServerConfig } from "@/lib/services/config/config.server";
 import { getIconPokemon, initAllIconSets } from "@/lib/services/uicons.svelte";
 import { getDefaultIconSet } from "@/lib/services/userSettings.svelte";
 import { MapObjectType } from "@/lib/mapObjects/mapObjectTypes";
@@ -23,7 +23,8 @@ export function isMapImageConfigured(): boolean {
  */
 export async function generatePokemonMapImage(
 	message: GolbatPokemonMessage,
-	thisFetch: typeof fetch = fetch
+	thisFetch: typeof fetch = fetch,
+	styleOverride?: string
 ): Promise<Buffer | null> {
 	const staticMap = getServerConfig().staticMap;
 	if (!staticMap?.enabled || !staticMap.url) return null;
@@ -45,7 +46,7 @@ export async function generatePokemonMapImage(
 			latitude: message.latitude,
 			longitude: message.longitude,
 			imgUrl: staticMap.diademUrl + resize(iconUrl, { width: 64 }),
-			style: staticMap.style || "positron",
+			style: styleOverride || staticMap.style || "positron",
 			pokemon_id: message.pokemon_id,
 			pokemonId: message.pokemon_id,
 			display_pokemon_id: message.display_pokemon_id ?? message.pokemon_id,
@@ -72,6 +73,61 @@ export async function generatePokemonMapImage(
 	} catch (error) {
 		const cause = error instanceof Error && error.cause ? ` (${error.cause})` : "";
 		log.warning(`Failed to generate map image: ${error}${cause}`);
+		return null;
+	}
+}
+
+/**
+ * Renders a style-preview thumbnail for the template editor's map-style picker — the same
+ * Rampardos call `generatePokemonMapImage` makes, at a fixed representative coordinate (the same
+ * one this app's own base-map style picker already previews at, see MapStyleFab.svelte) with a
+ * fixed Pikachu marker, varying only `style`. Never throws — a bad/failing style just yields
+ * `null`, which the caller turns into a broken-thumbnail response, not a broken picker.
+ */
+export async function generateMapStylePreview(
+	style: string,
+	thisFetch: typeof fetch = fetch
+): Promise<Buffer | null> {
+	const staticMap = getServerConfig().staticMap;
+	if (!staticMap?.enabled || !staticMap.url) return null;
+
+	try {
+		await initAllIconSets(thisFetch);
+		const iconSetId = getDefaultIconSet(MapObjectType.POKEMON).id;
+		const iconUrl = getIconPokemon({ pokemon_id: 25, form: 0 }, { iconSet: iconSetId });
+		const { styleLat, styleLon } = getClientConfig().mapPositions;
+
+		const payload = {
+			latitude: styleLat,
+			longitude: styleLon,
+			imgUrl: staticMap.diademUrl + resize(iconUrl, { width: 64 }),
+			style,
+			pokemon_id: 25,
+			pokemonId: 25,
+			display_pokemon_id: 25,
+			form: 0,
+			costume: 0,
+			weather: 0,
+			seen_type: "preview",
+			seenType: "preview",
+			verified: true,
+			confirmedTime: true
+		};
+
+		const response = await thisFetch(`${staticMap.url}/multistaticmap/poracle-multi-monster`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(payload),
+			signal: AbortSignal.timeout(10_000)
+		});
+		if (!response.ok) {
+			log.warning(`Static map style preview request failed for "${style}": ${response.status}`);
+			return null;
+		}
+		return Buffer.from(await response.arrayBuffer());
+	} catch (error) {
+		const cause = error instanceof Error && error.cause ? ` (${error.cause})` : "";
+		log.warning(`Failed to generate style preview for "${style}": ${error}${cause}`);
 		return null;
 	}
 }
