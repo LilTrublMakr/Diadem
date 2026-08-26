@@ -133,6 +133,30 @@ export const POKEMON_TEMPLATE_FIELDS: TemplateField[] = [
 		sample: "<:type_dragon:...>",
 		unescaped: true
 	},
+	{
+		tag: "hasFeaturedAttack",
+		label: "Featured Attack Active (true/false)",
+		category: "Moves",
+		sample: "false"
+	},
+	{
+		tag: "featuredAttackMoveName",
+		label: "Featured Attack Move Name",
+		category: "Moves",
+		sample: "Icy Wind"
+	},
+	{
+		tag: "featuredAttackMoveCategory",
+		label: "Featured Attack Move Category (fast/charged)",
+		category: "Moves",
+		sample: "charged"
+	},
+	{
+		tag: "featuredAttackEvolvesTo",
+		label: "Featured Attack Result Species",
+		category: "Moves",
+		sample: "Thievul"
+	},
 
 	{ tag: "pvpGreatRank", label: "Great League Rank", category: "PVP", sample: "1" },
 	{ tag: "pvpUltraRank", label: "Ultra League Rank", category: "PVP", sample: "1" },
@@ -832,6 +856,13 @@ export const PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 	{
 		tag: "{{#if (or trackedShundo trackedHundo trackedShiny trackedNundo)}}\nHave:{{#if trackedShundoEmoji}} {{trackedShundoEmoji}}{{/if}}{{#if trackedHundoEmoji}} {{trackedHundoEmoji}}{{/if}}{{#if trackedShinyEmoji}} {{trackedShinyEmoji}}{{/if}}{{#if trackedNundoEmoji}} {{trackedNundoEmoji}}{{/if}}\n{{/if}}",
 		label: "Have: badges (your collection)",
+		category: "Presets",
+		sample: "",
+		raw: true
+	},
+	{
+		tag: "{{#if hasFeaturedAttack}}\n⚔️ Evolve for a {{featuredAttackEvolvesTo}} with {{featuredAttackMoveName}}!\n{{/if}}",
+		label: "Featured Attack note",
 		category: "Presets",
 		sample: "",
 		raw: true

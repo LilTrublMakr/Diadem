@@ -14,6 +14,8 @@ import { discordEmojiTag } from "@/lib/features/notifications/discordEmoji";
 import { formatShinyRate } from "@/lib/features/notifications/shinyRateFormat";
 import { isMapImageConfigured } from "@/lib/server/notifications/mapImage";
 import { getShinyRate } from "@/lib/server/provider/shinyRateProvider";
+import { featuredAttackProvider } from "@/lib/server/provider/featuredAttackProvider";
+import { findActiveFeaturedAttack } from "@/lib/utils/featuredAttack";
 import { registerNotificationHelpers } from "@/lib/features/notifications/handlebarsHelpers";
 import type {
 	GolbatInvasionMessage,
@@ -173,6 +175,11 @@ export async function buildPokemonContext(
 	const type1 = typeIdToText(master?.types?.[0]);
 	const type2 = master?.types?.[1] ? typeIdToText(master.types[1]) : "";
 	const evolutions = buildEvolutionFamily(message.pokemon_id);
+	const featuredAttack = findActiveFeaturedAttack(
+		await featuredAttackProvider.get(),
+		message.pokemon_id,
+		form
+	);
 
 	const atk = message.individual_attack ?? null;
 	const def = message.individual_defense ?? null;
@@ -247,6 +254,10 @@ export async function buildPokemonContext(
 		pokestopName: message.pokestop_name ?? "",
 		username: message.username ?? "",
 		evolutions,
+		hasFeaturedAttack: !!featuredAttack,
+		featuredAttackMoveName: featuredAttack?.moveName ?? "",
+		featuredAttackMoveCategory: featuredAttack?.moveCategory ?? "",
+		featuredAttackEvolvesTo: featuredAttack?.resultName ?? "",
 		// Fetched as bytes and sent as a Discord file attachment (see mapImage.ts's
 		// generatePokemonSpriteImage + bot.ts), not a public URL — same reasoning as
 		// mapImageUrl above: the sprite is served through this app's own /assets proxy,

@@ -93,6 +93,9 @@ export type PokemonSubscriptionFilters = BaseSubscriptionFilters & {
 	// pvpMaxRank in ANY of these leagues) — one shared rank threshold across all of them.
 	pvpLeagues?: PvpLeagueFilter[];
 	pvpMaxRank?: number;
+	// true = only notify when this exact species+form currently grants a Featured Attack move on
+	// evolution/catch (see featuredAttackProvider) — absent/false = no filtering on this.
+	featuredAttackOnly?: boolean;
 };
 
 export type RaidTeam = 0 | 1 | 2 | 3; // 0=neutral/uncontested, 1=Mystic, 2=Valor, 3=Instinct
@@ -305,6 +308,12 @@ export type PokemonTemplateContext = {
 	username: string;
 	evolutions: { fullName: string; pokemonId: number }[];
 	pokemonImageUrl: string;
+	// Whether this species+form currently grants a "Featured Attack" move on evolution/catch (see
+	// featuredAttackProvider) — moveCategory/evolvesTo are "" when hasFeaturedAttack is false.
+	hasFeaturedAttack: boolean;
+	featuredAttackMoveName: string;
+	featuredAttackMoveCategory: "fast" | "charged" | "";
+	featuredAttackEvolvesTo: string;
 };
 
 // Rendering context for the "raid" type (covers both egg and hatched-boss phases — see

@@ -94,7 +94,11 @@ const base: PokemonTemplateContext = {
 		{ fullName: "Dragonair", pokemonId: 148 },
 		{ fullName: "Dragonite", pokemonId: 149 }
 	],
-	pokemonImageUrl: "https://pogovt.com/assets/DEFAULT/pokemon/147.png"
+	pokemonImageUrl: "https://pogovt.com/assets/DEFAULT/pokemon/147.png",
+	hasFeaturedAttack: false,
+	featuredAttackMoveName: "",
+	featuredAttackMoveCategory: "",
+	featuredAttackEvolvesTo: ""
 };
 
 export const TEST_SCENARIOS: TestScenario[] = [
@@ -169,6 +173,21 @@ export const TEST_SCENARIOS: TestScenario[] = [
 			pokemonId: 148,
 			cp: 1120,
 			iv: 88
+		}
+	},
+	{
+		id: "featured-attack",
+		label: "Featured Attack Available",
+		// Real verified example: Nickit Community Day (August 2026) — evolving Nickit into
+		// Thievul during/shortly after the event grants Icy Wind.
+		context: {
+			...base,
+			pokemonName: "Nickit",
+			pokemonId: 827,
+			hasFeaturedAttack: true,
+			featuredAttackMoveName: "Icy Wind",
+			featuredAttackMoveCategory: "charged",
+			featuredAttackEvolvesTo: "Thievul"
 		}
 	}
 ];

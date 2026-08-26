@@ -113,6 +113,9 @@ export const pokemonFiltersSchema = z.object({
 		.max(3)
 		.optional(),
 	pvpMaxRank: z.number().int().min(1).max(4096).optional(),
+	// true = only notify when this exact species+form currently grants a Featured Attack move on
+	// evolution/catch (see featuredAttackProvider) — absent/false = no filtering on this.
+	featuredAttackOnly: z.boolean().optional(),
 	...baseFiltersShape
 });
 

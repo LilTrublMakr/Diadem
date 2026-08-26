@@ -342,6 +342,8 @@ function matchesFilters(context: PokemonTemplateContext, filters: PokemonSubscri
 		if (!qualifies) return false;
 	}
 
+	if (filters.featuredAttackOnly && !context.hasFeaturedAttack) return false;
+
 	return true;
 }
 

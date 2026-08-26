@@ -73,6 +73,11 @@
 	import BigCountdown from "@/components/ui/popups/common/BigCountdown.svelte";
 	import { mLeague } from "$lib/services/ingameLocale";
 	import { getIconLeague } from "$lib/services/uicons.svelte";
+	import {
+		ensureFeaturedAttacksLoaded,
+		getFeaturedAttacks
+	} from "$lib/features/featuredAttacks.svelte";
+	import { findActiveFeaturedAttack } from "$lib/utils/featuredAttack";
 
 	export { image, overview, main };
 
@@ -91,6 +96,7 @@
 
 	export function getPopupPropsPokemon(data: MapData) {
 		data = data as PokemonData;
+		ensureFeaturedAttacksLoaded();
 		return {
 			type: m.wild_pokemon(),
 			title: pokemonName(data),
@@ -98,6 +104,10 @@
 			overview,
 			main
 		} as MapObjectPopupProps;
+	}
+
+	function getFeaturedAttack(data: PokemonData) {
+		return findActiveFeaturedAttack(getFeaturedAttacks(), data.pokemon_id, data.form ?? 0);
 	}
 
 	let showIvBreakdown: boolean = $state(false);
@@ -197,8 +207,17 @@
 
 {#snippet image(d: MapData)}
 	{@const data = d as PokemonData}
-	<div class="size-14 shrink-0">
+	{@const featuredAttack = getFeaturedAttack(data)}
+	<div class="size-14 shrink-0 relative">
 		<ImagePopup alt={mPokemon(data)} src={getIconPokemon(data)} class="size-14" />
+		{#if featuredAttack}
+			<span
+				class="absolute -top-0.5 -right-0.5 text-sm leading-none select-none pointer-events-none"
+				title="Featured Attack available"
+			>
+				⚔️
+			</span>
+		{/if}
 	</div>
 {/snippet}
 
@@ -240,6 +259,7 @@
 	{@const statsEntry = stats?.entry}
 	{@const WeatherIcon = getWeatherIcon(data.weather)}
 	{@const pvpNotice = getPvpNotice(data)}
+	{@const featuredAttack = getFeaturedAttack(data)}
 	{@const tracker = getTrackers()[trackerKey(data.pokemon_id, data.form ?? 0)] ?? {
 		shiny: false,
 		hundo: false,
@@ -383,6 +403,19 @@
 					name: speciesName(data),
 					league: pvpNotice
 				})}
+			</BasicMainCard>
+		{/if}
+
+		<!--Featured Attack-->
+		{#if featuredAttack}
+			<BasicMainCard class="flex gap-2 font-medium justify-center">
+				<Swords class="size-4 mt-1" />
+				{#if featuredAttack.trigger === "evolve"}
+					Evolve during {featuredAttack.eventName} (or shortly after) for a {featuredAttack.resultName}
+					that knows {featuredAttack.moveName}!
+				{:else}
+					Catch or evolve during {featuredAttack.eventName} — {featuredAttack.resultName} knows {featuredAttack.moveName}!
+				{/if}
 			</BasicMainCard>
 		{/if}
 

@@ -72,3 +72,6 @@ export const REFRESH_MASTER_STATS = 60 * 60;
 // pokemon_stats DB rebuilds every 5 minutes (see CLAUDE.md) — no point refreshing more often.
 export const REFRESH_SHINY_RATE = 5 * 60;
 export const REFRESH_RAMPARDOS_STYLES = 60 * 60;
+// Scrapes N LeekDuck pages per refresh (not one endpoint), but should reflect a fresh
+// Community Day / event announcement reasonably fast — matches events/+server.ts's own cache TTL.
+export const REFRESH_FEATURED_ATTACKS = 15 * 60;
