@@ -284,8 +284,25 @@
 	}
 </script>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-	<div class="flex flex-col gap-3">
+<div class="grid grid-cols-1 lg:grid-cols-[240px_1fr_1fr] lg:items-start gap-4">
+	<div
+		class="order-2 lg:order-1 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 lg:sticky lg:top-0 lg:max-h-[80vh] lg:overflow-y-auto"
+	>
+		<p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+			Click a tag to insert it into the last-focused field.
+		</p>
+		<TagPicker
+			fields={[
+				...typeFields,
+				...CONDITIONAL_TEMPLATE_FIELDS,
+				...typePresets,
+				...EMOJI_TEMPLATE_FIELDS
+			]}
+			onInsert={insertTag}
+		/>
+	</div>
+
+	<div class="order-1 lg:order-2 flex flex-col gap-3">
 		<label class="flex flex-col gap-1 text-sm">
 			<span class="text-zinc-500 dark:text-zinc-400">Message Content</span>
 			<textarea
@@ -478,24 +495,9 @@
 				</div>
 			</div>
 		{/if}
-
-		<div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
-			<p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-				Click a tag to insert it into the last-focused field above.
-			</p>
-			<TagPicker
-				fields={[
-					...typeFields,
-					...CONDITIONAL_TEMPLATE_FIELDS,
-					...typePresets,
-					...EMOJI_TEMPLATE_FIELDS
-				]}
-				onInsert={insertTag}
-			/>
-		</div>
 	</div>
 
-	<div class="flex flex-col gap-3">
+	<div class="order-3 flex flex-col gap-3">
 		<div class="flex items-center gap-2 text-sm flex-wrap">
 			<span class="text-zinc-500 dark:text-zinc-400">Preview with</span>
 			<select
