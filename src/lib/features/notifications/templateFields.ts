@@ -833,6 +833,24 @@ export const PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 		raw: true
 	},
 	{
+		// evolvesTo is direct next-stage evolution(s) ONLY — never a pre-evolution. Use this for
+		// "can evolve into" wording; the "Evolution family list" preset above lists the whole
+		// family (including pre-evolutions) and is meant for a plain family listing instead.
+		tag: "{{#if evolvesTo.length}}\nCan evolve into: {{#each evolvesTo}}{{fullName}}{{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}",
+		label: "Can evolve into (next stage only)",
+		category: "Presets",
+		sample: "",
+		raw: true
+	},
+	{
+		// futureEvolutions is every stage ahead (immediate AND beyond) — never a pre-evolution.
+		tag: "{{#if futureEvolutions.length}}\nCan evolve into: {{#each futureEvolutions}}{{fullName}}{{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}",
+		label: "Can evolve into (all future stages)",
+		category: "Presets",
+		sample: "",
+		raw: true
+	},
+	{
 		tag: "{{#with (filterRank pvpLittle 25) as |ranked|}}\n{{#if ranked.length}}\n**Little League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}",
 		label: "Little League rankings (rank 25 or better)",
 		category: "Presets",

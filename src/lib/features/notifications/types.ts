@@ -307,6 +307,14 @@ export type PokemonTemplateContext = {
 	pokestopName: string;
 	username: string;
 	evolutions: { fullName: string; pokemonId: number }[];
+	// Direct next-stage evolution(s) ONLY (e.g. Gyarados → [] since it has none; Magikarp →
+	// [Gyarados]) — unlike `evolutions` above, this never includes pre-evolutions. Use this for
+	// any "can evolve into" wording; `evolutions` is for a "whole family" listing.
+	evolvesTo: { fullName: string; pokemonId: number }[];
+	// Every FUTURE stage reachable from here, immediate and beyond (e.g. Dratini →
+	// [Dragonair, Dragonite]; Magikarp → [Gyarados]; Gyarados → []) — never a pre-evolution, and
+	// includes every branch for a species with multiple possible evolutions (e.g. Eevee).
+	futureEvolutions: { fullName: string; pokemonId: number }[];
 	pokemonImageUrl: string;
 	// Whether this species+form currently grants a "Featured Attack" move on evolution/catch (see
 	// featuredAttackProvider) — moveCategory/evolvesTo are "" when hasFeaturedAttack is false.

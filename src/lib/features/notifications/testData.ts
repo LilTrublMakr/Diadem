@@ -94,6 +94,14 @@ const base: PokemonTemplateContext = {
 		{ fullName: "Dragonair", pokemonId: 148 },
 		{ fullName: "Dragonite", pokemonId: 149 }
 	],
+	// Direct next stage ONLY (Dragonite is two stages away, so it's not listed here) — this is
+	// what "can evolve into" wording should use, never `evolutions` above.
+	evolvesTo: [{ fullName: "Dragonair", pokemonId: 148 }],
+	// Every future stage — same as `evolutions` here only because Dratini has no pre-evolution.
+	futureEvolutions: [
+		{ fullName: "Dragonair", pokemonId: 148 },
+		{ fullName: "Dragonite", pokemonId: 149 }
+	],
 	pokemonImageUrl: "https://pogovt.com/assets/DEFAULT/pokemon/147.png",
 	hasFeaturedAttack: false,
 	featuredAttackMoveName: "",
@@ -129,6 +137,8 @@ export const TEST_SCENARIOS: TestScenario[] = [
 			level: 22,
 			iv: 78,
 			evolutions: [],
+			evolvesTo: [],
+			futureEvolutions: [],
 			pokemonImageUrl: "https://pogovt.com/assets/DEFAULT/pokemon/26.f62.png"
 		}
 	},
@@ -535,8 +545,11 @@ export function randomizePokemonContext(): PokemonTemplateContext {
 		pvpUltraRank: bestRank(pvpUltra),
 		despawnUnix: randomDespawnUnix(),
 		minutesLeft: randomInt(1, 60),
-		// only this species' real next stage — never a random unrelated species
+		// only this species' real next stage — never a random unrelated species. RANDOM_SPECIES
+		// only models one hop deep, so evolvesTo/futureEvolutions are identical here.
 		evolutions: species.evolvesTo ? [species.evolvesTo] : [],
+		evolvesTo: species.evolvesTo ? [species.evolvesTo] : [],
+		futureEvolutions: species.evolvesTo ? [species.evolvesTo] : [],
 		pokemonImageUrl: `https://pogovt.com/assets/DEFAULT/pokemon/${species.id}.png`
 	};
 }

@@ -139,6 +139,35 @@ function buildEvolutionFamily(pokemonId: number): { fullName: string; pokemonId:
 		}));
 }
 
+// Every future stage reachable from pokemonId/form, immediate and beyond — never a
+// pre-evolution. Walks every branch for a species with multiple possible evolutions (e.g. Eevee)
+// rather than just one path. `seen` guards against a cycle (shouldn't exist in real data, but a
+// malformed masterfile entry must not infinite-loop this).
+function buildFutureEvolutions(
+	pokemonId: number,
+	form: number
+): { fullName: string; pokemonId: number }[] {
+	const result: { fullName: string; pokemonId: number }[] = [];
+	const seen = new Set<number>([pokemonId]);
+
+	function walk(id: number, f: number) {
+		const master = getMasterPokemon(id, f);
+		for (const evo of master?.evolutions ?? []) {
+			if (seen.has(evo.pokemonId)) continue;
+			seen.add(evo.pokemonId);
+			const evoForm = getNormalizedForm(evo.pokemonId, evo.form);
+			result.push({
+				fullName: mPokemon({ pokemon_id: evo.pokemonId, form: evoForm }),
+				pokemonId: evo.pokemonId
+			});
+			walk(evo.pokemonId, evoForm);
+		}
+	}
+	walk(pokemonId, form);
+
+	return result;
+}
+
 export async function buildPokemonContext(
 	message: GolbatPokemonMessage,
 	thisFetch: typeof fetch = fetch
@@ -175,6 +204,17 @@ export async function buildPokemonContext(
 	const type1 = typeIdToText(master?.types?.[0]);
 	const type2 = master?.types?.[1] ? typeIdToText(master.types[1]) : "";
 	const evolutions = buildEvolutionFamily(message.pokemon_id);
+	// Direct next-stage evolution(s) only — buildEvolutionFamily above returns pre-evolutions too,
+	// which is correct for a "family" listing but wrong for "can evolve into" wording (e.g. a
+	// Gyarados encounter must never claim it "can evolve into Magikarp").
+	const evolvesTo = (master?.evolutions ?? []).map((evo) => ({
+		fullName: mPokemon({
+			pokemon_id: evo.pokemonId,
+			form: getNormalizedForm(evo.pokemonId, evo.form)
+		}),
+		pokemonId: evo.pokemonId
+	}));
+	const futureEvolutions = buildFutureEvolutions(message.pokemon_id, form);
 	const featuredAttack = findActiveFeaturedAttack(
 		await featuredAttackProvider.get(),
 		message.pokemon_id,
@@ -254,6 +294,8 @@ export async function buildPokemonContext(
 		pokestopName: message.pokestop_name ?? "",
 		username: message.username ?? "",
 		evolutions,
+		evolvesTo,
+		futureEvolutions,
 		hasFeaturedAttack: !!featuredAttack,
 		featuredAttackMoveName: featuredAttack?.moveName ?? "",
 		featuredAttackMoveCategory: featuredAttack?.moveCategory ?? "",
