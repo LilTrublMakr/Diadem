@@ -75,3 +75,6 @@ export const REFRESH_RAMPARDOS_STYLES = 60 * 60;
 // Scrapes N LeekDuck pages per refresh (not one endpoint), but should reflect a fresh
 // Community Day / event announcement reasonably fast — matches events/+server.ts's own cache TTL.
 export const REFRESH_FEATURED_ATTACKS = 15 * 60;
+// Move mechanics (duration/energy) essentially never change — long TTL matches Pokébattler's
+// "cache aggressively, avoid sustained automated load" guidance.
+export const REFRESH_MOVE_MECHANICS = 24 * 60 * 60;

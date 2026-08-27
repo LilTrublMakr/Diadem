@@ -5,6 +5,8 @@
 	import { getIconPokemon, initAllIconSets } from '$lib/services/uicons.svelte';
 	import { getUserDetails } from '$lib/services/user/userDetails.svelte';
 	import { getTrackers, setTrackerEntry, trackerKey } from '$lib/features/trackerState.svelte';
+	import { ensureMoveMechanicsLoaded, getMoveMechanics } from '$lib/features/moveMechanics.svelte';
+	import { buildMovesetMatrix } from '$lib/utils/moveDps';
 	import TrackedPokemonImg from '@/components/custom/TrackedPokemonImg.svelte';
 	import type { MasterEvolution, MasterPokemon } from '$lib/types/masterfile';
 	type PokemonDetailResponse = {
@@ -103,6 +105,12 @@
 		Promise.all([loadMasterFile(), initAllIconSets()]).then(() => { masterReady = true; });
 	});
 
+	// Independent of masterReady — non-critical, best-effort DPS data from an external
+	// service, shouldn't block the rest of the page from rendering.
+	$effect(() => {
+		ensureMoveMechanicsLoaded();
+	});
+
 	$effect(() => {
 		const id = pokemonId;
 		statsLoading = true;
@@ -168,6 +176,11 @@
 		if (!pokemon) return null;
 		if (activeForm === 0) return pokemon;
 		return pokemon.forms[activeForm.toString()] ?? pokemon.tempEvos[activeForm.toString()] ?? pokemon;
+	});
+
+	let movesetMatrix = $derived.by(() => {
+		if (!activePokemon) return [];
+		return buildMovesetMatrix(activePokemon, getMoveMechanics());
 	});
 
 	type EvoTreeNode = { id: number; evo: MasterEvolution | null; children: EvoTreeNode[] };
@@ -960,6 +973,37 @@
 				</div>
 			{/each}
 		</div>
+
+		<!-- Moveset DPS ranking -->
+		<div class="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 mb-6">
+			<h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">All Movesets (by DPS)</h2>
+			{#if movesetMatrix.length === 0}
+				<p class="text-sm text-zinc-400 dark:text-zinc-600">
+					{Object.keys(getMoveMechanics()).length === 0 ? 'Loading move data…' : 'No moveset data available.'}
+				</p>
+			{:else}
+				<div class="max-h-96 overflow-y-auto flex flex-col gap-1.5 pr-1">
+					{#each movesetMatrix as entry, i (entry.quick.proto + ':' + entry.charge.proto)}
+						<div class="flex items-center justify-between gap-2 text-sm px-2 py-1.5 rounded {i === 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''}">
+							<div class="flex items-center gap-1.5 min-w-0 flex-1">
+								<span class="text-zinc-400 dark:text-zinc-600 text-xs w-5 text-right flex-shrink-0">{i + 1}</span>
+								<span class="type-badge text-white text-xs px-1.5 py-0.5 rounded flex-shrink-0" style="background-color:{TYPE_COLORS[entry.quick.type] ?? '#9099a1'}">{entry.quick.name}</span>
+								<span class="text-zinc-400 dark:text-zinc-600 text-xs flex-shrink-0">/</span>
+								<span class="type-badge text-white text-xs px-1.5 py-0.5 rounded flex-shrink-0" style="background-color:{TYPE_COLORS[entry.charge.type] ?? '#9099a1'}">{entry.charge.name}</span>
+								{#if entry.isLegacy}
+									<span class="text-xs text-zinc-400 dark:text-zinc-500 flex-shrink-0">Legacy</span>
+								{/if}
+							</div>
+							<span class="font-mono text-xs text-zinc-700 dark:text-zinc-300 flex-shrink-0">{entry.dps.toFixed(1)} DPS</span>
+						</div>
+					{/each}
+				</div>
+			{/if}
+			<p class="text-xs text-zinc-400 dark:text-zinc-600 mt-3">
+				Raw DPS estimate (STAB only, no specific raid boss) — move data via <a href="https://www.pokebattler.com" target="_blank" rel="noopener noreferrer" class="underline hover:text-zinc-600 dark:hover:text-zinc-400">Pokébattler</a>.
+			</p>
+		</div>
+
 		<p class="text-xs text-zinc-400 dark:text-zinc-600 mt-3">Stats updated every 5 minutes. Moves from game data.</p>
 
 	{/if}
