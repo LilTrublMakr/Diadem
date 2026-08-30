@@ -13,6 +13,7 @@
 		IconActive,
 		labelActive,
 		actions = [],
+		compact = false,
 		...rest
 	}: {
 		Icon: LucideIcon;
@@ -21,16 +22,26 @@
 		IconActive?: LucideIcon;
 		labelActive?: string;
 		actions?: PopupActionDropdown[];
+		// Smaller pill sizing (matches the "My Collection" tracker buttons) instead of the default
+		// full-size popup button — used where several buttons need to fit compactly in one row.
+		compact?: boolean;
 	} & ButtonProps = $props();
 </script>
 
 <div class="flex gap-0.5 [&>*:first-child:not(:last-child)]:rounded-r-none" role="group">
-	<Button size="default" variant="secondary" class="items-center" {...rest}>
+	<Button
+		size={compact ? "" : "default"}
+		variant={compact ? "" : "secondary"}
+		class={compact
+			? "items-center text-xs px-2 py-1 h-auto rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground active:bg-accent active:text-accent-foreground"
+			: "items-center"}
+		{...rest}
+	>
 		{#if !active}
-			<Icon class="size-4 mb-0.5" />
+			<Icon class={compact ? "size-3.5 mb-0.5" : "size-4 mb-0.5"} />
 			{label}
 		{:else if labelActive}
-			<IconActive class="size-4 mb-0.5" />
+			<IconActive class={compact ? "size-3.5 mb-0.5" : "size-4 mb-0.5"} />
 			{labelActive}
 		{/if}
 	</Button>
@@ -39,8 +50,15 @@
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
 				{#snippet child({ props })}
-					<Button class="px-3! rounded-l-none" size="default" variant="secondary" {...props}>
-						<Ellipsis class="size-4 mt-0.5" />
+					<Button
+						class={compact
+							? "px-1.5! h-auto py-1! rounded-l-none border border-input bg-background hover:bg-accent hover:text-accent-foreground active:bg-accent active:text-accent-foreground"
+							: "px-3! rounded-l-none"}
+						size={compact ? "" : "default"}
+						variant={compact ? "" : "secondary"}
+						{...props}
+					>
+						<Ellipsis class={compact ? "size-3.5 mt-0.5" : "size-4 mt-0.5"} />
 					</Button>
 				{/snippet}
 			</DropdownMenu.Trigger>

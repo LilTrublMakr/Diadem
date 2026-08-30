@@ -686,5 +686,9 @@
 	"with_background": "With Background",
 	"map_limit_title": "Limit reached",
 	"map_limit_zoom_hint": "Zoom in to see more {objects}",
-	"pogo_data": "data"
+	"pogo_data": "data",
+	"popup_view_pokedex": "View Pokédex",
+	"popup_copy_lat": "Copy Lat",
+	"popup_copy_lon": "Copy Lon",
+	"popup_copied": "Copied!"
 }
