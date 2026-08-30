@@ -8,6 +8,9 @@
 		parsePokeGenieCsv,
 		type ExportFormat
 	} from "@/lib/utils/collectionImportUtils";
+	import { aggregateTrackerImport } from "@/lib/utils/collectionTrackerImport";
+	import { loadTrackers } from "$lib/features/trackerState.svelte";
+	import { getUserDetails } from "$lib/services/user/userDetails.svelte";
 	import type { RawExportFile, RawExportPokemon } from "@/lib/types/collectionExport";
 	import { Upload, Download, FileJson } from "@lucide/svelte";
 
@@ -108,6 +111,35 @@
 	function downloadCalcyIv() {
 		if (!pokemon) return;
 		downloadCsv("calcy_iv_history.csv", buildCalcyIvCsv(pokemon, buildMoveNameMap()));
+	}
+
+	let importMode = $state<"merge" | "replace">("merge");
+	let importing = $state(false);
+	let importResult = $state<string | null>(null);
+	let importError = $state<string | null>(null);
+
+	async function importToCollection() {
+		if (!pokemon) return;
+		importing = true;
+		importResult = null;
+		importError = null;
+
+		try {
+			const entries = aggregateTrackerImport(pokemon);
+			const res = await fetch("/api/custom/collection-import", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ entries, mode: importMode })
+			});
+			if (!res.ok) throw new Error(`Import failed (${res.status})`);
+			const body: { updated: number } = await res.json();
+			await loadTrackers();
+			importResult = `Updated tracker for ${body.updated} species/form${body.updated === 1 ? "" : "s"}.`;
+		} catch (e) {
+			importError = e instanceof Error ? e.message : "Import failed";
+		} finally {
+			importing = false;
+		}
 	}
 </script>
 
@@ -212,6 +244,47 @@
 					Download CalcyIV CSV
 				</button>
 			</div>
+
+			{#if getUserDetails().details}
+				<div class="mt-5 pt-5 border-t border-zinc-200 dark:border-zinc-800">
+					<h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Import to My Collection</h2>
+					<p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+						Bulk-updates your tracked hundos/nundos/shundos/legacy moves from this parsed export.
+						{#if detectedFormat !== "json"}
+							This export has no shiny data, so shiny/shundo won't be set from it.
+						{/if}
+					</p>
+					<div class="flex items-center gap-4 mb-3 text-sm">
+						<label class="flex items-center gap-1.5 cursor-pointer">
+							<input type="radio" bind:group={importMode} value="merge" />
+							Merge (recommended)
+						</label>
+						<label class="flex items-center gap-1.5 cursor-pointer">
+							<input type="radio" bind:group={importMode} value="replace" />
+							Replace (import is the source of truth)
+						</label>
+					</div>
+					{#if importMode === "replace"}
+						<p class="text-xs text-amber-600 dark:text-amber-500 mb-3">
+							Replace can downgrade or clear tracked flags/legacy moves for any species+form this
+							export covers — including clearing shiny/shundo if this export has no shiny data.
+						</p>
+					{/if}
+					<button
+						onclick={importToCollection}
+						disabled={importing}
+						class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						{importing ? "Importing…" : "Import to My Collection"}
+					</button>
+					{#if importResult}
+						<p class="mt-2 text-xs text-emerald-600 dark:text-emerald-400">{importResult}</p>
+					{/if}
+					{#if importError}
+						<p class="mt-2 text-xs text-red-500">{importError}</p>
+					{/if}
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>
