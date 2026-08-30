@@ -57,6 +57,26 @@ export function cpmToLevel(cpm: number): number | undefined {
 	return closest.level;
 }
 
+// Reverse of cpmToLevel - used when parsing a source that only records level (e.g. an imported
+// PokeGenie/CalcyIV CSV), since RawExportPokemon stores cpm, not level, internally.
+export function levelToCpm(level: number): number | undefined {
+	if (!level) return undefined;
+
+	const table = buildLevelCpmTable();
+	let closest = table[0];
+	let closestDiff = Math.abs(table[0].level - level);
+
+	for (const entry of table) {
+		const diff = Math.abs(entry.level - level);
+		if (diff < closestDiff) {
+			closest = entry;
+			closestDiff = diff;
+		}
+	}
+
+	return closest.cpm;
+}
+
 export function getGenderSymbol(gender: number): string {
 	if (gender === 1) return "♂";
 	if (gender === 2) return "♀";
@@ -129,7 +149,7 @@ export function formatCalcyIvDate(ms: number): string {
 	return `${d.getMonth() + 1}/${d.getDate()}/${year2} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-const POKE_GENIE_HEADER = [
+export const POKE_GENIE_HEADER = [
 	"Index", "Name", "Form", "Pokemon", "Gender", "CP", "HP", "Atk IV", "Def IV", "Sta IV",
 	"IV Avg", "Level Min", "Level Max", "Quick Move", "Charge Move", "Charge Move 2", "Scan Date",
 	"Catch Date", "Weight", "Height", "Lucky", "Shadow/Purified", "Favorite", "Dust",
@@ -187,7 +207,7 @@ export function buildPokeGenieCsv(
 	return lines.join("\r\n");
 }
 
-const CALCY_IV_HEADER = [
+export const CALCY_IV_HEADER = [
 	"Ancestor?", "Scan date", "Nr", "Name", "Temp Evo", "Gender", "Nickname", "Level",
 	"possibleLevels", "CP", "HP", "Dust cost", "min IV%", "ØIV%", "max IV%", "ØATT IV", "ØDEF IV",
 	"ØHP IV", "Unique?", "Fast move", "Fast move (ID)", "Special move", "Special move (ID)",

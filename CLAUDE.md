@@ -211,6 +211,11 @@ All custom code lives in paths that Diadem treats as extension points:
 | `src/routes/api/custom/tracker/[id]/+server.ts` | Per-pokemon tracker API — GET returns `{ shiny, hundo, nundo, shundo }`, POST updates (insert or update); 401 if not logged in |
 | `src/routes/api/custom/tracker/+server.ts` | All-tracker GET — returns `{ pokemonId, shiny, hundo, nundo, shundo }[]` for logged-in user |
 | `src/routes/(custom)/profile/+page.svelte` | User profile page at `/profile` — shows tracked shundos, hundos, shinies, nundos (in that order) |
+| `src/routes/(custom)/collection-export/+page.svelte` | Collection CSV converter at `/collection-export` — upload/drag-drop/paste an export (autodetects this app's own `export.json`, a PokeGenie CSV, or a CalcyIV CSV), download the other two formats |
+| `src/lib/types/collectionExport.ts` | `RawExportPokemon`/`RawExportFile` — the internal shape every collection-export format normalizes to/from; sourced from a third-party inventory export tool, no producer code in this repo |
+| `src/lib/utils/collectionExportUtils.ts` | Builds PokeGenie/CalcyIV CSVs from `RawExportPokemon[]` (`buildPokeGenieCsv`/`buildCalcyIvCsv`), plus shared helpers (`cpmToLevel`/`levelToCpm`, `csvRow`/`csvField`, date formatters) and the exported `POKE_GENIE_HEADER`/`CALCY_IV_HEADER` column contracts |
+| `src/lib/utils/collectionImportUtils.ts` | Reverse of the above — `detectExportFormat()` (json/pokegenie/calcyiv/unknown), `parsePokeGenieCsv()`/`parseCalcyIvCsv()` back to `RawExportPokemon[]`. PokeGenie parsing is lossy (no shiny/nickname/costume/tags/traded/hatched columns exist in that format) — defaulted, not guessed |
+| `src/lib/utils/csvParse.ts` | `parseCsv()` — quoted-field-aware CSV tokenizer, the reverse of `csvField`/`csvRow` |
 | `src/lib/server/db/internal/schema.ts` | Internal DB schema — includes `pokemon_tracker` table (userId, pokemonId, shiny, hundo, nundo, shundo, updatedAt; unique on userId+pokemonId) |
 | `src/lib/features/trackerState.svelte.ts` | Global reactive tracker state — `loadTrackers()`, `getTrackers()`, `setTrackerEntry()`, `isTrackerLoaded()`; `TrackerEntry = { shiny, hundo, nundo, shundo }` |
 | `src/components/custom/TrackedPokemonImg.svelte` | Drop-in `<img>` wrapper — badge positions: ✨ top-left, 🌟 top-right, 0️⃣ bottom-left, 💯 bottom-right |
