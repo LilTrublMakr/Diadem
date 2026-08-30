@@ -5,7 +5,6 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 	import type { TopEncounter, TopEncountersResponse } from '../../routes/api/custom/top-encounters/+server';
 	import { getIconPokemon } from '$lib/services/uicons.svelte';
 	import { loadTrackers } from '$lib/features/trackerState.svelte';
-	import NavBar from './NavBar.svelte';
 	import Footer from './Footer.svelte';
 	import TrackedPokemonImg from './TrackedPokemonImg.svelte';
 
@@ -89,8 +88,6 @@ import type { RecentHundo } from '../../routes/api/custom/hundos/+server';
 </svelte:head>
 
 <div class="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col">
-
-	<NavBar />
 
 	<!-- Hero -->
 	<section class="max-w-6xl mx-auto px-6 pt-16 pb-12 w-full">

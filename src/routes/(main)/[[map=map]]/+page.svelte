@@ -34,7 +34,6 @@
 	import ErrorPageWebGl from "@/components/ui/ErrorPageWebGl.svelte";
 	import MapMain from "@/components/map/MapMain.svelte";
 	import MapMenuUi from "@/components/ui/MapMenuUi.svelte";
-	import MapHomeButton from "@/components/custom/MapHomeButton.svelte";
 	import SessionExpiredBanner from "@/components/custom/SessionExpiredBanner.svelte";
 	import type maplibre from "maplibre-gl";
 	import { onDestroy, onMount } from "svelte";
@@ -95,12 +94,11 @@
 	<ContextMenu />
 
 	{#if isSearchViewActive()}
-		<div class="fixed z-50 top-safe-inset-top px-2 w-full pointer-events-none">
+		<div class="fixed z-50 top-[calc(env(safe-area-inset-top)+3.625rem)] px-2 w-full pointer-events-none">
 			<ActiveSearchView />
 		</div>
 	{/if}
 
-	<MapHomeButton />
 	<SessionExpiredBanner />
 
 	<MapMenuUi>
@@ -129,7 +127,7 @@
 
 		{#snippet mobileTop()}
 			<div
-				class="fixed top-safe-inset-top z-10 flex flex-col gap-2"
+				class="fixed top-[calc(env(safe-area-inset-top)+3.625rem)] z-10 flex flex-col gap-2"
 				class:right-2={!isUiLeft() || isMenuSidebar()}
 				class:left-2={isUiLeft() && !isMenuSidebar()}
 				class:items-end={!isUiLeft() || isMenuSidebar()}

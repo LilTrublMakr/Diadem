@@ -13,7 +13,8 @@
 		{ href: "/events", label: "Events" },
 		{ href: "/shiny", label: "Shiny Stats" },
 		{ href: "/seen", label: "Seen Stats" },
-		{ href: "/status", label: "Worker Status" }
+		{ href: "/status", label: "Worker Status" },
+		{ href: "/support", label: "Support" }
 	];
 
 	let user = $derived(getUserDetails().details);

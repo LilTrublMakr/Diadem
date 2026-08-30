@@ -21,7 +21,7 @@
 
 {#if isMenuSidebar()}
 	<div
-		class="fixed inset-0 z-10 flex items-end overflow-hidden pt-safe-inset-top pb-safe-inset-bottom pointer-events-none"
+		class="fixed inset-0 z-10 flex items-end overflow-hidden pt-[calc(env(safe-area-inset-top)+3.625rem)] pb-safe-inset-bottom pointer-events-none"
 	>
 		<div
 			class="mr-auto flex h-full min-w-[17rem] max-w-104 flex-[1_1_26rem] flex-col items-start justify-end gap-2"
