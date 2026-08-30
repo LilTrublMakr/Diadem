@@ -10,12 +10,14 @@
 
 	const navLinks = [
 		{ href: "/map", label: "Map" },
-		{ href: "/events", label: "Events" },
+		{ href: "/events", label: "Events" }
+	];
+	const statsLinks = [
 		{ href: "/shiny", label: "Shiny Stats" },
 		{ href: "/seen", label: "Seen Stats" },
-		{ href: "/status", label: "Worker Status" },
-		{ href: "/support", label: "Support" }
+		{ href: "/status", label: "Worker Status" }
 	];
+	const toolsLinks = [{ href: "/collection-export", label: "IV Export Converter" }];
 
 	let user = $derived(getUserDetails().details);
 	let canScan = $derived.by(() => {
@@ -28,6 +30,11 @@
 	let isDark = $derived(getUserSettings().themeMode !== "light");
 	let menuOpen = $state(false);
 	let dropdownOpen = $state(false);
+	let statsOpen = $state(false);
+	let toolsOpen = $state(false);
+
+	let statsActive = $derived(statsLinks.some((link) => link.href === page.url.pathname));
+	let toolsActive = $derived(toolsLinks.some((link) => link.href === page.url.pathname));
 
 	async function logout() {
 		dropdownOpen = false;
@@ -47,6 +54,12 @@
 		const target = e.target as HTMLElement;
 		if (!target.closest("[data-user-menu]")) {
 			dropdownOpen = false;
+		}
+		if (!target.closest("[data-stats-menu]")) {
+			statsOpen = false;
+		}
+		if (!target.closest("[data-tools-menu]")) {
+			toolsOpen = false;
 		}
 	}
 </script>
@@ -73,6 +86,70 @@
 					{link.label}
 				</a>
 			{/each}
+
+			<div class="relative" data-stats-menu>
+				<button
+					onclick={() => (statsOpen = !statsOpen)}
+					class="flex items-center gap-1 transition-colors {statsActive
+						? 'text-zinc-900 dark:text-white'
+						: 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'}"
+				>
+					Stats
+					<ChevronDown size={14} class="transition-transform {statsOpen ? 'rotate-180' : ''}" />
+				</button>
+				{#if statsOpen}
+					<div
+						class="absolute left-0 top-full mt-2 w-40 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg overflow-hidden z-20"
+					>
+						{#each statsLinks as link}
+							<a
+								href={link.href}
+								onclick={() => (statsOpen = false)}
+								class="block px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+							>
+								{link.label}
+							</a>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<div class="relative" data-tools-menu>
+				<button
+					onclick={() => (toolsOpen = !toolsOpen)}
+					class="flex items-center gap-1 transition-colors {toolsActive
+						? 'text-zinc-900 dark:text-white'
+						: 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'}"
+				>
+					Tools
+					<ChevronDown size={14} class="transition-transform {toolsOpen ? 'rotate-180' : ''}" />
+				</button>
+				{#if toolsOpen}
+					<div
+						class="absolute left-0 top-full mt-2 w-44 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg overflow-hidden z-20"
+					>
+						{#each toolsLinks as link}
+							<a
+								href={link.href}
+								onclick={() => (toolsOpen = false)}
+								class="block px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+							>
+								{link.label}
+							</a>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<a
+				href="/support"
+				class="transition-colors {page.url.pathname === '/support'
+					? 'text-zinc-900 dark:text-white'
+					: 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'}"
+			>
+				Support
+			</a>
+
 			<PokedexSearch />
 			<span class="w-px h-4 bg-zinc-200 dark:bg-zinc-800"></span>
 			<button
@@ -117,13 +194,6 @@
 								class="block px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
 							>
 								My Collection
-							</a>
-							<a
-								href="/collection-export"
-								onclick={() => (dropdownOpen = false)}
-								class="block px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
-							>
-								Collection CSV Export
 							</a>
 							{#if canScan}
 								<a
@@ -207,6 +277,63 @@
 					{link.label}
 				</a>
 			{/each}
+
+			<details>
+				<summary
+					class="py-2 text-sm cursor-pointer select-none list-none {statsActive
+						? 'text-zinc-900 dark:text-white font-medium'
+						: 'text-zinc-500 dark:text-zinc-400'}"
+				>
+					Stats
+				</summary>
+				<div class="pl-3 flex flex-col gap-1 pb-1">
+					{#each statsLinks as link}
+						<a
+							href={link.href}
+							onclick={closeMenu}
+							class="py-1.5 text-sm transition-colors {page.url.pathname === link.href
+								? 'text-zinc-900 dark:text-white font-medium'
+								: 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'}"
+						>
+							{link.label}
+						</a>
+					{/each}
+				</div>
+			</details>
+
+			<details>
+				<summary
+					class="py-2 text-sm cursor-pointer select-none list-none {toolsActive
+						? 'text-zinc-900 dark:text-white font-medium'
+						: 'text-zinc-500 dark:text-zinc-400'}"
+				>
+					Tools
+				</summary>
+				<div class="pl-3 flex flex-col gap-1 pb-1">
+					{#each toolsLinks as link}
+						<a
+							href={link.href}
+							onclick={closeMenu}
+							class="py-1.5 text-sm transition-colors {page.url.pathname === link.href
+								? 'text-zinc-900 dark:text-white font-medium'
+								: 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'}"
+						>
+							{link.label}
+						</a>
+					{/each}
+				</div>
+			</details>
+
+			<a
+				href="/support"
+				onclick={closeMenu}
+				class="py-2 text-sm transition-colors {page.url.pathname === '/support'
+					? 'text-zinc-900 dark:text-white font-medium'
+					: 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'}"
+			>
+				Support
+			</a>
+
 			<div
 				class="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 flex flex-col gap-2 text-sm"
 			>
@@ -228,13 +355,6 @@
 						class="py-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
 					>
 						My Collection
-					</a>
-					<a
-						href="/collection-export"
-						onclick={closeMenu}
-						class="py-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
-					>
-						Collection CSV Export
 					</a>
 					{#if canScan}
 						<a
