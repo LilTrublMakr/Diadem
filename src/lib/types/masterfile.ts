@@ -47,4 +47,7 @@ export type MasterFile = {
 	pokemon: { [key: string]: MasterPokemon };
 	weather: { [key: string]: MasterWeather };
 	items: string[];
+	// Every move in the game, keyed by id - includes retired/no-longer-learnable moves (old
+	// Community Day exclusives, etc.) that don't appear in any current species' movepool.
+	moves: { [key: string]: MasterMove };
 };

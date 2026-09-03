@@ -49,6 +49,9 @@ type RawMasterFile = {
 			types: { typeId: number }[];
 		};
 	};
+	// Global move list - unlike per-pokemon quickMoves/chargedMoves, includes moves no longer
+	// learnable by any current species (id/name only guaranteed; type/power are sometimes absent).
+	moves?: { [key: string]: { id: number; name: string; proto: string; type?: number; power?: number } };
 };
 
 // proto → {id, name, type, power} — populated during first parse pass
@@ -163,7 +166,13 @@ export class MasterfileProvider extends BaseDataProvider<MasterFile> {
 		const masterFile = {
 			pokemon: {},
 			items: Object.keys(data.items),
-			weather: {}
+			weather: {},
+			moves: Object.fromEntries(
+				Object.entries(data.moves ?? {}).map(([id, m]) => [
+					id,
+					{ id: m.id, name: m.name, proto: m.proto, type: m.type ?? 0, power: m.power ?? 0 }
+				])
+			)
 		} as MasterFile;
 
 		for (const [id, pokemon] of Object.entries(data.pokemon)) {
