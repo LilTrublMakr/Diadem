@@ -86,12 +86,10 @@
 	<h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">IV Export Converter</h1>
 	<p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
 		Convert a Pokemon collection export between <strong>PokeGenie</strong> and <strong>CalcyIV</strong>
-		CSV formats — upload, drag-and-drop, or paste either one and download the other. This also accepts
-		<code class="text-zinc-600 dark:text-zinc-300">export.json</code>, the format produced by a smaller,
-		closed-source companion tool most people haven't heard of yet (it may see wider use down the road).
-		The format is detected automatically. Not every column those tools use exists in every source
-		format - unavailable columns (e.g. shiny/nickname/costume when starting from a PokeGenie CSV) are
-		left blank rather than guessed at.
+		CSV formats — upload, drag-and-drop, or paste either one and download the other. The format is
+		detected automatically. Not every column those tools use exists in every source format -
+		unavailable columns (e.g. shiny/nickname/costume when starting from a PokeGenie CSV) are left
+		blank rather than guessed at.
 	</p>
 	<p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
 		PokeGenie itself can't import a CSV — the "PokeGenie-style CSV" download below is a plain

@@ -38,9 +38,7 @@
 		try {
 			const format = detectExportFormat(text);
 			if (format === "unknown") {
-				throw new Error(
-					"Unrecognized format — expected this app's own export.json, a PokeGenie CSV, or a CalcyIV CSV."
-				);
+				throw new Error("Unrecognized format — expected a PokeGenie CSV or a CalcyIV CSV.");
 			}
 
 			if (!masterFileLoaded) {
@@ -125,7 +123,7 @@
 		id="paste-export-text"
 		bind:value={pasteText}
 		rows="4"
-		placeholder="Paste export.json / PokeGenie CSV / CalcyIV CSV contents here…"
+		placeholder="Paste PokeGenie CSV / CalcyIV CSV contents here…"
 		class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-xs font-mono text-zinc-800 dark:text-zinc-200"
 	></textarea>
 	<button

@@ -162,7 +162,7 @@
 	{#if loggedIn}
 		<details class="mb-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4">
 			<summary class="text-sm font-semibold text-zinc-800 dark:text-zinc-200 cursor-pointer select-none">
-				Import from PokeGenie / CalcyIV / export.json
+				Import from PokeGenie / CalcyIV
 			</summary>
 			<div class="mt-4">
 				<p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
