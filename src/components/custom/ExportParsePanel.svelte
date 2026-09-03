@@ -22,8 +22,10 @@
 	let masterFileLoaded = false;
 
 	function parseJsonExport(text: string): RawExportPokemon[] {
-		const data = JSON.parse(text) as RawExportFile;
-		const list = data?.payload?.pokemon;
+		const data = JSON.parse(text);
+		// The export tool switched (Sept 2026) from a {payload:{ok,pokemon:[...]}} wrapper to a
+		// plain top-level array — accept either shape.
+		const list = Array.isArray(data) ? data : (data as RawExportFile)?.payload?.pokemon;
 		if (!Array.isArray(list)) throw new Error("This doesn't look like a Pokemon collection export");
 		return list;
 	}

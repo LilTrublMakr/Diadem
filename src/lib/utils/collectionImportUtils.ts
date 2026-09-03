@@ -9,12 +9,17 @@ export type ExportFormat = "json" | "pokegenie" | "calcyiv" | "unknown";
  * Try the app's own JSON export shape first, then sniff a CSV header row for a couple of column
  * names distinctive to each third-party format — not a full exact-header match, so minor column
  * additions in a newer PokeGenie/CalcyIV app version don't silently break detection.
+ *
+ * The export tool's JSON shape changed (as of Sept 2026) from a `{payload:{ok,pokemon:[...]}}`
+ * wrapper to a plain top-level array of pokemon — both are accepted here, and in
+ * ExportParsePanel.svelte's parseJsonExport, in case an older export is ever pasted in.
  */
 export function detectExportFormat(text: string): ExportFormat {
 	const trimmed = text.trim();
-	if (trimmed.startsWith("{")) {
+	if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
 		try {
 			const data = JSON.parse(trimmed);
+			if (Array.isArray(data)) return "json";
 			if (Array.isArray(data?.payload?.pokemon)) return "json";
 		} catch {
 			// fall through to CSV sniffing below
@@ -110,6 +115,7 @@ export function parsePokeGenieCsv(text: string, moveIds: Map<string, number>): R
 		return {
 			alignment: alignmentLabelToValue(cell(row, header, "Shadow/Purified")),
 			atk: Number(cell(row, header, "Atk IV")) || 0,
+			buddy_level: 0,
 			caught_ms: parsePokeGenieDate(cell(row, header, "Catch Date")),
 			costume: 0,
 			cp: Number(cell(row, header, "CP")) || 0,
@@ -122,6 +128,7 @@ export function parsePokeGenieCsv(text: string, moveIds: Map<string, number>): R
 			hatched: false,
 			id: crypto.randomUUID(),
 			lucky: cell(row, header, "Lucky") === "1",
+			mega_level: 0,
 			move1: moveIds.get(cell(row, header, "Quick Move").toLowerCase()) ?? 0,
 			move2: moveIds.get(cell(row, header, "Charge Move").toLowerCase()) ?? 0,
 			move3: moveIds.get(cell(row, header, "Charge Move 2").toLowerCase()) ?? 0,
@@ -153,6 +160,7 @@ export function parseCalcyIvCsv(text: string, moveIds: Map<string, number>): Raw
 		return {
 			alignment: cell(row, header, "ShadowForm") === "1" ? 1 : 0,
 			atk: Math.round(Number(cell(row, header, "ØATT IV"))) || 0,
+			buddy_level: 0,
 			caught_ms: parseCalcyIvDate(cell(row, header, "Catch Date")),
 			costume: 0,
 			cp: Number(cell(row, header, "CP")) || 0,
@@ -165,6 +173,7 @@ export function parseCalcyIvCsv(text: string, moveIds: Map<string, number>): Raw
 			hatched: cell(row, header, "Egg") === "1",
 			id: crypto.randomUUID(),
 			lucky: cell(row, header, "Lucky?") === "1",
+			mega_level: 0,
 			move1: fastMoveId ?? moveIds.get(cell(row, header, "Fast move").toLowerCase()) ?? 0,
 			move2: specialMoveId ?? moveIds.get(cell(row, header, "Special move").toLowerCase()) ?? 0,
 			move3: specialMove2Id ?? moveIds.get(cell(row, header, "Special move 2").toLowerCase()) ?? 0,
