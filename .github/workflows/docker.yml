@@ -38,7 +38,7 @@ jobs:
           context: .
           target: runtime
           push: true
-          platforms: linux/arm64
+          platforms: linux/arm64,linux/amd64
           tags: ghcr.io/liltrublmakr/diadem:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
