@@ -124,5 +124,6 @@
 				onlyShowNavigationButton={activeSnapPoint === 1}
 			/>
 		</Drawer.Content>
+>>>>>>> c211aa1a (chore: add map attributions (closes #179))
 	</Drawer.Portal>
 </Drawer.Root>
