@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { Drawer } from "$lib/diadem-vaul-svelte/src/lib";
+	import { Drawer } from "$lib/drawer";
 	import {
-		closeMenu,
 		getOpenedMenu,
 		Menu,
 		onMenuDrawerOpenChangeComplete,
@@ -10,7 +9,6 @@
 	import MenuContainer from "@/components/menus/MenuContainer.svelte";
 	import MobileTitle from "@/components/menus/mobile/MobileTitle.svelte";
 	import { onMount } from "svelte";
-	import ScoutMenu from "@/components/menus/scout/ScoutMenu.svelte";
 
 	let {
 		menus
@@ -26,17 +24,19 @@
 <Drawer.Root
 	open={menus.includes(getOpenedMenu())}
 	onOpenChangeComplete={onMenuDrawerOpenChangeComplete}
-	closeOnOutsideClick={false}
+	modal={false}
+	disablePointerDismissal
 >
 	<Drawer.Portal>
-		<Drawer.Content
-			class="duration-150! fixed flex flex-col bottom-0 z-10 px-2 pt-2 w-full h-fit border border-t-border bg-card/60 backdrop-blur-sm rounded-t-xl"
-		>
-			<MobileTitle />
-
-			<div class="pb-20 content">
-				<MenuContainer />
-			</div>
-		</Drawer.Content>
+		<Drawer.Viewport class="drawer-viewport flex items-end z-0!">
+			<Drawer.Popup
+				class="drawer-popup flex flex-col px-2 pt-2 w-full h-fit border border-t-border bg-card/60 backdrop-blur-sm rounded-t-xl pb-[env(safe-area-inset-bottom)]"
+			>
+				<MobileTitle />
+				<Drawer.Content class="pb-20 content">
+					<MenuContainer />
+				</Drawer.Content>
+			</Drawer.Popup>
+		</Drawer.Viewport>
 	</Drawer.Portal>
 </Drawer.Root>

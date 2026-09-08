@@ -175,7 +175,7 @@
 					<StatsMainCardEntry
 						Icon={Heart}
 						name={m.stamina()}
-						value={m.pogo_hp({ hp: formatNumber(data.battle_pokemon_stamina) })}
+						value={formatNumber(data.battle_pokemon_stamina)}
 					/>
 					<StatsMainCardEntry
 						Icon={Calculator}
@@ -277,13 +277,6 @@
 
 	{/if}
 
-	<TitledMainSection Icon={Info} title={m.pogo_station()}>
-		<StatsMainCard>
-			<StatsMainCardEntry Icon={MapPinned} name={m.name()} value={data.name} />
-			<UpdatedTimes updated={data.updated} />
-		</StatsMainCard>
-	</TitledMainSection>
-
 	<TitledMainSection
 		Icon={CircleDot}
 		title={m.access_this_power_spot()}
@@ -297,5 +290,12 @@
 			zoom={15.5}
 			icon={resize(getIconStation(data), { width: 64 })}
 		/>
+	</TitledMainSection>
+
+	<TitledMainSection Icon={Info} title={m.about_this_sation()}>
+		<StatsMainCard>
+			<StatsMainCardEntry Icon={MapPinned} name={m.name()} value={data.name} />
+			<UpdatedTimes updated={data.updated} />
+		</StatsMainCard>
 	</TitledMainSection>
 {/snippet}

@@ -6,7 +6,7 @@
 	import WeatherOverview from "@/components/map/WeatherOverview.svelte";
 	import DataLimitNotice from "@/components/map/DataLimitNotice.svelte";
 	import { isSupportedFeature } from "@/lib/services/supportedFeatures";
-	import { closeMenu, getOpenedMenu } from "@/lib/ui/menus.svelte.js";
+	import { closeMenu, getOpenedMenu, Menu } from "@/lib/ui/menus.svelte.js";
 	import Fabs from "@/components/ui/fab/Fabs.svelte";
 	import PopupContainer from "@/components/ui/popups/PopupContainer.svelte";
 	import DesktopMenu from "@/components/menus/DesktopMenu.svelte";
@@ -138,10 +138,10 @@
 			</div>
 		{/snippet}
 		{#snippet mobileBottom()}
+			{#if !isSearchViewActive() && getOpenedMenu() !== Menu.SCOUT}
+				<Fabs {map} allowFollow={true} />
+			{/if}
 			{#if !getOpenedMenu()}
-				{#if !isSearchViewActive()}
-					<Fabs {map} allowFollow={true} />
-				{/if}
 				<PopupContainer />
 			{/if}
 			{#if !isSearchViewActive()}

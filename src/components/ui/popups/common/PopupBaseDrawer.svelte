@@ -4,12 +4,14 @@
 
 <script lang="ts">
 	import { onDestroy, tick, untrack } from "svelte";
-	import { Drawer } from "$lib/diadem-vaul-svelte/src/lib";
+	import { Drawer } from "$lib/drawer";
 	import { watch } from "runed";
 	import { closePopup } from "$lib/mapObjects/interact";
 	import { bindPopupDrawerSnapPoint } from "$lib/ui/popupDrawer.svelte";
 	import type { Coords } from "$lib/utils/coordinates";
-	import PopupBaseStatic, { type MapObjectPopupProps } from "@/components/ui/popups/common/PopupBaseStatic.svelte";
+	import PopupBaseStatic, {
+		type MapObjectPopupProps
+	} from "@/components/ui/popups/common/PopupBaseStatic.svelte";
 	import type { MapData } from "$lib/mapObjects/mapObjectTypes";
 	import {
 		centerRequestedMapObjectIfPopupCovers,
@@ -21,12 +23,12 @@
 		open = $bindable(false),
 		coords,
 		props,
-		data,
+		data
 	}: {
-		open: boolean,
-		coords: Coords,
-		data: MapData | undefined
-		props: MapObjectPopupProps | undefined,
+		open: boolean;
+		coords: Coords;
+		data: MapData | undefined;
+		props: MapObjectPopupProps | undefined;
 	} = $props();
 
 	let initialSnapPoint: SnapPoint = $state("250px");
@@ -34,15 +36,18 @@
 	let snapPoints: SnapPoint[] = $derived([initialSnapPoint, 1]);
 	let activeSnapPoint: SnapPoint = $state(untrack(() => initialSnapPoint));
 	let pendingVisibilityRequest: PopupVisibilityRequest | undefined;
+	let popupElement: HTMLDivElement | undefined = $state();
 
 	function updateInitialSnapPoint() {
-		if (typeof document === "undefined") return;
+		if (!document) return;
 
-		const drawerElement = document.querySelector<HTMLElement>("[data-vaul-drawer]");
-		const endElement = drawerElement?.querySelector<HTMLElement>("[data-popup-initial-snap-point-end]");
-		if (!(drawerElement instanceof HTMLElement) || !endElement) return;
+		const endElement = popupElement?.querySelector<HTMLElement>(
+			"[data-popup-initial-snap-point-end]"
+		);
+		if (!popupElement || !endElement) return;
 
-		const distance = endElement.getBoundingClientRect().bottom - drawerElement.getBoundingClientRect().top;
+		const distance =
+			endElement.getBoundingClientRect().bottom - popupElement.getBoundingClientRect().top;
 		if (distance <= 0) return;
 
 		const popupHeight = Math.ceil(distance + 16);
@@ -52,9 +57,7 @@
 		initialSnapPoint = nextSnapPoint;
 
 		if (wasAtInitialSnapPoint || activeSnapPoint !== 1) {
-			tick().then(() => {
-				activeSnapPoint = nextSnapPoint;
-			})
+			activeSnapPoint = nextSnapPoint;
 		}
 
 		if (pendingVisibilityRequest) {
@@ -88,15 +91,14 @@
 
 	function isActiveSnapPointExpanded() {
 		if (activeSnapPoint === 1) return true;
-		if (typeof document === "undefined") return false;
+		if (!document) return false;
 
-		const drawerElement = document.querySelector<HTMLElement>("[data-vaul-drawer]");
-		return Boolean(drawerElement && Math.abs(drawerElement.getBoundingClientRect().top) <= 1);
+		return Boolean(popupElement && Math.abs(popupElement.getBoundingClientRect().top) <= 1);
 	}
 
 	const unbindPopupDrawerSnapPoint = bindPopupDrawerSnapPoint({
 		getActiveSnapPoint: () => activeSnapPoint,
-		setActiveSnapPoint: (snapPoint) => (activeSnapPoint = snapPoint),
+		setActiveSnapPoint: (value) => (activeSnapPoint = value),
 		getInitialSnapPoint: () => snapPoints[0],
 		isExpanded: isActiveSnapPointExpanded
 	});
@@ -105,24 +107,30 @@
 
 <Drawer.Root
 	{open}
-	onRelease={(_, open) => {
+	onOpenChange={(open) => {
 		if (!open) closePopup();
 	}}
-	closeOnOutsideClick={false}
+	modal={false}
+	disablePointerDismissal
 	{snapPoints}
-	bind:activeSnapPoint
+	bind:snapPoint={activeSnapPoint}
 >
 	<Drawer.Portal>
-		<Drawer.Content
-			class="duration-150! fixed flex flex-col bottom-0 z-50 w-full h-full rounded-t-xl border border-t-border bg-card pb-[env(safe-area-inset-bottom)] mt-safe-inset-top"
-		>
-			<div class="w-10 mx-auto my-3 rounded-full bg-ring h-1 shrink-0"></div>
-			<PopupBaseStatic
-				{coords}
-				{data}
-				{props}
-				onlyShowNavigationButton={activeSnapPoint === 1}
-			/>
-		</Drawer.Content>
+		<Drawer.Viewport class="drawer-viewport z-50!">
+			<Drawer.Popup
+				bind:ref={popupElement}
+				class="drawer-popup flex flex-col w-full h-full rounded-t-xl border border-t-border bg-card pb-[env(safe-area-inset-bottom)] mt-safe-inset-top"
+			>
+				<div class="w-10 mx-auto my-3 rounded-full bg-ring h-1 shrink-0"></div>
+				<Drawer.Content class="flex min-h-0 flex-1 flex-col overflow-hidden">
+					<PopupBaseStatic
+						{coords}
+						{data}
+						{props}
+						onlyShowNavigationButton={activeSnapPoint === 1}
+					/>
+				</Drawer.Content>
+			</Drawer.Popup>
+		</Drawer.Viewport>
 	</Drawer.Portal>
 </Drawer.Root>
