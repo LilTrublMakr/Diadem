@@ -16,11 +16,13 @@
 		Copy,
 		Eye,
 		EyeClosed,
+		Focus,
 		Minus,
 		Navigation,
 		Plus,
 		Timer,
-		TimerOff
+		TimerOff,
+		Scan
 	} from "@lucide/svelte";
 	import * as m from "@/lib/paraglide/messages";
 	import { getMapsUrl } from "@/lib/utils/mapUrl";
@@ -30,6 +32,9 @@
 	import PopupButton from "@/components/ui/popups/common/PopupButton.svelte";
 	import { MapObjectType, type MapData } from "$lib/mapObjects/mapObjectTypes";
 	import type { PokemonData } from "$lib/types/mapObjectData/pokemon";
+	import { getFocusedRouteMapId, setFocusedRouteMapId } from "$lib/features/focusedRoute.svelte.js";
+	import { refreshRouteFeatures } from "$lib/map/featuresGen.svelte";
+	import { getUserSettings } from "@/lib/services/userSettings.svelte";
 
 	let {
 		lat,
@@ -45,6 +50,9 @@
 	let selectedMapId = $derived(data?.mapId);
 	let pokemonData = $derived(
 		selectedType === MapObjectType.POKEMON ? (data as PokemonData) : undefined
+	);
+	let routeFocused = $derived(
+		selectedType === MapObjectType.ROUTE && getFocusedRouteMapId() === selectedMapId
 	);
 
 	let copiedLat = $state(false);
@@ -72,15 +80,6 @@
 	{/if}
 
 	<div class="flex gap-2 flex-wrap">
-<!--	<PopupButton-->
-<!--		variant="default"-->
-<!--		Icon={Plus}-->
-<!--		label={m.popup_show_details()}-->
-<!--		IconActive={Minus}-->
-<!--		labelActive={m.popup_hide_details()}-->
-<!--		active={isPopupExpanded(selectedType)}-->
-<!--		onclick={() => togglePopupExpanded(selectedType)}-->
-<!--	/>-->
 		<PopupButton
 			variant="default"
 			Icon={Navigation}
@@ -89,6 +88,19 @@
 			href={getMapsUrl(new Coords(lat, lon), getShareTitle(getCurrentSelectedData()))}
 			target="_blank"
 		/>
+		{#if supportsPopupAction(selectedType, PopupAction.FOCUS_ROUTE) && getUserSettings().filters.route.enabled}
+			<PopupButton
+				Icon={Focus}
+				label={m.focus_route()}
+				IconActive={Scan}
+				labelActive={m.unfocus_route()}
+				active={routeFocused}
+				onclick={() => {
+					setFocusedRouteMapId(routeFocused ? null : selectedMapId);
+					refreshRouteFeatures();
+				}}
+			/>
+		{/if}
 		{#if pokemonData}
 			<PopupButton
 				compact

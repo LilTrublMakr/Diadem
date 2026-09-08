@@ -9,8 +9,11 @@ import { Expand, Eye, SquareStack } from "@lucide/svelte";
 export enum PopupAction {
 	DIMMED = "dimmed",
 	RADIUS = "radius",
-	TIMER = "timer"
+	TIMER = "timer",
+	FOCUS_ROUTE = "focusRoute"
 }
+
+type StatefulPopupAction = Exclude<PopupAction, PopupAction.FOCUS_ROUTE>;
 
 export type PopupActionDropdown = {
 	label: string;
@@ -24,7 +27,8 @@ const supportedPopupActions: Partial<Record<MapObjectType, PopupAction[]>> = {
 	[MapObjectType.POKESTOP]: [PopupAction.DIMMED, PopupAction.RADIUS, PopupAction.TIMER],
 	[MapObjectType.GYM]: [PopupAction.DIMMED, PopupAction.RADIUS, PopupAction.TIMER],
 	[MapObjectType.STATION]: [PopupAction.DIMMED, PopupAction.RADIUS, PopupAction.TIMER],
-	[MapObjectType.TAPPABLE]: [PopupAction.DIMMED, PopupAction.TIMER]
+	[MapObjectType.TAPPABLE]: [PopupAction.DIMMED, PopupAction.TIMER],
+	[MapObjectType.ROUTE]: [PopupAction.FOCUS_ROUTE]
 };
 
 export function supportsPopupAction(mapObject: MapObjectType | undefined, action: PopupAction) {
@@ -34,7 +38,7 @@ export function supportsPopupAction(mapObject: MapObjectType | undefined, action
 
 export function getPopupActions(
 	mapObject: MapObjectType | undefined,
-	action: PopupAction
+	action: StatefulPopupAction
 ): PopupActionDropdown[] | undefined {
 	if (!mapObject) return;
 
@@ -90,7 +94,7 @@ export function togglePopupExpanded(mapObject: MapObjectType | undefined) {
 export function isPopupActionActive(
 	mapObject: MapObjectType | undefined,
 	mapId: string | undefined,
-	action: PopupAction
+	action: StatefulPopupAction
 ) {
 	if (!mapObject || !mapId || !supportsPopupAction(mapObject, action)) return false;
 
@@ -103,7 +107,7 @@ export function isPopupActionActive(
 export function togglePopupAction(
 	mapObject: MapObjectType | undefined,
 	mapId: string | undefined,
-	action: PopupAction
+	action: StatefulPopupAction
 ) {
 	if (!mapObject || !mapId || !supportsPopupAction(mapObject, action)) return;
 
@@ -131,14 +135,20 @@ export function togglePopupAction(
 	if (action === PopupAction.RADIUS) updateRadiusFeatures();
 }
 
-export function isPopupActionAllActive(mapObject: MapObjectType | undefined, action: PopupAction) {
+export function isPopupActionAllActive(
+	mapObject: MapObjectType | undefined,
+	action: StatefulPopupAction
+) {
 	if (!mapObject || !supportsPopupAction(mapObject, action)) return false;
 
 	const actionState = getUserSettings().actions[mapObject][action];
 	return "all" in actionState ? actionState.all : false;
 }
 
-export function togglePopupActionAll(mapObject: MapObjectType | undefined, action: PopupAction) {
+export function togglePopupActionAll(
+	mapObject: MapObjectType | undefined,
+	action: StatefulPopupAction
+) {
 	if (!mapObject || !supportsPopupAction(mapObject, action)) return;
 
 	const actionState = getUserSettings().actions[mapObject][action];
@@ -150,7 +160,10 @@ export function togglePopupActionAll(mapObject: MapObjectType | undefined, actio
 	if (action === PopupAction.RADIUS) updateRadiusFeatures();
 }
 
-export function clearPopupAction(mapObject: MapObjectType | undefined, action: PopupAction) {
+export function clearPopupAction(
+	mapObject: MapObjectType | undefined,
+	action: StatefulPopupAction
+) {
 	if (!mapObject || !supportsPopupAction(mapObject, action)) return;
 
 	const actionState = getUserSettings().actions[mapObject][action];

@@ -22,6 +22,7 @@
 	import {
 		centerRequestedMapObjectIfPopupCovers,
 		getPopupVisibilityRequest,
+		setPopupOcclusion,
 		type PopupVisibilityRequest
 	} from "$lib/mapObjects/popupVisibility.svelte";
 
@@ -58,6 +59,7 @@
 
 	function updatePopupWidth(width: number | undefined) {
 		popupWidth = width ?? 0;
+		setPopupOcclusion(popupWidth ? { width: popupWidth } : undefined);
 		checkPopupVisibility();
 	}
 
@@ -77,6 +79,8 @@
 					closeMenu();
 				}
 				snapshotData = $state.snapshot(data);
+			} else {
+				setPopupOcclusion(undefined);
 			}
 		}
 	);

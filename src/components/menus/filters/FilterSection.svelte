@@ -16,7 +16,6 @@
 	import type { AnyFilter, FilterCategory } from "@/lib/features/filters/filters";
 	import Switch from "@/components/ui/input/Switch.svelte";
 	import { getIconPokemon } from "@/lib/services/uicons.svelte";
-	import type { Snippet } from "svelte";
 	import {
 		getUserSettings,
 		updateUserSettings,
@@ -55,10 +54,16 @@
 		}[];
 	} = $props();
 
+	const primaryFeatures = $derived(
+		Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission]
+	);
 	const sectionFeatures = $derived([
-		...(Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission]),
+		...primaryFeatures,
 		...subCategories.map((subcategory) => subcategory.requiredPermission)
 	]);
+	const hasPrimaryPermission = $derived(
+		hasAnyFeatureAnywhere(getUserDetails().permissions, primaryFeatures)
+	);
 
 	let subcategoriesExpanded: boolean = $state(
 		untrack(() => sessionExpandedState[category as string] ?? false)
@@ -73,15 +78,27 @@
 		filter.enabled = value;
 
 		subCategories.forEach((subcategory) => {
-			(getUserSettings().filters[category] as unknown as Record<string, AnyFilter>)[subcategory.category].enabled = value;
+			(getUserSettings().filters[category] as unknown as Record<string, AnyFilter>)[
+				subcategory.category
+			].enabled = value;
 		});
+
+		if (
+			mapObject === MapObjectType.POKESTOP ||
+			mapObject === MapObjectType.GYM ||
+			mapObject === MapObjectType.ROUTE
+		) {
+			deleteAllFeaturesOfType(MapObjectType.ROUTE);
+		}
 
 		updateUserSettings();
 		updateAllMapObjects().then();
 	}
 
 	function onSubEnabledChange(thisCategory: FilterCategory, value: boolean) {
-		(getUserSettings().filters[category] as unknown as Record<string, AnyFilter>)[thisCategory].enabled = value;
+		(getUserSettings().filters[category] as unknown as Record<string, AnyFilter>)[
+			thisCategory
+		].enabled = value;
 
 		if (
 			value ||
@@ -91,6 +108,14 @@
 		}
 
 		deleteAllFeaturesOfType(mapObject);
+		if (
+			mapObject === MapObjectType.POKESTOP ||
+			mapObject === MapObjectType.GYM ||
+			mapObject === MapObjectType.ROUTE
+		) {
+			deleteAllFeaturesOfType(MapObjectType.ROUTE);
+		}
+
 		updateUserSettings();
 		updateAllMapObjects().then();
 	}
@@ -98,22 +123,24 @@
 
 {#if hasAnyFeatureAnywhere(getUserDetails().permissions, sectionFeatures)}
 	<Card class="py-1 px-2">
-		<FilterControl
-			{title}
-			{isFilterable}
-			{filterModal}
-			{mapObject}
-			majorCategory={category}
-			{onEnabledChange}
-			isExpandable={subCategories.length > 0}
-			collapsibleByFiltersets={subCategories.length === 0}
-			filter={getUserSettings().filters[category]}
-			{filtersReorderable}
-			bind:expanded={subcategoriesExpanded}
-		/>
+		{#if hasPrimaryPermission}
+			<FilterControl
+				{title}
+				{isFilterable}
+				{filterModal}
+				{mapObject}
+				majorCategory={category}
+				{onEnabledChange}
+				isExpandable={subCategories.length > 0}
+				collapsibleByFiltersets={subCategories.length === 0}
+				filter={getUserSettings().filters[category]}
+				{filtersReorderable}
+				bind:expanded={subcategoriesExpanded}
+			/>
+		{/if}
 
 		{#if subCategories.length > 0}
-			{#if subcategoriesExpanded}
+			{#if subcategoriesExpanded || !hasPrimaryPermission}
 				<div class="mb-2" transition:slide={{ duration: 80 }}>
 					{#each subCategories as subcategory (subcategory.category)}
 						{#if hasFeatureAnywhere(getUserDetails().permissions, subcategory.requiredPermission)}

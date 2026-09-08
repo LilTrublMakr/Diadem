@@ -17,6 +17,9 @@
 		"src/lib/server/api/requestBody.test.ts",
 		"src/lib/server/api/respond.test.ts",
 		"src/lib/utils/filterHash.test.ts",
-		"src/lib/utils/requests.test.ts"
+		"src/lib/utils/requests.test.ts",
+		"src/lib/server/queryMapObjects/queryRoute.test.ts",
+		"src/lib/services/user/checkPerm.test.ts",
+		"src/lib/utils/routeUtils.test.ts"
 	]
 }

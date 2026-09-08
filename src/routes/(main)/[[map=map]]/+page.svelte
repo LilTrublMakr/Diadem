@@ -46,10 +46,10 @@
 
 	$effect(() => {
 		if (getIsLoading() || searchHandled) return;
-		const pokemonIdParam = page.url.searchParams.get('pokemon_id');
+		const pokemonIdParam = page.url.searchParams.get("pokemon_id");
 		if (!pokemonIdParam) return;
 		const pokemonId = parseInt(pokemonIdParam);
-		const form = parseInt(page.url.searchParams.get('form') ?? '0') || 0;
+		const form = parseInt(page.url.searchParams.get("form") ?? "0") || 0;
 		const pokemon = getMasterPokemon(pokemonId);
 		if (pokemon) {
 			setActiveSearchPokemon({ pokemon_id: pokemonId, form });
@@ -94,7 +94,9 @@
 	<ContextMenu />
 
 	{#if isSearchViewActive()}
-		<div class="fixed z-50 top-[calc(env(safe-area-inset-top)+3.625rem)] px-2 w-full pointer-events-none">
+		<div
+			class="fixed z-50 top-[calc(env(safe-area-inset-top)+3.625rem)] px-2 w-full pointer-events-none"
+		>
 			<ActiveSearchView />
 		</div>
 	{/if}
@@ -111,7 +113,7 @@
 			{/if}
 		{/snippet}
 		{#snippet desktopRight()}
-			<div class="mb-auto mx-2 mt-safe-inset-top flex flex-col items-end gap-2">
+			<div class="mb-auto mx-2 flex flex-col items-end gap-2">
 				<WeatherOverview />
 				<DataLimitNotice />
 			</div>
