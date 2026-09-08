@@ -168,7 +168,7 @@
 >
 	<MapAttribution
 		{map}
-		class="{isUiLeft() ? 'left-2 right-auto' : 'right-2'}"
+		class={isUiLeft() ? "left-2 right-auto" : "right-2"}
 	/>
 
 	<GeometryLayer id={MapSourceId.SELECTED_WEATHER} reactive={false} />

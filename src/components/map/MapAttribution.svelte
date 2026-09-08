@@ -1,20 +1,20 @@
 <script lang="ts">
 	import type { Map, MapLibreEvent, MapStyleDataEvent } from "maplibre-gl";
-	import DOMPurify from 'dompurify';
+	import DOMPurify from "dompurify";
 
 	let {
 		class: class_ = "",
 		map
 	}: {
 		class?: string;
-		map: Map | undefined
+		map: Map | undefined;
 	} = $props();
 
-	let attribution = $state("")
+	let attribution = $state("");
 
 	function updateAttribution(loadedMap: Map) {
-		const style = loadedMap?.getStyle()
-		if (!loadedMap || !style) return
+		const style = loadedMap?.getStyle();
+		if (!loadedMap || !style) return;
 		const attributions = [
 			...new Set(
 				Object.keys(style.sources)
@@ -23,31 +23,28 @@
 			)
 		];
 
-		attribution = attributions.join(" | ")
+		attribution = attributions.join(" | ");
 	}
 
 	function onMapLoad(e: MapLibreEvent) {
-		updateAttribution(e.target)
+		updateAttribution(e.target);
 	}
 
 	function onStyleChange(e: MapStyleDataEvent) {
-		updateAttribution(e.target)
+		updateAttribution(e.target);
 	}
 
-
 	$effect(() => {
-		if (!map) return
-		map.on("load", onMapLoad)
-		map.on("styledata", onStyleChange)
+		if (!map) return;
+		map.on("load", onMapLoad);
+		map.on("styledata", onStyleChange);
 
 		return () => {
-			map.off("load", onMapLoad)
-			map.off("styledata", onStyleChange)
-		}
-	})
-
+			map.off("load", onMapLoad);
+			map.off("styledata", onStyleChange);
+		};
+	});
 </script>
-
 
 <div
 	class="absolute right-0 bottom-0 tracking-tighter text-[0.5rem]/[0.5rem] text-muted-foreground/50 z-10 bg-background/50 px-0.5 backdrop-blur-sm {class_}"
