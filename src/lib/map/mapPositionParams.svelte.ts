@@ -4,7 +4,7 @@ import maplibre from "maplibre-gl";
 import { setMap } from "@/lib/map/map.svelte.js";
 import { onMapDragStart, onMapMoveEnd, onMapMoveStart, onTouchStart } from "@/lib/map/events";
 import { clearPressTimer, onContextMenu } from "@/lib/ui/contextmenu.svelte.js";
-import { getUserSettings, updateUserSettings } from "@/lib/services/userSettings.svelte.js";
+import { getUserSettings, updateMapPosition } from "@/lib/services/userSettings.svelte.js";
 
 export function getMapPositionFromUrlParams(): [Coords | undefined, number | undefined] {
 	let zoom: number | undefined = undefined;
@@ -43,7 +43,7 @@ export function getInitialMapPositionMain() {
 		userSettings.mapPosition.zoom = zoom;
 	}
 	if (center || zoom) {
-		updateUserSettings();
+		updateMapPosition();
 	}
 
 	return $state.snapshot(getUserSettings().mapPosition);

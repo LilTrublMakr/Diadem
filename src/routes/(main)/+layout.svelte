@@ -8,6 +8,7 @@
 	import Loading from "@/components/ui/Loading.svelte";
 	import { loadTrackers } from "$lib/features/trackerState.svelte";
 	import FortDetailsModal from "@/components/ui/popups/common/FortDetailsModal.svelte";
+	import { syncUserSettings } from "@/lib/services/userSettings.svelte";
 
 	let { data, children } = $props();
 
@@ -16,6 +17,15 @@
 		loadTrackers();
 	});
 </script>
+
+<svelte:window onpagehide={syncUserSettings} />
+
+<svelte:document
+	onvisibilitychange={() => {
+		if (document.visibilityState === "hidden") syncUserSettings();
+	}}
+/>
+
 
 {#if getIsToastOpen()}
 	<Toast />

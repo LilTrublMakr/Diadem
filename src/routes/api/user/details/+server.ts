@@ -1,12 +1,11 @@
+import { respond } from "@/lib/server/api/respond";
 import { getUserInfoResult, isGuildMember } from "@/lib/server/auth/discordDetails";
 import { getDiscordAccessToken, signOut } from "@/lib/server/auth/betterAuth";
 import { getEveryonePerms } from "@/lib/server/auth/permissions";
 import { getClientConfig } from "@/lib/services/config/config.server";
 import type { UserData } from "@/lib/services/user/userDetails.svelte";
 import { getServerLogger } from "@/lib/server/logging";
-import { noStoreHttpHeaders } from "@/lib/utils/apiUtils.server";
 import { removeRedundantPermissionAreas } from "@/lib/utils/features";
-import { json } from "@sveltejs/kit";
 
 const log = getServerLogger("auth");
 
@@ -14,19 +13,16 @@ export async function GET(event) {
 	const user = event.locals.user;
 
 	if (!user) {
-		return json(
-			{
-				permissions: removeRedundantPermissionAreas(await getEveryonePerms(event.fetch))
-			} as UserData,
-			{ headers: noStoreHttpHeaders }
-		);
+		return respond(event.request, {
+			permissions: removeRedundantPermissionAreas(await getEveryonePerms(event.fetch))
+		} as UserData);
 	}
 
 	const accessToken = await getDiscordAccessToken(event);
 	if (!accessToken) {
-		return json({ permissions: removeRedundantPermissionAreas(event.locals.perms) } as UserData, {
-			headers: noStoreHttpHeaders
-		});
+		return respond(event.request, {
+			permissions: removeRedundantPermissionAreas(event.locals.perms)
+		} as UserData);
 	}
 
 	const [userInfoResult, isMember] = await Promise.all([
@@ -41,25 +37,19 @@ export async function GET(event) {
 	if (!data) {
 		if (userInfoResult.status === 401) {
 			await signOut(event);
-			return json(
-				{
-					permissions: removeRedundantPermissionAreas(await getEveryonePerms(event.fetch))
-				} as UserData,
-				{ headers: noStoreHttpHeaders }
-			);
+			return respond(event.request, {
+				permissions: removeRedundantPermissionAreas(await getEveryonePerms(event.fetch))
+			} as UserData);
 		}
 
-		return json({ permissions: removeRedundantPermissionAreas(event.locals.perms) } as UserData, {
-			headers: noStoreHttpHeaders
-		});
+		return respond(event.request, {
+			permissions: removeRedundantPermissionAreas(event.locals.perms)
+		} as UserData);
 	}
 
-	return json(
-		{
-			details: data,
-			permissions: removeRedundantPermissionAreas(event.locals.perms),
-			isGuildMember: isMember
-		} as UserData,
-		{ headers: noStoreHttpHeaders }
-	);
+	return respond(event.request, {
+		details: data,
+		permissions: removeRedundantPermissionAreas(event.locals.perms),
+		isGuildMember: isMember
+	} as UserData);
 }

@@ -1,27 +1,24 @@
+import { respond } from "@/lib/server/api/respond";
 import { getServerConfig } from "@/lib/services/config/config.server";
 import { isAuthRequired } from "@/lib/server/auth/betterAuth";
 import type { SupportedFeatures } from "@/lib/services/supportedFeatures";
-import { noStoreHttpHeaders } from "@/lib/utils/apiUtils.server";
-import { json } from "@sveltejs/kit";
+import type { RequestHandler } from "./$types";
 
-export async function GET({ locals }) {
+export const GET: RequestHandler = async ({ locals, request }) => {
 	const config = getServerConfig();
 	const authRequired = isAuthRequired();
 
-	return json(
-		{
-			koji: !!config.koji && !!config.koji.url,
-			geocoding:
-				(!!config.nominatim && !!config.nominatim.url) ||
-				(!!config.pelias && !!config.pelias.url) ||
-				(!!config.photon && !!config.photon.url),
-			auth: !!config.auth?.enabled,
-			authRequired,
-			showFullscreenLogin: authRequired && !locals.user,
-			geometryLookup:
-				Boolean(config.nominatim?.url) &&
-				(!Boolean(config.pelias?.url) || Boolean(config.photon?.url)) // supported if nomatim is set and pelias is not the provider
-		} as SupportedFeatures,
-		{ headers: noStoreHttpHeaders }
-	);
-}
+	return respond(request, {
+		koji: !!config.koji && !!config.koji.url,
+		geocoding:
+			(!!config.nominatim && !!config.nominatim.url) ||
+			(!!config.pelias && !!config.pelias.url) ||
+			(!!config.photon && !!config.photon.url),
+		auth: !!config.auth?.enabled,
+		authRequired,
+		showFullscreenLogin: authRequired && !locals.user,
+		geometryLookup:
+			Boolean(config.nominatim?.url) &&
+			(!Boolean(config.pelias?.url) || Boolean(config.photon?.url)) // supported if nomatim is set and pelias is not the provider
+	} as SupportedFeatures);
+};

@@ -6,7 +6,7 @@ import { querySingleMapObject } from "@/lib/server/queryMapObjects/queryMapObjec
 import { FeaturePermissionContext } from "@/lib/services/user/checkPerm";
 import { featureFamily } from "@/lib/utils/features";
 import { getLogger } from "@/lib/utils/logger";
-import { error, json } from "@sveltejs/kit";
+import { error } from "@sveltejs/kit";
 import { constants } from "http2";
 import type { RequestHandler } from "./$types";
 
@@ -56,5 +56,5 @@ export const GET: RequestHandler = async ({ params, locals, fetch, getClientAddr
 		(performance.now() - start).toFixed(1)
 	);
 
-	return json(data);
+	return respond(request, data);
 };

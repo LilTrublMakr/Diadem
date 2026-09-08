@@ -8,6 +8,7 @@ import { closeMenu, setJustChangedMenus } from "@/lib/ui/menus.svelte";
 import { getCoveringS2Cells } from "@/lib/mapObjects/s2cells";
 import type { MapStyle } from "@/lib/services/config/configTypes";
 import { getMapStyle } from "@/lib/utils/mapStyle";
+import { encodeRequestBody, getHeaders, parseResponse } from "@/lib/utils/requests";
 
 const MAX_S2_CELLS = 5000;
 export const WAYFARER_CELLS_14_MIN_ZOOM = 10;
@@ -118,18 +119,20 @@ export async function fetchWayfarerForts(
 	const fetchId = ++activeFetchId;
 
 	try {
+		const encoded = encodeRequestBody({ cellIds, countsOnly });
 		const response = await fetch("/api/wayfarer/forts", {
-			body: JSON.stringify({ cellIds, countsOnly }),
+			body: encoded.body,
+			headers: getHeaders(encoded.contentType),
 			method: "POST",
 			signal: controller.signal
 		});
 		if (fetchId !== activeFetchId) return;
 		if (!response.ok) return;
-		const data = (await response.json()) as {
+		const data = await parseResponse<{
 			pokestopCounts: Record<string, number>;
 			gymCounts: Record<string, number>;
 			forts: FortData[];
-		};
+		}>(response);
 		if (fetchId !== activeFetchId) return;
 		pokestopCounts = data.pokestopCounts ?? {};
 		gymCounts = data.gymCounts ?? {};

@@ -15,6 +15,11 @@
 		"src/lib/diadem-vaul-svelte/src/index.test.ts",
 		"src/lib/diadem-vaul-svelte/vite.config.ts",
 		"src/lib/diadem-vaul-svelte/playwright.config.ts",
-		"src/lib/server/queryMapObjects/invasionRewards.test.ts"
+		"src/lib/server/queryMapObjects/invasionRewards.test.ts",
+		"src/lib/server/api/filterCache.test.ts",
+		"src/lib/server/api/requestBody.test.ts",
+		"src/lib/server/api/respond.test.ts",
+		"src/lib/utils/filterHash.test.ts",
+		"src/lib/utils/requests.test.ts"
 	]
 }
