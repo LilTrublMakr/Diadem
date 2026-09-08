@@ -55,7 +55,11 @@ export function registerOverlayHandler(kind: OverlayKind, handler: OverlayHandle
 	const kindHandlers = handlers.get(kind) ?? new Set<OverlayHandler>();
 	kindHandlers.add(handler);
 	handlers.set(kind, kindHandlers);
-	handler(activeOverlays.filter((entry) => entry.kind === kind));
+	try {
+		handler(activeOverlays.filter((entry) => entry.kind === kind));
+	} catch (err) {
+		console.error(`Overlay handler for "${kind}" threw during registration`, err);
+	}
 
 	return () => {
 		kindHandlers.delete(handler);
@@ -69,7 +73,13 @@ export function reconcileOverlays(state: App.PageState) {
 	try {
 		for (const [kind, kindHandlers] of handlers) {
 			const entries = activeOverlays.filter((entry) => entry.kind === kind);
-			for (const handler of kindHandlers) handler(entries);
+			for (const handler of kindHandlers) {
+				try {
+					handler(entries);
+				} catch (err) {
+					console.error(`Overlay handler for "${kind}" threw during reconciliation`, err);
+				}
+			}
 		}
 	} finally {
 		syncing = false;
