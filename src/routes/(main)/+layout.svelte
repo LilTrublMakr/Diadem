@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
+	import { watch } from "runed";
+	import { page } from "$app/state";
 	import { getIsLoading, load } from "@/lib/services/initialLoad.svelte";
 	import Toast from "@/components/ui/Toast.svelte";
 	import { getIsToastOpen } from "@/lib/ui/toasts.svelte";
@@ -9,6 +11,7 @@
 	import { loadTrackers } from "$lib/features/trackerState.svelte";
 	import FortDetailsModal from "@/components/ui/popups/common/FortDetailsModal.svelte";
 	import { syncUserSettings } from "@/lib/services/userSettings.svelte";
+	import { closeTopOverlay, reconcileOverlays } from "@/lib/ui/overlays.svelte";
 
 	let { data, children } = $props();
 
@@ -16,6 +19,8 @@
 		load().then();
 		loadTrackers();
 	});
+
+	watch(() => page.state, reconcileOverlays);
 </script>
 
 <svelte:window onpagehide={syncUserSettings} />
@@ -24,8 +29,12 @@
 	onvisibilitychange={() => {
 		if (document.visibilityState === "hidden") syncUserSettings();
 	}}
+	onkeydown={(event) => {
+		if (event.key !== "Escape" || !closeTopOverlay()) return;
+		event.preventDefault();
+		event.stopImmediatePropagation();
+	}}
 />
-
 
 {#if getIsToastOpen()}
 	<Toast />

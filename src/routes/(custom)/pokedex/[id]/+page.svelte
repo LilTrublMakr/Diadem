@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { replaceState } from '$app/navigation';
+	import { replacePageState } from '$lib/ui/overlays.svelte';
 	import { getMasterPokemon, getMasterFile, loadMasterFile } from '$lib/services/masterfile';
 	import { getIconPokemon, initAllIconSets } from '$lib/services/uicons.svelte';
 	import { getUserDetails } from '$lib/services/user/userDetails.svelte';
@@ -169,7 +169,7 @@
 		const opt = formOptions.find((o) => o.form === form);
 		if (!opt) return;
 		const hash = formToHash(opt);
-		replaceState(hash ? `#${hash}` : page.url.pathname, {});
+		replacePageState(hash ? `#${hash}` : page.url.pathname);
 	}
 
 	let activePokemon = $derived.by((): MasterPokemon | null => {

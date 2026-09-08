@@ -121,7 +121,7 @@
 				bind:ref={popupElement}
 				class="drawer-popup flex flex-col w-full h-full rounded-t-xl border border-t-border bg-card pb-[env(safe-area-inset-bottom)] mt-safe-inset-top"
 			>
-				<div class="w-10 mx-auto my-3 rounded-full bg-ring h-1 shrink-0"></div>
+				<Drawer.Handle class="my-1" />
 				<Drawer.Content class="flex min-h-0 flex-1 flex-col overflow-hidden">
 					<PopupBaseStatic
 						{coords}
