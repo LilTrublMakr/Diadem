@@ -9,6 +9,7 @@
 		togglePopupExpanded
 	} from "@/lib/ui/popupActions.js";
 	import {
+		Binoculars,
 		BookOpen,
 		Check,
 		CircleDot,
@@ -30,11 +31,17 @@
 	import { getShareTitle } from "@/lib/features/shareTexts";
 	import { getCurrentSelectedData } from "@/lib/mapObjects/currentSelectedState.svelte";
 	import PopupButton from "@/components/ui/popups/common/PopupButton.svelte";
-	import { MapObjectType, type MapData } from "$lib/mapObjects/mapObjectTypes";
+	import { ClientMapObjectType, MapObjectType, type MapData } from "$lib/mapObjects/mapObjectTypes";
 	import type { PokemonData } from "$lib/types/mapObjectData/pokemon";
 	import { getFocusedRouteMapId, setFocusedRouteMapId } from "$lib/features/focusedRoute.svelte.js";
 	import { refreshRouteFeatures } from "$lib/map/featuresGen.svelte";
 	import { getUserSettings } from "@/lib/services/userSettings.svelte";
+	import { setCurrentScoutCenter, setCurrentScoutCoords } from "$lib/features/scout.svelte";
+	import { getConfig } from "$lib/services/config/config";
+	import { hasFeatureAnywhere } from "$lib/services/user/checkPerm";
+	import { getUserDetails } from "$lib/services/user/userDetails.svelte";
+	import { Menu, openMenu } from "$lib/ui/menus.svelte";
+	import { Features } from "$lib/utils/features";
 
 	let {
 		lat,
@@ -46,7 +53,7 @@
 		data: MapData;
 	} = $props();
 
-	let selectedType = $derived(data?.type);
+	let selectedType = $derived(data.type === ClientMapObjectType.LOCATION ? undefined : data.type);
 	let selectedMapId = $derived(data?.mapId);
 	let pokemonData = $derived(
 		selectedType === MapObjectType.POKEMON ? (data as PokemonData) : undefined
@@ -88,6 +95,18 @@
 			href={getMapsUrl(new Coords(lat, lon), getShareTitle(getCurrentSelectedData()))}
 			target="_blank"
 		/>
+		{#if data.type === ClientMapObjectType.LOCATION && getConfig().tools.scout && hasFeatureAnywhere(getUserDetails().permissions, Features.SCOUT)}
+			<PopupButton
+				Icon={Binoculars}
+				label={m.scout_location()}
+				onclick={() => {
+					const coords = new Coords(lat, lon);
+					setCurrentScoutCoords([coords]);
+					setCurrentScoutCenter(coords);
+					openMenu(Menu.SCOUT);
+				}}
+			/>
+		{/if}
 		{#if supportsPopupAction(selectedType, PopupAction.FOCUS_ROUTE) && getUserSettings().filters.route.enabled}
 			<PopupButton
 				Icon={Focus}

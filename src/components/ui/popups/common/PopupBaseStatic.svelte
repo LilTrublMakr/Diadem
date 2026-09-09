@@ -4,19 +4,24 @@
 	import { useMetadata } from "$lib/ui/metadata.svelte";
 
 	export type MapObjectPopupProps = {
-		type: string,
-		title: string,
-		image: Snippet<[MapData]>,
-		overview?: Snippet<[MapData]>,
-		main: Snippet<[MapData]>,
-	}
+		type: string;
+		title: string;
+		image: Snippet<[MapData]>;
+		overview?: Snippet<[MapData]>;
+		main: Snippet<[MapData]>;
+	};
 </script>
 
 <script lang="ts">
 	import { getCurrentSelectedData } from "$lib/mapObjects/currentSelectedState.svelte";
 	import * as m from "$lib/paraglide/messages";
 	import PopupButtons from "@/components/ui/popups/common/PopupButtons.svelte";
-	import { backupShareUrl, canNativeShare, copyToClipboard, hasClipboardWrite } from "$lib/utils/device";
+	import {
+		backupShareUrl,
+		canNativeShare,
+		copyToClipboard,
+		hasClipboardWrite
+	} from "$lib/utils/device";
 	import Button from "@/components/ui/input/Button.svelte";
 	import { Copy, Navigation, Share2, X } from "@lucide/svelte";
 	import { getRootOrigin } from "$lib/native/runtime";
@@ -33,18 +38,18 @@
 		data,
 		onlyShowNavigationButton
 	}: {
-		coords: Coords,
-		data: MapData | undefined
-		props: MapObjectPopupProps | undefined,
-		onlyShowNavigationButton: boolean
+		coords: Coords;
+		data: MapData | undefined;
+		props: MapObjectPopupProps | undefined;
+		onlyShowNavigationButton: boolean;
 	} = $props();
 
 	useMetadata(() => ({ title: props ? props.title : undefined }));
 
 	function getShareUrl() {
-		return getRootOrigin() + getCurrentPath({ data }) + "?lang=" + getLocale();
+		const path = getCurrentPath({ data });
+		return getRootOrigin() + path + (path.includes("?") ? "&" : "?") + "lang=" + getLocale();
 	}
-
 </script>
 
 <div class="flex gap-6 px-4">

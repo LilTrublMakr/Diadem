@@ -14,10 +14,10 @@ import { getUserSettings, updateMapPosition } from "@/lib/services/userSettings.
 import {
 	clearPressTimer,
 	longPressDuration,
-	onContextMenu,
+	onLocationContext,
 	pressTimer
-} from "@/lib/ui/contextmenu.svelte.js";
-import maplibre from "maplibre-gl";
+} from "@/lib/map/locationEvents";
+import type * as maplibre from "maplibre-gl";
 import type { MapMoveEvent } from "svelte-maplibre";
 
 export async function onMapMoveEnd() {
@@ -35,7 +35,7 @@ export async function onMapMoveEnd() {
 }
 
 export function onTouchStart(e: maplibre.MapTouchEvent) {
-	pressTimer.push(setTimeout(() => onContextMenu(e), longPressDuration));
+	pressTimer.push(setTimeout(() => onLocationContext(e), longPressDuration));
 }
 
 export async function onMapMoveStart() {
