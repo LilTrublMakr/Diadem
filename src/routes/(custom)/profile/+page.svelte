@@ -108,6 +108,7 @@
 	let importedPokemon = $state<RawExportPokemon[] | null>(null);
 	let importedFormat = $state<ExportFormat | null>(null);
 	let importMode = $state<'merge' | 'replace'>('merge');
+	let includePreEvolutions = $state(false);
 	let importing = $state(false);
 	let importResult = $state<string | null>(null);
 	let importError = $state<string | null>(null);
@@ -126,7 +127,7 @@
 		importError = null;
 
 		try {
-			const entries = aggregateTrackerImport(importedPokemon);
+			const entries = aggregateTrackerImport(importedPokemon, { includePreEvolutions });
 			const res = await fetch('/api/custom/collection-import', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -195,6 +196,15 @@
 								export covers — including clearing shiny/shundo if this export has no shiny data.
 							</p>
 						{/if}
+						<label class="flex items-center gap-1.5 mb-3 text-sm cursor-pointer">
+							<input type="checkbox" bind:checked={includePreEvolutions} />
+							Also mark earlier evolution stages
+						</label>
+						<p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+							Evolving never changes IVs or shininess, so a hundo/nundo/shundo/shiny Pidgeot also
+							proves Pidgeotto and Pidgey were one - even though the export only names the stage
+							you actually caught.
+						</p>
 						<button
 							onclick={importToCollection}
 							disabled={importing}
