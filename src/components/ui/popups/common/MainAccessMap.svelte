@@ -115,6 +115,8 @@
 			accessData.iconFeatures.features.map((feature) => feature.properties)
 		);
 
+		if (bindMap !== map) return;
+
 		const source = map.getSource<maplibre.GeoJSONSource>(ACCESS_MAP_ID);
 		source?.setData(accessData.features);
 	}
