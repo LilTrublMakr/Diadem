@@ -152,7 +152,10 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ pokemon: importedPokemon, format: importedFormat })
 			});
-			if (!res.ok) throw new Error(`Server returned ${res.status}`);
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				throw new Error(body?.error ?? `Server returned ${res.status}`);
+			}
 			loadedFromAccount = true;
 			collectionMessage = 'Saved to your account.';
 		} catch (e) {
