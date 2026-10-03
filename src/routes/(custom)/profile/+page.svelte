@@ -30,6 +30,7 @@
 		Promise.all([loadMasterFile(), initAllIconSets()]).then(() => {
 			ready = true;
 		});
+		loadSavedCollection();
 	});
 
 	let search = $state('');
@@ -112,12 +113,65 @@
 	let importing = $state(false);
 	let importResult = $state<string | null>(null);
 	let importError = $state<string | null>(null);
+	let loadedFromAccount = $state(false);
+	let savingCollection = $state(false);
+	let collectionMessage = $state<string | null>(null);
 
 	function onImportParsed(pokemon: RawExportPokemon[], format: ExportFormat) {
 		importedPokemon = pokemon;
 		importedFormat = format;
 		importResult = null;
 		importError = null;
+		loadedFromAccount = false;
+		collectionMessage = null;
+	}
+
+	async function loadSavedCollection() {
+		if (!loggedIn) return;
+		try {
+			const res = await fetch('/api/custom/collection');
+			if (!res.ok) return;
+			const saved: { pokemon: RawExportPokemon[]; format: ExportFormat | null } | null = await res.json();
+			if (saved?.pokemon?.length) {
+				importedPokemon = saved.pokemon;
+				importedFormat = saved.format;
+				loadedFromAccount = true;
+			}
+		} catch {
+			// Not critical - the upload panel still works without a saved collection.
+		}
+	}
+
+	async function saveCollection() {
+		if (!importedPokemon) return;
+		savingCollection = true;
+		collectionMessage = null;
+		try {
+			const res = await fetch('/api/custom/collection', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ pokemon: importedPokemon, format: importedFormat })
+			});
+			if (!res.ok) throw new Error(`Server returned ${res.status}`);
+			loadedFromAccount = true;
+			collectionMessage = 'Saved to your account.';
+		} catch (e) {
+			collectionMessage = e instanceof Error ? e.message : 'Failed to save';
+		} finally {
+			savingCollection = false;
+		}
+	}
+
+	async function clearSavedCollection() {
+		try {
+			await fetch('/api/custom/collection', { method: 'DELETE' });
+		} catch {
+			// Nothing more to do if this fails - the saved row just stays until retried.
+		}
+		importedPokemon = null;
+		importedFormat = null;
+		loadedFromAccount = false;
+		collectionMessage = null;
 	}
 
 	async function importToCollection() {
@@ -177,8 +231,30 @@
 				{#if importedPokemon}
 					<div class="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
 						<div class="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
-							Parsed <span class="font-semibold text-zinc-900 dark:text-zinc-100">{importedPokemon.length}</span>
+							{loadedFromAccount ? 'Loaded from your account' : 'Parsed'}
+							<span class="font-semibold text-zinc-900 dark:text-zinc-100">{importedPokemon.length}</span>
 							Pokemon.
+						</div>
+						<div class="flex items-center gap-2 mb-3">
+							{#if !loadedFromAccount}
+								<button
+									onclick={saveCollection}
+									disabled={savingCollection}
+									class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									{savingCollection ? 'Saving…' : 'Save to my account'}
+								</button>
+							{:else}
+								<button
+									onclick={clearSavedCollection}
+									class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+								>
+									Clear saved collection
+								</button>
+							{/if}
+							{#if collectionMessage}
+								<span class="text-xs text-zinc-400 dark:text-zinc-600">{collectionMessage}</span>
+							{/if}
 						</div>
 						<div class="flex items-center gap-4 mb-3 text-sm">
 							<label class="flex items-center gap-1.5 cursor-pointer">
