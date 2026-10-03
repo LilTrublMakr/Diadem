@@ -185,7 +185,10 @@
 										onclick={() =>
 											copySearchString(
 												lineup.name,
-												ranked.map((r) => getSpeciesName(r.individual.dex))
+												ranked.flatMap((r) => [
+													getSpeciesName(r.individual.dex),
+													...r.qualifyingMoves.map((m) => m.name)
+												])
 											)}
 										class="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
 									>
@@ -202,9 +205,12 @@
 												</span>
 												— CP {r.individual.cp}, covers {r.score}/{r.totalDefenders}
 												{#if r.individual.shiny}✨{/if}{#if r.individual.lucky}🍀{/if}
-												{#if r.resistedMoveTypes.length}
+												<span class="text-zinc-400 dark:text-zinc-600">
+													via {r.qualifyingMoves.map((m) => m.name).join(", ")}
+												</span>
+												{#if r.resistedMoves.length}
 													<span class="text-amber-600 dark:text-amber-500">
-														⚠ {r.resistedMoveTypes.join(", ")} resisted here
+														⚠ {r.resistedMoves.map((m) => m.name).join(", ")} resisted here
 													</span>
 												{/if}
 											</li>

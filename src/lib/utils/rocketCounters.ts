@@ -1,18 +1,23 @@
-import { buildMoveTypeMap } from "@/lib/utils/collectionExportUtils";
+import { buildMoveNameMap, buildMoveTypeMap } from "@/lib/utils/collectionExportUtils";
 import { getWeaknesses, isResisted } from "@/lib/utils/typeEffectiveness";
 import type { RawExportPokemon } from "@/lib/types/collectionExport";
 import type { RocketLineup, RocketPokemon } from "@/lib/types/rocketLineups";
+
+export type RankedMove = { name: string; type: string };
 
 export type RankedCounter = {
 	individual: RawExportPokemon;
 	score: number;
 	totalDefenders: number;
 	coveredNames: string[];
-	// Owned move types that are actively resisted (not just unhelpful) by at least one defender in
-	// this lineup - a liability, not merely a wasted slot (e.g. Dialga's Roar of Time vs this
-	// grunt's Fairy-type half). Ranked individuals with fewer of these are preferred when tied on
-	// coverage, since "every move helps" beats "one move helps, the other works against you."
-	resistedMoveTypes: string[];
+	// The actual owned move(s) that land super-effective against at least one defender here -
+	// what makes this individual a real counter, not just a good species pick.
+	qualifyingMoves: RankedMove[];
+	// Owned moves that are actively resisted (not just unhelpful) by at least one defender in this
+	// lineup - a liability, not merely a wasted slot (e.g. Dialga's Roar of Time vs this grunt's
+	// Fairy-type half). Ranked individuals with fewer of these are preferred when tied on coverage,
+	// since "every move helps" beats "one move helps, the other works against you."
+	resistedMoves: RankedMove[];
 };
 
 /**
@@ -42,40 +47,45 @@ export function rankCountersForLineup(
 	const defenderTypesList = [...defenders.values()].map((p) => p.types);
 
 	const moveTypes = buildMoveTypeMap();
+	const moveNames = buildMoveNameMap();
 	const results: RankedCounter[] = [];
 
 	for (const individual of pokemon) {
-		const ownedMoveTypes = [...new Set(
+		const ownedMoves = [...new Map(
 			[individual.move1, individual.move2, individual.move3]
 				.filter((id) => id)
-				.map((id) => moveTypes.get(id))
-				.filter((t): t is string => !!t)
-		)];
-		if (!ownedMoveTypes.length) continue;
+				.map((id) => [id, moveTypes.get(id)] as const)
+				.filter((entry): entry is [number, string] => !!entry[1])
+		).entries()].map(([id, type]) => ({ id, type, name: moveNames.get(id) ?? `Move ${id}` }));
+		if (!ownedMoves.length) continue;
 
 		const coveredNames: string[] = [];
 		for (const [name, weaknesses] of weaknessesByDefender) {
-			if (ownedMoveTypes.some((t) => weaknesses.has(t))) coveredNames.push(name);
+			if (ownedMoves.some((m) => weaknesses.has(m.type))) coveredNames.push(name);
 		}
 		if (!coveredNames.length) continue;
 
-		const resistedMoveTypes = ownedMoveTypes.filter((t) =>
-			defenderTypesList.some((defTypes) => isResisted(t, defTypes))
-		);
+		const qualifyingMoves = ownedMoves
+			.filter((m) => [...weaknessesByDefender.values()].some((w) => w.has(m.type)))
+			.map((m) => ({ name: m.name, type: m.type }));
+		const resistedMoves = ownedMoves
+			.filter((m) => defenderTypesList.some((defTypes) => isResisted(m.type, defTypes)))
+			.map((m) => ({ name: m.name, type: m.type }));
 
 		results.push({
 			individual,
 			score: coveredNames.length,
 			totalDefenders: defenders.size,
 			coveredNames,
-			resistedMoveTypes
+			qualifyingMoves,
+			resistedMoves
 		});
 	}
 
 	results.sort((a, b) => {
 		if (b.score !== a.score) return b.score - a.score;
-		if (a.resistedMoveTypes.length !== b.resistedMoveTypes.length) {
-			return a.resistedMoveTypes.length - b.resistedMoveTypes.length;
+		if (a.resistedMoves.length !== b.resistedMoves.length) {
+			return a.resistedMoves.length - b.resistedMoves.length;
 		}
 		const ivA = a.individual.atk + a.individual.def + a.individual.sta;
 		const ivB = b.individual.atk + b.individual.def + b.individual.sta;
