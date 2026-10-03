@@ -15,7 +15,8 @@
 	const statsLinks = [
 		{ href: "/shiny", label: "Shiny Stats" },
 		{ href: "/seen", label: "Seen Stats" },
-		{ href: "/status", label: "Worker Status" }
+		{ href: "/status", label: "Worker Status" },
+		{ href: "/rocket", label: "Team GO Rocket" }
 	];
 	const toolsLinks = [{ href: "/collection-export", label: "IV Export Converter" }];
 

@@ -1,5 +1,5 @@
 import { getMasterFile, getMasterPokemon } from "@/lib/services/masterfile";
-import { getNormalizedForm } from "@/lib/utils/pokemonUtils";
+import { getNormalizedForm, typeIdToText } from "@/lib/utils/pokemonUtils";
 import { CALCY_IV_MOVE_IDS } from "@/lib/utils/calcyIvMoveIds";
 import { findCalcyFormId } from "@/lib/utils/calcyIvFormIds";
 import type { RawExportPokemon } from "@/lib/types/collectionExport";
@@ -108,6 +108,34 @@ export function buildMoveNameMap(): Map<number, string> {
 		if (!pokemon) return;
 		for (const move of [...(pokemon.quickMoves ?? []), ...(pokemon.chargedMoves ?? [])]) {
 			if (!map.has(move.id)) map.set(move.id, move.name);
+		}
+	};
+
+	for (const pokemon of Object.values(masterFile.pokemon)) {
+		addMoves(pokemon);
+		for (const form of Object.values(pokemon.forms ?? {})) addMoves(form);
+		for (const tempEvo of Object.values(pokemon.tempEvos ?? {})) addMoves(tempEvo);
+	}
+
+	return map;
+}
+
+// Same traversal as buildMoveNameMap, but for the move's damage type (lowercase, matching
+// typeEffectiveness.ts's keys) instead of its display name - used to check whether a pokemon's
+// currently-taught moves are actually super-effective against something, not just to label them.
+export function buildMoveTypeMap(): Map<number, string> {
+	const map = new Map<number, string>();
+	const masterFile = getMasterFile();
+	if (!masterFile) return map;
+
+	for (const move of Object.values(masterFile.moves ?? {})) {
+		map.set(move.id, typeIdToText(move.type));
+	}
+
+	const addMoves = (pokemon: (typeof masterFile.pokemon)[string] | undefined) => {
+		if (!pokemon) return;
+		for (const move of [...(pokemon.quickMoves ?? []), ...(pokemon.chargedMoves ?? [])]) {
+			if (!map.has(move.id)) map.set(move.id, typeIdToText(move.type));
 		}
 	};
 

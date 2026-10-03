@@ -78,3 +78,5 @@ export const REFRESH_FEATURED_ATTACKS = 15 * 60;
 // Move mechanics (duration/energy) essentially never change — long TTL matches Pokébattler's
 // "cache aggressively, avoid sustained automated load" guidance.
 export const REFRESH_MOVE_MECHANICS = 24 * 60 * 60;
+// Team GO Rocket lineups rotate occasionally (roughly monthly), never hourly.
+export const REFRESH_ROCKET_LINEUPS = 6 * 60 * 60;
