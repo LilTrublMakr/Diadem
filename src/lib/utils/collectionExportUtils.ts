@@ -120,17 +120,17 @@ export function buildMoveNameMap(): Map<number, string> {
 	return map;
 }
 
-// Same traversal as buildMoveNameMap, but for the move's damage type (lowercase, matching
-// typeEffectiveness.ts's keys) instead of its display name - used to check whether a pokemon's
-// currently-taught moves are actually super-effective against something, not just to label them.
+// Unlike buildMoveNameMap, this does NOT consult masterFile.moves (the global list) first -
+// every entry in that list is missing its `type` field entirely (verified: 0/533 have one), so
+// the provider parses it as 0 -> typeIdToText(0) -> "normal" for literally every move. Trusting
+// that first (as buildMoveNameMap correctly does for names, which the global list DOES have
+// reliably) silently mislabeled every real move as Normal-type here, since the per-species
+// movepool fallback never got a chance to run once the map already "had" every move id. The
+// per-species movepool is the only source with real type data, so it's the only pass this needs.
 export function buildMoveTypeMap(): Map<number, string> {
 	const map = new Map<number, string>();
 	const masterFile = getMasterFile();
 	if (!masterFile) return map;
-
-	for (const move of Object.values(masterFile.moves ?? {})) {
-		map.set(move.id, typeIdToText(move.type));
-	}
 
 	const addMoves = (pokemon: (typeof masterFile.pokemon)[string] | undefined) => {
 		if (!pokemon) return;
