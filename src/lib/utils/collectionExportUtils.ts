@@ -120,13 +120,48 @@ export function buildMoveNameMap(): Map<number, string> {
 	return map;
 }
 
+// A handful of legacy/signature charged moves that aren't attached to ANY species' per-form
+// movepool in the current masterfile (verified against a real ~4,800-entry collection: these 24
+// ids never resolve via the per-species walk below, on either the base species or any of its
+// forms) - mostly single-species legendary signature moves the masterfile snapshot just doesn't
+// carry type data for anywhere, plus the universal Shadow-pokemon placeholder move. Real, stable
+// move types (these don't change), used only as a last-resort fallback for ids the movepool walk
+// can't find - never overrides real per-species data.
+const KNOWN_MOVE_TYPES: Record<number, string> = {
+	322: "normal", // Frustration (shadow pokemon placeholder - by far the most common of these)
+	323: "normal", // Return
+	378: "ice", // Glaciate
+	290: "ground", // Precipice Blades (Groudon)
+	289: "water", // Origin Pulse (Kyogre)
+	394: "dragon", // Roar of Time (Dialga)
+	387: "fairy", // Geomancy (Xerneas)
+	390: "fairy", // Nature's Madness (Tapu)
+	370: "dark", // Obstruct (Galarian Obstagoon)
+	388: "dragon", // Spacial Rend (Palkia)
+	366: "psychic", // Mist Ball (Latias)
+	389: "flying", // Oblivion Wing (Yveltal)
+	384: "flying", // Dragon Ascent (Rayquaza)
+	469: "steel", // Behemoth Blade (Zacian Crowned Sword)
+	489: "fighting", // Secret Sword (Keldeo Resolute)
+	365: "psychic", // Luster Purge (Latios)
+	467: "ice", // Ice Burn (White Kyurem)
+	466: "ice", // Freeze Shock (Black Kyurem)
+	482: "dragon", // Dynamax Cannon (Eternatus)
+	464: "ghost", // Rage Fist
+	405: "ghost", // Moongeist Beam (Lunala)
+	494: "steel", // Gigaton Hammer
+	404: "steel", // Sunsteel Strike (Solgaleo/Necrozma Dusk Mane)
+	470: "steel" // Behemoth Bash (Zamazenta Crowned Shield)
+};
+
 // Unlike buildMoveNameMap, this does NOT consult masterFile.moves (the global list) first -
 // every entry in that list is missing its `type` field entirely (verified: 0/533 have one), so
 // the provider parses it as 0 -> typeIdToText(0) -> "normal" for literally every move. Trusting
 // that first (as buildMoveNameMap correctly does for names, which the global list DOES have
 // reliably) silently mislabeled every real move as Normal-type here, since the per-species
 // movepool fallback never got a chance to run once the map already "had" every move id. The
-// per-species movepool is the only source with real type data, so it's the only pass this needs.
+// per-species movepool is the only source with real type data, so it's the only pass this needs -
+// KNOWN_MOVE_TYPES only fills in the few ids that pass never finds at all.
 export function buildMoveTypeMap(): Map<number, string> {
 	const map = new Map<number, string>();
 	const masterFile = getMasterFile();
@@ -143,6 +178,10 @@ export function buildMoveTypeMap(): Map<number, string> {
 		addMoves(pokemon);
 		for (const form of Object.values(pokemon.forms ?? {})) addMoves(form);
 		for (const tempEvo of Object.values(pokemon.tempEvos ?? {})) addMoves(tempEvo);
+	}
+
+	for (const [id, type] of Object.entries(KNOWN_MOVE_TYPES)) {
+		if (!map.has(Number(id))) map.set(Number(id), type);
 	}
 
 	return map;

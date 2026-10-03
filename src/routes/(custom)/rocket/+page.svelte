@@ -12,6 +12,22 @@
 	let fetchError = $state<string | null>(null);
 	let search = $state("");
 	let myPokemon = $state<RawExportPokemon[] | null>(null);
+	let copiedLineupName = $state<string | null>(null);
+
+	// Pokemon GO's own box search accepts a comma-separated list of species names as an OR query -
+	// paste this straight into the in-game search bar to pull up every owned counter at once.
+	async function copySearchString(lineupName: string, speciesNames: string[]) {
+		const query = [...new Set(speciesNames)].join(",");
+		try {
+			await navigator.clipboard.writeText(query);
+			copiedLineupName = lineupName;
+			setTimeout(() => {
+				if (copiedLineupName === lineupName) copiedLineupName = null;
+			}, 2000);
+		} catch {
+			// Clipboard access can be blocked (permissions, non-secure context) - nothing more to do.
+		}
+	}
 
 	async function fetchLineups() {
 		loading = true;
@@ -165,6 +181,16 @@
 										Nothing in your upload currently has a super-effective move against this lineup.
 									</p>
 								{:else}
+									<button
+										onclick={() =>
+											copySearchString(
+												lineup.name,
+												ranked.map((r) => getSpeciesName(r.individual.dex))
+											)}
+										class="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+									>
+										{copiedLineupName === lineup.name ? "Copied!" : "Copy GO search string"}
+									</button>
 									<ul class="space-y-1">
 										{#each ranked as r}
 											<li class="text-xs text-zinc-600 dark:text-zinc-400">
@@ -176,6 +202,11 @@
 												</span>
 												— CP {r.individual.cp}, covers {r.score}/{r.totalDefenders}
 												{#if r.individual.shiny}✨{/if}{#if r.individual.lucky}🍀{/if}
+												{#if r.resistedMoveTypes.length}
+													<span class="text-amber-600 dark:text-amber-500">
+														⚠ {r.resistedMoveTypes.join(", ")} resisted here
+													</span>
+												{/if}
 											</li>
 										{/each}
 									</ul>

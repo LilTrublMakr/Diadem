@@ -1,5 +1,5 @@
 import { buildMoveTypeMap } from "@/lib/utils/collectionExportUtils";
-import { getWeaknesses } from "@/lib/utils/typeEffectiveness";
+import { getWeaknesses, isResisted } from "@/lib/utils/typeEffectiveness";
 import type { RawExportPokemon } from "@/lib/types/collectionExport";
 import type { RocketLineup, RocketPokemon } from "@/lib/types/rocketLineups";
 
@@ -8,6 +8,11 @@ export type RankedCounter = {
 	score: number;
 	totalDefenders: number;
 	coveredNames: string[];
+	// Owned move types that are actively resisted (not just unhelpful) by at least one defender in
+	// this lineup - a liability, not merely a wasted slot (e.g. Dialga's Roar of Time vs this
+	// grunt's Fairy-type half). Ranked individuals with fewer of these are preferred when tied on
+	// coverage, since "every move helps" beats "one move helps, the other works against you."
+	resistedMoveTypes: string[];
 };
 
 /**
@@ -34,15 +39,18 @@ export function rankCountersForLineup(
 	for (const [name, p] of defenders) {
 		weaknessesByDefender.set(name, new Set(getWeaknesses(p.types).map((w) => w.type)));
 	}
+	const defenderTypesList = [...defenders.values()].map((p) => p.types);
 
 	const moveTypes = buildMoveTypeMap();
 	const results: RankedCounter[] = [];
 
 	for (const individual of pokemon) {
-		const ownedMoveTypes = [individual.move1, individual.move2, individual.move3]
-			.filter((id) => id)
-			.map((id) => moveTypes.get(id))
-			.filter((t): t is string => !!t);
+		const ownedMoveTypes = [...new Set(
+			[individual.move1, individual.move2, individual.move3]
+				.filter((id) => id)
+				.map((id) => moveTypes.get(id))
+				.filter((t): t is string => !!t)
+		)];
 		if (!ownedMoveTypes.length) continue;
 
 		const coveredNames: string[] = [];
@@ -51,16 +59,24 @@ export function rankCountersForLineup(
 		}
 		if (!coveredNames.length) continue;
 
+		const resistedMoveTypes = ownedMoveTypes.filter((t) =>
+			defenderTypesList.some((defTypes) => isResisted(t, defTypes))
+		);
+
 		results.push({
 			individual,
 			score: coveredNames.length,
 			totalDefenders: defenders.size,
-			coveredNames
+			coveredNames,
+			resistedMoveTypes
 		});
 	}
 
 	results.sort((a, b) => {
 		if (b.score !== a.score) return b.score - a.score;
+		if (a.resistedMoveTypes.length !== b.resistedMoveTypes.length) {
+			return a.resistedMoveTypes.length - b.resistedMoveTypes.length;
+		}
 		const ivA = a.individual.atk + a.individual.def + a.individual.sta;
 		const ivB = b.individual.atk + b.individual.def + b.individual.sta;
 		if (ivB !== ivA) return ivB - ivA;
