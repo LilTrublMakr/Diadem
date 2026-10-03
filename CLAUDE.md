@@ -374,6 +374,21 @@ You might be able to use the Svelte MCP server, where you have access to compreh
 - Tracker `toggleTracker` type is `'shiny' | 'hundo' | 'nundo' | 'shundo'`; button/section order everywhere: shundo → hundo → shiny → nundo
 - `pokemon_tracker` DB migration (run manually if columns missing): `ALTER TABLE pokemon_tracker ADD nundo boolean DEFAULT false NOT NULL; ALTER TABLE pokemon_tracker ADD shundo boolean DEFAULT false NOT NULL;`
 - `scan_area` DB migration (run manually if column missing): `ALTER TABLE scan_area ADD override_active boolean;` — nullable manual override for scheduled areas (null = schedule decides, true/false = forced on/off, persists across window boundaries until `clearScanAreaOverride` runs)
+- `user_collection` DB migration (new table, create manually - one row per user, a saved snapshot of their last-uploaded collection export so features like the Team GO Rocket counters lookup don't require re-uploading every visit):
+
+  ```sql
+  CREATE TABLE `user_collection` (
+      `id` int AUTO_INCREMENT NOT NULL,
+      `user_id` varchar(255) NOT NULL,
+      `pokemon` json NOT NULL,
+      `format` varchar(16),
+      `updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT `user_collection_id` PRIMARY KEY(`id`),
+      CONSTRAINT `user_collection_user_id_unique` UNIQUE(`user_id`),
+      CONSTRAINT `user_collection_user_id_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE
+  );
+  ```
+
 - **`pnpm db:push` is dangerous on this DB** — drizzle-kit sees drift on pre-existing tables (wants to TRUNCATE `user`/`session`/`pokemon_tracker`). Never confirm its prompt; create new tables with raw SQL instead (see docs guide `scan-areas.md` for the `scan_area` DDL)
 - Dragonite v2 API: core `:7272` (no auth) serves `/v2/areas/` CRUD; admin proxy `:7273` needs `X-Dragonite-Admin-Secret` and prefixes `/api`. Client pattern: `new URL('v2/areas/', adminUrl ?? url)` — relative paths, same as `dragoniteStatus.ts`
 - Scan-area lifecycle is **mirror-all**: every `scan_area` row has a permanent Dragonite area (`vtscan_{dbId}_{slug}`, `SCAN_AREA_PREFIX` in `src/lib/server/scanAreas/constants.ts`); occupancy = `pokemon_mode.workers` (manual-active → N, else 0); `quest_mode.workers` stays N always (a cap, NOT scalable — Dragonite rejects `scale: quest` actions)

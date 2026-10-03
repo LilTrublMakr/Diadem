@@ -10,6 +10,7 @@ import {
 	uniqueIndex,
 	varchar
 } from "drizzle-orm/mysql-core";
+import type { RawExportPokemon } from "@/lib/types/collectionExport";
 
 export const user = mysqlTable(
 	"user",
@@ -124,6 +125,26 @@ export const pokemonTracker = mysqlTable(
 );
 
 export type PokemonTracker = typeof pokemonTracker.$inferSelect;
+
+// One row per user - a saved snapshot of their last-uploaded collection export, so features
+// like the Team GO Rocket counters lookup don't require re-uploading every visit.
+export const userCollection = mysqlTable(
+	"user_collection",
+	{
+		id: int("id").autoincrement().primaryKey(),
+		userId: varchar("user_id", { length: 255 })
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		pokemon: json("pokemon").$type<RawExportPokemon[]>().notNull(),
+		format: varchar("format", { length: 16 }), // last-imported ExportFormat, for display only
+		updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
+	},
+	(table) => ({
+		userIdUnique: uniqueIndex("user_collection_user_id_unique").on(table.userId)
+	})
+);
+
+export type UserCollection = typeof userCollection.$inferSelect;
 
 export const scanArea = mysqlTable(
 	"scan_area",

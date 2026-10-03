@@ -5,8 +5,10 @@ import type {
 	NotificationSubscription,
 	NotificationTemplate,
 	PokemonTracker,
-	ScanArea
+	ScanArea,
+	UserCollection
 } from "@/lib/server/db/internal/schema";
+import type { RawExportPokemon } from "@/lib/types/collectionExport";
 import type { AnySubscriptionFilters, NotificationType } from "@/lib/features/notifications/types";
 import type {
 	NotificationSchedule,
@@ -143,6 +145,37 @@ export async function upsertTracker(
 		})
 		.onDuplicateKeyUpdate({ set: updateSet });
 	return getTracker(userId, pokemonId, form);
+}
+
+// Same mysql2-doesn't-auto-parse-JSON gotcha as parseJsonColumns below.
+function parseUserCollectionRow(row: UserCollection): UserCollection {
+	return {
+		...row,
+		pokemon: typeof row.pokemon === "string" ? JSON.parse(row.pokemon) : row.pokemon
+	};
+}
+
+export async function getUserCollection(userId: string): Promise<UserCollection | null> {
+	const [result] = await db
+		.select()
+		.from(table.userCollection)
+		.where(eq(table.userCollection.userId, userId));
+	return result ? parseUserCollectionRow(result) : null;
+}
+
+export async function saveUserCollection(
+	userId: string,
+	pokemon: RawExportPokemon[],
+	format: string | null
+): Promise<void> {
+	await db
+		.insert(table.userCollection)
+		.values({ userId, pokemon, format })
+		.onDuplicateKeyUpdate({ set: { pokemon, format } });
+}
+
+export async function deleteUserCollection(userId: string): Promise<void> {
+	await db.delete(table.userCollection).where(eq(table.userCollection.userId, userId));
 }
 
 // mysql2 doesn't auto-parse JSON columns, so drizzle returns them as raw strings

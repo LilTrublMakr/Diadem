@@ -1,10 +1,12 @@
 <script lang="ts">
 	import type { RocketLineup } from "@/lib/types/rocketLineups";
 	import type { RawExportPokemon } from "@/lib/types/collectionExport";
+	import type { ExportFormat } from "@/lib/utils/collectionImportUtils";
 	import { ROCKET_QUOTES } from "@/lib/utils/rocketQuotes";
 	import { getWeaknesses } from "@/lib/utils/typeEffectiveness";
 	import { rankCountersForLineup } from "@/lib/utils/rocketCounters";
 	import { getSpeciesName, getFormName } from "@/lib/utils/collectionExportUtils";
+	import { getUserDetails } from "@/lib/services/user/userDetails.svelte";
 	import ExportParsePanel from "@/components/custom/ExportParsePanel.svelte";
 
 	let lineups = $state<RocketLineup[] | null>(null);
@@ -12,7 +14,59 @@
 	let fetchError = $state<string | null>(null);
 	let search = $state("");
 	let myPokemon = $state<RawExportPokemon[] | null>(null);
+	let pendingFormat = $state<ExportFormat | null>(null);
+	let loadedFromAccount = $state(false);
+	let savingCollection = $state(false);
+	let collectionMessage = $state<string | null>(null);
 	let copiedLineupName = $state<string | null>(null);
+
+	let loggedIn = $derived(!!getUserDetails().details);
+
+	async function loadSavedCollection() {
+		if (!loggedIn) return;
+		try {
+			const res = await fetch("/api/custom/collection");
+			if (!res.ok) return;
+			const saved: { pokemon: RawExportPokemon[] } | null = await res.json();
+			if (saved?.pokemon?.length) {
+				myPokemon = saved.pokemon;
+				loadedFromAccount = true;
+			}
+		} catch {
+			// Not critical - the upload panel still works without a saved collection.
+		}
+	}
+
+	async function saveCollection() {
+		if (!myPokemon) return;
+		savingCollection = true;
+		collectionMessage = null;
+		try {
+			const res = await fetch("/api/custom/collection", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ pokemon: myPokemon, format: pendingFormat })
+			});
+			if (!res.ok) throw new Error(`Server returned ${res.status}`);
+			loadedFromAccount = true;
+			collectionMessage = "Saved to your account.";
+		} catch (e) {
+			collectionMessage = e instanceof Error ? e.message : "Failed to save";
+		} finally {
+			savingCollection = false;
+		}
+	}
+
+	async function clearSavedCollection() {
+		try {
+			await fetch("/api/custom/collection", { method: "DELETE" });
+		} catch {
+			// Nothing more to do if this fails - the saved row just stays until retried.
+		}
+		myPokemon = null;
+		loadedFromAccount = false;
+		collectionMessage = null;
+	}
 
 	// Pokemon GO's own box search accepts a comma-separated list of species names as an OR query -
 	// paste this straight into the in-game search bar to pull up every owned counter at once.
@@ -45,10 +99,14 @@
 
 	$effect(() => {
 		fetchLineups();
+		loadSavedCollection();
 	});
 
-	function onRosterParsed(pokemon: RawExportPokemon[]) {
+	function onRosterParsed(pokemon: RawExportPokemon[], format: ExportFormat) {
 		myPokemon = pokemon;
+		pendingFormat = format;
+		loadedFromAccount = false;
+		collectionMessage = null;
 	}
 
 	const LEADER_NAMES = ["Giovanni", "Cliff", "Arlo", "Sierra"];
@@ -103,8 +161,32 @@
 		<ExportParsePanel onParsed={onRosterParsed} />
 		{#if myPokemon}
 			<p class="mt-3 text-xs text-emerald-600 dark:text-emerald-400">
-				Parsed {myPokemon.length} Pokémon — expand "Show my best counters" on any lineup below.
+				{loadedFromAccount ? "Loaded from your account" : "Parsed"} {myPokemon.length} Pokémon —
+				expand "Show my best counters" on any lineup below.
 			</p>
+			{#if loggedIn}
+				<div class="mt-2 flex items-center gap-2">
+					{#if !loadedFromAccount}
+						<button
+							onclick={saveCollection}
+							disabled={savingCollection}
+							class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						>
+							{savingCollection ? "Saving…" : "Save to my account"}
+						</button>
+					{:else}
+						<button
+							onclick={clearSavedCollection}
+							class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+						>
+							Clear saved collection
+						</button>
+					{/if}
+					{#if collectionMessage}
+						<span class="text-xs text-zinc-400 dark:text-zinc-600">{collectionMessage}</span>
+					{/if}
+				</div>
+			{/if}
 		{/if}
 	</div>
 
