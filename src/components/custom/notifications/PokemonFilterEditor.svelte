@@ -8,6 +8,7 @@
 	} from "@/lib/features/notifications/types";
 	import type { ScanAreaDto } from "@/lib/features/scanAreas/types";
 	import type { KojiFeatures } from "@/lib/features/koji";
+	import { PLAYER_ID_PATTERN, type ShinyAccountDto } from "@/lib/features/shinyPrediction";
 
 	type NumericFilterKey =
 		| "minIv"
@@ -30,16 +31,38 @@
 		ownAreas,
 		kojiAreas,
 		notificationAreas,
-		// Not meaningful for a channel audience (no single linked account) — the admin-configured
-		// channel subscription page omits this section entirely by passing false.
-		showPredictedShiny = true
+		showPredictedShiny = true,
+		// Passing this switches the predicted-shiny section from the personal page's simple "my
+		// linked accounts" checkbox to an explicit account picker — a channel post has no single
+		// implicit recipient, so the admin must name which account (or a manually-typed player id)
+		// to check against. Omit entirely to hide the section (feature disabled).
+		shinyAccounts
 	}: {
 		filters: PokemonSubscriptionFilters;
 		ownAreas: ScanAreaDto[];
 		kojiAreas: KojiFeatures;
 		notificationAreas: NotificationAreaDto[];
 		showPredictedShiny?: boolean;
+		shinyAccounts?: ShinyAccountDto[];
 	} = $props();
+
+	type ShinyTarget = "none" | "custom" | number;
+	let shinyTarget = $derived<ShinyTarget>(
+		filters.predictedShinyPlayerId ? "custom" : (filters.predictedShinyAccountId ?? "none")
+	);
+
+	function onShinyTargetChange(value: string) {
+		if (value === "none") {
+			filters.predictedShinyAccountId = undefined;
+			filters.predictedShinyPlayerId = undefined;
+		} else if (value === "custom") {
+			filters.predictedShinyAccountId = undefined;
+			filters.predictedShinyPlayerId ??= "";
+		} else {
+			filters.predictedShinyAccountId = Number(value);
+			filters.predictedShinyPlayerId = undefined;
+		}
+	}
 
 	function togglePvpLeague(league: "little" | "great" | "ultra", checked: boolean) {
 		const leagues = new Set(filters.pvpLeagues ?? []);
@@ -156,9 +179,44 @@
 			checked={filters.predictedShinyOnly ?? false}
 			onchange={(e) => (filters.predictedShinyOnly = e.currentTarget.checked || undefined)}
 		/>
-		Only when predicted shiny for one of my linked accounts
-		<a href="/profile" class="text-xs text-indigo-500 hover:underline">(manage)</a>
+		{#if shinyAccounts}
+			Only when predicted shiny
+		{:else}
+			Only when predicted shiny for one of my linked accounts
+			<a href="/profile" class="text-xs text-indigo-500 hover:underline">(manage)</a>
+		{/if}
 	</label>
+
+	{#if shinyAccounts && filters.predictedShinyOnly}
+		<label class="flex flex-col gap-1 text-sm pl-6">
+			<span class="text-zinc-500 dark:text-zinc-400">Check against</span>
+			<select
+				value={shinyTarget}
+				onchange={(e) => onShinyTargetChange(e.currentTarget.value)}
+				class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
+			>
+				<option value="none">Any of my linked accounts</option>
+				{#each shinyAccounts as account (account.id)}
+					<option value={account.id}>{account.label} ({account.playerIdHint})</option>
+				{/each}
+				<option value="custom">Custom player ID…</option>
+			</select>
+			{#if shinyTarget === "custom"}
+				{@const valid = PLAYER_ID_PATTERN.test(filters.predictedShinyPlayerId ?? "")}
+				<input
+					type="text"
+					value={filters.predictedShinyPlayerId ?? ""}
+					oninput={(e) =>
+						(filters.predictedShinyPlayerId = e.currentTarget.value.trim().toLowerCase())}
+					placeholder="16 hex chars, or 21 digits for Google accounts"
+					class="rounded border px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 {valid ||
+					!filters.predictedShinyPlayerId
+						? 'border-zinc-300 dark:border-zinc-600'
+						: 'border-red-400 dark:border-red-700'}"
+				/>
+			{/if}
+		</label>
+	{/if}
 {/if}
 
 <label class="flex flex-col gap-1 text-sm">

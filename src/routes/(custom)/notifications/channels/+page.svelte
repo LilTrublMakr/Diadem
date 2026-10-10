@@ -47,12 +47,17 @@
 		QuestSubscriptionFilters,
 		RaidSubscriptionFilters
 	} from "@/lib/features/notifications/types";
+	import { getConfig } from "@/lib/services/config/config";
+	import type { ShinyAccountDto } from "@/lib/features/shinyPrediction";
 
 	const notifState = getNotificationsState();
 	const channelState = getChannelNotificationsState();
 	const scanAreasState = getScanAreasState();
 	const notificationAreasState = getNotificationAreasState();
 	let kojiGeofences = $state<KojiFeatures>([]);
+	// The admin's own linked accounts, for the "check against" picker on the pokemon filter editor
+	// — a channel post has no single implicit recipient, so predicted-shiny must name an account.
+	let shinyAccounts = $state<ShinyAccountDto[]>([]);
 
 	$effect(() => {
 		void loadManageableGuilds();
@@ -60,6 +65,11 @@
 		void loadScanAreas();
 		void loadNotificationAreas();
 		void loadKojiGeofences().then(() => (kojiGeofences = getKojiGeofences()));
+		if (getConfig().general.shinyPrediction) {
+			void fetch("/api/custom/shiny-accounts")
+				.then((res) => (res.ok ? res.json() : []))
+				.then((accounts) => (shinyAccounts = accounts));
+		}
 	});
 
 	let errorMessage = $state<string | null>(null);
@@ -402,7 +412,8 @@
 											ownAreas={scanAreasState.areas}
 											kojiAreas={kojiGeofences}
 											notificationAreas={notificationAreasState.areas}
-											showPredictedShiny={false}
+											showPredictedShiny={getConfig().general.shinyPrediction}
+											{shinyAccounts}
 										/>
 									{/if}
 

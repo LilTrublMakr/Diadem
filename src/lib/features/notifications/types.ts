@@ -90,6 +90,16 @@ export type PokemonSubscriptionFilters = BaseSubscriptionFilters & {
 	// No plain shinyOnly filter — Golbat's shiny flag is per scanner-account, not the same catch
 	// for every player. predictedShinyOnly instead checks the recipient's OWN linked accounts.
 	predictedShinyOnly?: boolean;
+	// Only meaningful when predictedShinyOnly is set. A personal (DM) subscription has an implicit
+	// recipient and checks ALL of their linked accounts, ignoring these. A channel subscription has
+	// no single recipient, so it must pick one explicitly: predictedShinyAccountId references one of
+	// the configuring admin's own linked shinyAccount rows (resolved server-side — the id, not the
+	// player id, travels in this filter); predictedShinyPlayerId is a manual override player id typed
+	// directly by the admin (e.g. to check an account that isn't theirs). Omitting both on a channel
+	// subscription falls back to the admin's own linked accounts, same as the personal-DM behavior.
+	// If both are set, predictedShinyPlayerId wins.
+	predictedShinyAccountId?: number;
+	predictedShinyPlayerId?: string;
 	// Empty/absent = no PVP filter. Multiple leagues = OR match (notify if it ranks within
 	// pvpMaxRank in ANY of these leagues) — one shared rank threshold across all of them.
 	pvpLeagues?: PvpLeagueFilter[];

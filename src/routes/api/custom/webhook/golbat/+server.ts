@@ -18,7 +18,11 @@ import {
 } from "@/lib/server/notifications/matchCache";
 import { isScheduleActiveNow } from "@/lib/features/notifications/scheduleActive";
 import { getKojiAreaById } from "@/lib/server/notifications/kojiAreaCache";
-import { predictShiny } from "@/lib/server/shinyPrediction/service";
+import {
+	predictShiny,
+	predictShinyForAccountId,
+	predictShinyForPlayerId
+} from "@/lib/server/shinyPrediction/service";
 import { recordSpawn } from "@/lib/server/shinyPrediction/spawnIndex";
 import {
 	generatePokemonMapImage,
@@ -627,10 +631,39 @@ async function deliver(
 async function deliverPokemonChannel(
 	subscription: NotificationChannelSubscription,
 	context: PokemonTemplateContext,
+	encounterId: string,
 	getMapImage: (style: string | undefined) => Promise<Buffer | null>,
 	getSpriteImage: () => Promise<Buffer | null>,
 	thisFetch: typeof fetch
 ) {
+	const filters = subscription.filters as PokemonSubscriptionFilters;
+	if (filters.predictedShinyOnly) {
+		const isShiny = filters.predictedShinyPlayerId
+			? await predictShinyForPlayerId(
+					filters.predictedShinyPlayerId,
+					encounterId,
+					context.pokemonId,
+					context.form
+				)
+			: filters.predictedShinyAccountId
+				? await predictShinyForAccountId(
+						subscription.createdByUserId,
+						filters.predictedShinyAccountId,
+						encounterId,
+						context.pokemonId,
+						context.form
+					)
+				: (
+						await predictShiny(
+							subscription.createdByUserId,
+							encounterId,
+							context.pokemonId,
+							context.form
+						)
+					).accounts.length > 0;
+		if (!isShiny) return;
+	}
+
 	if (
 		!(await matchesArea(
 			{ filters: subscription.filters, ownerId: subscription.createdByUserId },
@@ -713,7 +746,14 @@ async function handlePokemon(message: GolbatPokemonMessage, thisFetch: typeof fe
 			deliver(sub, context, message.encounter_id, getMapImage, getSpriteImage, thisFetch)
 		),
 		...channelMatches.map((sub) =>
-			deliverPokemonChannel(sub, context, getMapImage, getSpriteImage, thisFetch)
+			deliverPokemonChannel(
+				sub,
+				context,
+				message.encounter_id,
+				getMapImage,
+				getSpriteImage,
+				thisFetch
+			)
 		)
 	]);
 }

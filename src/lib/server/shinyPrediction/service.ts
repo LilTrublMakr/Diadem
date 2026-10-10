@@ -114,3 +114,38 @@ export async function predictShiny(
 			.map((a) => a.label)
 	};
 }
+
+/**
+ * Checks a single specific one of ownerId's own linked accounts — used by channel subscriptions,
+ * which (unlike a DM subscription) have no implicit single recipient and must name an account
+ * explicitly. Ownership-checked: only searches ownerId's own cached accounts, so an accountId
+ * belonging to someone else's linked account always resolves to false.
+ */
+export async function predictShinyForAccountId(
+	ownerId: string,
+	accountId: number,
+	encounterId: string,
+	pokemonId: number,
+	form: number
+): Promise<boolean> {
+	if (!isShinyPredictionEnabled() || !ENCOUNTER_ID_PATTERN.test(encounterId)) return false;
+	const account = (await getCachedAccounts(ownerId)).find((a) => a.id === accountId);
+	if (!account) return false;
+	const odds = await getShinyOdds(pokemonId, form);
+	if (odds === null) return false;
+	return rollShinyDie(encounterId, account.playerId, odds) === 0;
+}
+
+/** Manual-override variant of the above — checks a raw player id typed directly into a channel
+ * subscription's filters, rather than one of the admin's own saved shinyAccount rows. */
+export async function predictShinyForPlayerId(
+	playerId: string,
+	encounterId: string,
+	pokemonId: number,
+	form: number
+): Promise<boolean> {
+	if (!isShinyPredictionEnabled() || !ENCOUNTER_ID_PATTERN.test(encounterId)) return false;
+	const odds = await getShinyOdds(pokemonId, form);
+	if (odds === null) return false;
+	return rollShinyDie(encounterId, playerId, odds) === 0;
+}

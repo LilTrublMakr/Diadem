@@ -1,5 +1,6 @@
 import { DAY_TOKENS } from "@/lib/features/notifications/scheduleTypes";
 import type { NotificationType } from "@/lib/features/notifications/types";
+import { PLAYER_ID_PATTERN } from "@/lib/features/shinyPrediction";
 import { z } from "zod";
 
 export const notificationNameSchema = z.string().trim().min(1).max(64);
@@ -118,6 +119,9 @@ export const pokemonFiltersSchema = z.object({
 	featuredAttackOnly: z.boolean().optional(),
 	// true = only notify when the spawn is predicted shiny for one of the user's linked accounts
 	predictedShinyOnly: z.boolean().optional(),
+	// Channel-subscription-only account selection — see the type's own doc comment.
+	predictedShinyAccountId: z.number().int().positive().optional(),
+	predictedShinyPlayerId: z.string().regex(PLAYER_ID_PATTERN).optional(),
 	...baseFiltersShape
 });
 
