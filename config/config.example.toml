@@ -45,13 +45,16 @@ baseUrl = "https://map.co/"
 [server.auth.discord]
 clientId = ""
 clientSecret = ""
-# Optional: personal Discord DM notifications (see /notifications page). Enable a
+# Optional: personal Discord DM notifications (see /notifications page) and
+# admin-configurable channel notifications (see /notifications/channels page). Enable a
 # Bot user on this same Discord Application (Developer Portal -> Bot) and paste its
-# token below - the bot needs no special permissions, just to share a guild with
-# users it will DM. webhookSecret is a shared secret you make up, checked against
-# the header on one additional `[[webhooks]]` block you add to Golbat's own
-# config.toml pointing at this app's /api/custom/webhook/golbat - existing webhook
-# blocks (e.g. one feeding Poracle) are untouched.
+# token below. For DMs alone the bot needs no special permissions, just to share a
+# guild with users it will DM - but for channel notifications, invite it to each
+# server with an OAuth2 URL granting Send Messages/Embed Links/Attach Files in
+# whatever channels it should post to. webhookSecret is a shared secret you make up,
+# checked against the header on one additional `[[webhooks]]` block you add to
+# Golbat's own config.toml pointing at this app's /api/custom/webhook/golbat -
+# existing webhook blocks (e.g. one feeding Poracle) are untouched.
 #botToken = "your-bot-token"
 #webhookSecret = "some-shared-secret"
 

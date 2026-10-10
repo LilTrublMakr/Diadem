@@ -78,3 +78,38 @@ export async function isGuildMember(guildId: string, accessToken: string) {
 	if (!lookup.found) return;
 	return !!lookup.data.user;
 }
+
+// Discord permission bit flags relevant to "is this user an admin of this guild" -
+// https://discord.com/developers/docs/topics/permissions
+export const DISCORD_PERMISSION_ADMINISTRATOR = 0x8;
+export const DISCORD_PERMISSION_MANAGE_GUILD = 0x20;
+
+export type DiscordUserGuild = { id: string; name: string; permissions: string };
+
+export type UserGuildsResult =
+	| { ok: true; guilds: DiscordUserGuild[] }
+	// Discord returns 401/403 here if the session's OAuth token predates the "guilds" scope -
+	// distinct from a generic failure so callers can tell the user to re-log-in.
+	| { ok: false; missingScope: true }
+	| { ok: false; missingScope: false; status: number };
+
+/** GET /users/@me/guilds - requires the "guilds" OAuth scope (not "guilds.members.read"). */
+export async function getUserGuildsWithPermissions(accessToken: string): Promise<UserGuildsResult> {
+	const response = await fetch(`${endpoint}/guilds`, getFetchOptions(accessToken));
+	if (response.status === 401 || response.status === 403) {
+		return { ok: false, missingScope: true };
+	}
+	if (!response.ok) {
+		return { ok: false, missingScope: false, status: response.status };
+	}
+	const guilds: DiscordUserGuild[] = await response.json();
+	return { ok: true, guilds };
+}
+
+export function hasManageGuildPermission(permissions: string): boolean {
+	const bits = BigInt(permissions);
+	return (
+		(bits & BigInt(DISCORD_PERMISSION_ADMINISTRATOR)) !== 0n ||
+		(bits & BigInt(DISCORD_PERMISSION_MANAGE_GUILD)) !== 0n
+	);
+}

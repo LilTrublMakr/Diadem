@@ -2,6 +2,7 @@ import { db } from "@/lib/server/db/internal/index";
 import * as table from "@/lib/server/db/internal/schema";
 import type {
 	NotificationArea,
+	NotificationChannelSubscription,
 	NotificationSubscription,
 	NotificationTemplate,
 	PokemonTracker,
@@ -421,6 +422,107 @@ export async function getAllEnabledNotificationSubscriptions(): Promise<
 		.from(table.notificationSubscription)
 		.where(eq(table.notificationSubscription.enabled, true));
 	return rows.map(parseSubscriptionJson);
+}
+
+// --- Notification channel subscriptions (admin-configured, post to a Discord channel) ---
+// Scoped by guildId, not userId - a channel subscription's "owner" for authorization purposes is
+// whichever admin of that guild is editing it, not a single fixed user (createdByUserId is audit
+// only - see schema.ts's comment on the table).
+
+function parseChannelSubscriptionJson(
+	row: NotificationChannelSubscription
+): NotificationChannelSubscription {
+	return {
+		...row,
+		filters: typeof row.filters === "string" ? JSON.parse(row.filters) : row.filters,
+		schedule: typeof row.schedule === "string" ? JSON.parse(row.schedule) : (row.schedule ?? null)
+	};
+}
+
+export async function getChannelSubscriptions(
+	guildId: string
+): Promise<NotificationChannelSubscription[]> {
+	const rows = await db
+		.select()
+		.from(table.notificationChannelSubscription)
+		.where(eq(table.notificationChannelSubscription.guildId, guildId));
+	return rows.map(parseChannelSubscriptionJson);
+}
+
+export async function getChannelSubscription(
+	guildId: string,
+	id: number
+): Promise<NotificationChannelSubscription | null> {
+	const [result] = await db
+		.select()
+		.from(table.notificationChannelSubscription)
+		.where(
+			and(
+				eq(table.notificationChannelSubscription.id, id),
+				eq(table.notificationChannelSubscription.guildId, guildId)
+			)
+		);
+	return result ? parseChannelSubscriptionJson(result) : null;
+}
+
+export async function insertChannelSubscription(row: {
+	createdByUserId: string;
+	guildId: string;
+	channelId: string;
+	type: NotificationType;
+	templateId: number | null;
+	name: string;
+	enabled: boolean;
+	filters: AnySubscriptionFilters;
+	mode: SubscriptionMode;
+	schedule: NotificationSchedule | null;
+}): Promise<NotificationChannelSubscription> {
+	const [result] = await db.insert(table.notificationChannelSubscription).values(row).$returningId();
+	return (await getChannelSubscription(row.guildId, result.id))!;
+}
+
+export async function updateChannelSubscriptionRow(
+	guildId: string,
+	id: number,
+	patch: Partial<
+		Pick<
+			NotificationChannelSubscription,
+			"name" | "enabled" | "channelId" | "templateId" | "filters" | "mode" | "schedule"
+		>
+	>
+): Promise<void> {
+	await db
+		.update(table.notificationChannelSubscription)
+		.set(patch)
+		.where(
+			and(
+				eq(table.notificationChannelSubscription.id, id),
+				eq(table.notificationChannelSubscription.guildId, guildId)
+			)
+		);
+}
+
+export async function deleteChannelSubscriptionRow(guildId: string, id: number): Promise<void> {
+	await db
+		.delete(table.notificationChannelSubscription)
+		.where(
+			and(
+				eq(table.notificationChannelSubscription.id, id),
+				eq(table.notificationChannelSubscription.guildId, guildId)
+			)
+		);
+}
+
+// Loads every enabled channel subscription across all guilds — used by the webhook matching
+// engine's channel-subscription index, same role as getAllEnabledNotificationSubscriptions.
+export async function getAllEnabledChannelSubscriptions(): Promise<
+	NotificationChannelSubscription[]
+> {
+	const rows = await db
+		.select()
+		.from(table.notificationChannelSubscription)
+		.where(eq(table.notificationChannelSubscription.enabled, true));
+	return rows.map(parseChannelSubscriptionJson);
 }
 
 // mysql2 doesn't auto-parse JSON columns, so drizzle returns them as raw strings

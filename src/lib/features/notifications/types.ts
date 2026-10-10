@@ -216,6 +216,23 @@ export type NotificationSubscriptionDto = {
 	updatedAt: string;
 };
 
+// Admin-configured, posts to a Discord channel instead of DMing a user - same shape as
+// NotificationSubscriptionDto plus the channel it posts to (guildId isn't included since it's
+// already the scoping key for whatever list this DTO came from, not a per-row concern client-side).
+export type NotificationChannelSubscriptionDto = {
+	id: number;
+	channelId: string;
+	type: NotificationType;
+	templateId: number | null;
+	name: string;
+	enabled: boolean;
+	filters: AnySubscriptionFilters;
+	mode: SubscriptionMode;
+	schedule: NotificationSchedule | null;
+	createdAt: string;
+	updatedAt: string;
+};
+
 export type NotificationErrorResponse = {
 	error: string;
 	message?: string;

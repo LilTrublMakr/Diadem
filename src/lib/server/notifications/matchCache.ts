@@ -1,5 +1,11 @@
-import { getAllEnabledNotificationSubscriptions } from "@/lib/server/db/internal/repository";
-import type { NotificationSubscription } from "@/lib/server/db/internal/schema";
+import {
+	getAllEnabledChannelSubscriptions,
+	getAllEnabledNotificationSubscriptions
+} from "@/lib/server/db/internal/repository";
+import type {
+	NotificationChannelSubscription,
+	NotificationSubscription
+} from "@/lib/server/db/internal/schema";
 import type {
 	NotificationType,
 	PokemonSubscriptionFilters
@@ -13,6 +19,14 @@ let anySpecies: NotificationSubscription[] = [];
 // don't need a real index the way pokemon spawns do; a per-type flat-array filter is plenty
 // (see getSubscriptionsByType below).
 let allEnabled: NotificationSubscription[] = [];
+
+// Same shape, for admin-configured channel subscriptions — kept as a separate index rather than
+// merged into the above, since callers (the webhook route) need to tell "DM this user" and "post
+// to this channel" apart to deliver them differently.
+let channelByPokemonId: Map<number, NotificationChannelSubscription[]> = new Map();
+let channelAnySpecies: NotificationChannelSubscription[] = [];
+let channelAllEnabled: NotificationChannelSubscription[] = [];
+
 let dirty = true;
 let lastRefresh = 0;
 
@@ -35,7 +49,26 @@ function rebuild(subscriptions: NotificationSubscription[]) {
 	}
 }
 
-/** Call after any subscription create/update/delete so the next lookup refreshes. */
+function rebuildChannels(subscriptions: NotificationChannelSubscription[]) {
+	channelAllEnabled = subscriptions;
+	channelByPokemonId = new Map();
+	channelAnySpecies = [];
+	for (const sub of subscriptions) {
+		if (sub.type !== "pokemon") continue;
+		const pokemonIds = (sub.filters as PokemonSubscriptionFilters).pokemonIds;
+		if (pokemonIds && pokemonIds.length > 0) {
+			for (const pokemonId of pokemonIds) {
+				const bucket = channelByPokemonId.get(pokemonId) ?? [];
+				bucket.push(sub);
+				channelByPokemonId.set(pokemonId, bucket);
+			}
+		} else {
+			channelAnySpecies.push(sub);
+		}
+	}
+}
+
+/** Call after any subscription (DM or channel) create/update/delete so the next lookup refreshes. */
 export function invalidateSubscriptionCache() {
 	dirty = true;
 }
@@ -43,7 +76,12 @@ export function invalidateSubscriptionCache() {
 async function ensureFresh() {
 	const stale = Date.now() - lastRefresh > REFRESH_INTERVAL_MS;
 	if (!dirty && !stale) return;
-	rebuild(await getAllEnabledNotificationSubscriptions());
+	const [subs, channelSubs] = await Promise.all([
+		getAllEnabledNotificationSubscriptions(),
+		getAllEnabledChannelSubscriptions()
+	]);
+	rebuild(subs);
+	rebuildChannels(channelSubs);
 	dirty = false;
 	lastRefresh = Date.now();
 }
@@ -66,4 +104,20 @@ export async function getSubscriptionsByType(
 ): Promise<NotificationSubscription[]> {
 	await ensureFresh();
 	return allEnabled.filter((s) => s.type === type);
+}
+
+/** Channel-subscription equivalent of getPokemonSubscriptionCandidates. */
+export async function getChannelSubscriptionCandidates(
+	pokemonId: number
+): Promise<NotificationChannelSubscription[]> {
+	await ensureFresh();
+	return [...(channelByPokemonId.get(pokemonId) ?? []), ...channelAnySpecies];
+}
+
+/** Channel-subscription equivalent of getSubscriptionsByType. */
+export async function getChannelSubscriptionsByType(
+	type: NotificationType
+): Promise<NotificationChannelSubscription[]> {
+	await ensureFresh();
+	return channelAllEnabled.filter((s) => s.type === type);
 }

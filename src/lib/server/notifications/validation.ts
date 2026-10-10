@@ -218,3 +218,33 @@ export const patchSubscriptionSchema = z
 	.refine((patch) => Object.values(patch).some((v) => v !== undefined), {
 		message: "At least one field must be provided"
 	});
+
+// Discord snowflake ids are numeric strings, typically 17-20 digits.
+const discordIdSchema = z.string().regex(/^\d{17,20}$/, "Expected a Discord id");
+
+export const createChannelSubscriptionSchema = z.object({
+	guildId: discordIdSchema,
+	channelId: discordIdSchema,
+	name: notificationNameSchema,
+	type: notificationTypeSchema,
+	templateId: z.number().int().positive().nullable().optional(),
+	enabled: z.boolean().optional(),
+	filters: z.record(z.string(), z.unknown()),
+	mode: z.enum(["manual", "scheduled"]).optional(),
+	schedule: notificationScheduleSchema.nullable().optional()
+});
+
+// No `type`/`guildId` — immutable after creation, same reasoning as patchSubscriptionSchema.
+export const patchChannelSubscriptionSchema = z
+	.object({
+		name: notificationNameSchema.optional(),
+		channelId: discordIdSchema.optional(),
+		templateId: z.number().int().positive().nullable().optional(),
+		enabled: z.boolean().optional(),
+		filters: z.record(z.string(), z.unknown()).optional(),
+		mode: z.enum(["manual", "scheduled"]).optional(),
+		schedule: notificationScheduleSchema.nullable().optional()
+	})
+	.refine((patch) => Object.values(patch).some((v) => v !== undefined), {
+		message: "At least one field must be provided"
+	});

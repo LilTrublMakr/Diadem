@@ -112,6 +112,45 @@ async function getDmChannelId(discordId: string): Promise<string | null> {
 }
 
 export type DiscordAttachment = { filename: string; data: Buffer };
+export type DiscordMessagePayload = {
+	content?: string;
+	embed?: EmbedTemplate;
+	attachments?: (DiscordAttachment | null)[];
+};
+
+function buildMessageRequestInit(payload: DiscordMessagePayload): RequestInit {
+	const body: Record<string, unknown> = {};
+	if (payload.content) body.content = payload.content;
+	if (payload.embed) body.embeds = [buildDiscordEmbed(payload.embed)];
+
+	const attachments = (payload.attachments ?? []).filter((a): a is DiscordAttachment => !!a);
+	if (attachments.length > 0) {
+		const form = new FormData();
+		form.append("payload_json", JSON.stringify(body));
+		attachments.forEach((attachment, i) => {
+			form.append(
+				`files[${i}]`,
+				new Blob([attachment.data], { type: "image/png" }),
+				attachment.filename
+			);
+		});
+		return { method: "POST", body: form };
+	}
+	return { method: "POST", body: JSON.stringify(body) };
+}
+
+/** Low-level: post a message to any channel id the bot can see (DM or guild channel alike -
+ * Discord's message-send endpoint doesn't distinguish). Never throws, logs and swallows. */
+async function postToChannel(channelId: string, payload: DiscordMessagePayload): Promise<boolean> {
+	const response = await discordFetch(
+		`/channels/${channelId}/messages`,
+		buildMessageRequestInit(payload)
+	);
+	if (!response.ok) {
+		log.warning(`Failed to post Discord message to channel ${channelId}: ${response.status}`);
+	}
+	return response.ok;
+}
 
 /**
  * Send a Discord DM to a user. Never throws — delivery failures (DMs closed,
@@ -119,45 +158,68 @@ export type DiscordAttachment = { filename: string; data: Buffer };
  */
 export async function sendDirectMessage(
 	discordId: string,
-	payload: { content?: string; embed?: EmbedTemplate; attachments?: (DiscordAttachment | null)[] }
+	payload: DiscordMessagePayload
 ): Promise<void> {
 	const task = sendQueue.then(async () => {
 		try {
 			const channelId = await getDmChannelId(discordId);
 			if (!channelId) return;
 
-			const body: Record<string, unknown> = {};
-			if (payload.content) body.content = payload.content;
-			if (payload.embed) body.embeds = [buildDiscordEmbed(payload.embed)];
-
-			const attachments = (payload.attachments ?? []).filter((a): a is DiscordAttachment => !!a);
-
-			let requestInit: RequestInit;
-			if (attachments.length > 0) {
-				const form = new FormData();
-				form.append("payload_json", JSON.stringify(body));
-				attachments.forEach((attachment, i) => {
-					form.append(
-						`files[${i}]`,
-						new Blob([attachment.data], { type: "image/png" }),
-						attachment.filename
-					);
-				});
-				requestInit = { method: "POST", body: form };
-			} else {
-				requestInit = { method: "POST", body: JSON.stringify(body) };
-			}
-
-			const response = await discordFetch(`/channels/${channelId}/messages`, requestInit);
-			if (!response.ok) {
-				log.warning(`Failed to send Discord DM to ${discordId}: ${response.status}`);
-				// channel may have gone stale (e.g. user blocked the bot) — drop the cache entry
-				if (response.status === 403) dmChannelCache.delete(discordId);
-			}
+			const ok = await postToChannel(channelId, payload);
+			// channel may have gone stale (e.g. user blocked the bot) — drop the cache entry so the
+			// next send re-opens a fresh DM channel instead of repeatedly hitting a dead one.
+			if (!ok) dmChannelCache.delete(discordId);
 		} catch (error) {
 			log.warning(`Error sending Discord DM to ${discordId}: ${error}`);
 		}
 	});
 	sendQueue = task;
 	return task;
+}
+
+/**
+ * Post a message directly to a guild channel (admin-configured channel notifications). Same
+ * rate-limit queue and body-building as sendDirectMessage, just no DM-channel-id lookup since
+ * the destination channel id is already known. Never throws.
+ */
+export async function sendChannelMessage(
+	channelId: string,
+	payload: DiscordMessagePayload
+): Promise<void> {
+	const task = sendQueue.then(async () => {
+		try {
+			await postToChannel(channelId, payload);
+		} catch (error) {
+			log.warning(`Error posting Discord message to channel ${channelId}: ${error}`);
+		}
+	});
+	sendQueue = task;
+	return task;
+}
+
+export type DiscordGuildChannel = { id: string; name: string; type: number };
+
+// Channel types the bot can actually post embeds to - 0 = GUILD_TEXT, 5 = GUILD_ANNOUNCEMENT.
+const POSTABLE_CHANNEL_TYPES = new Set([0, 5]);
+
+export type ListGuildChannelsResult =
+	| { ok: true; channels: DiscordGuildChannel[] }
+	// Distinct from a generic failure so the UI can render an "invite the bot" prompt.
+	| { ok: false; botNotInGuild: true }
+	| { ok: false; botNotInGuild: false; status: number };
+
+/** GET /guilds/{guild.id}/channels via the bot token - the bot must already be a member of the
+ * guild (403 means it isn't). */
+export async function listGuildChannels(guildId: string): Promise<ListGuildChannelsResult> {
+	try {
+		const response = await discordFetch(`/guilds/${guildId}/channels`, { method: "GET" });
+		if (response.status === 403) return { ok: false, botNotInGuild: true };
+		if (!response.ok) return { ok: false, botNotInGuild: false, status: response.status };
+
+		const raw: DiscordGuildChannel[] = await response.json();
+		return { ok: true, channels: raw.filter((c) => POSTABLE_CHANNEL_TYPES.has(c.type)) };
+	} catch (error) {
+		log.warning(`Error listing channels for guild ${guildId}: ${error}`);
+		return { ok: false, botNotInGuild: false, status: 0 };
+	}
 }

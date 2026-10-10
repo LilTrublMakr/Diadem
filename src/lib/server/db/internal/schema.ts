@@ -275,6 +275,55 @@ export const notificationSubscription = mysqlTable(
 
 export type NotificationSubscription = typeof notificationSubscription.$inferSelect;
 
+// Admin-configured, posts to a Discord CHANNEL instead of DMing a user - separate from
+// notification_subscription (which is structurally a per-user DM-recipient table: no unique
+// index, userId is the delivery target) since a channel subscription's "owner" is the admin who
+// configured it, not who receives it. createdByUserId is for template-ownership checks + audit
+// only, not a delivery target - delivery goes straight to channelId via the bot.
+export const notificationChannelSubscription = mysqlTable(
+	"notification_channel_subscription",
+	{
+		id: int("id").autoincrement().primaryKey(),
+		createdByUserId: varchar("created_by_user_id", { length: 255 })
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		guildId: varchar("guild_id", { length: 32 }).notNull(),
+		channelId: varchar("channel_id", { length: 32 }).notNull(),
+		type: varchar("type", { length: 32 })
+			.$type<import("@/lib/features/notifications/types").NotificationType>()
+			.notNull(),
+		templateId: int("template_id").references(() => notificationTemplate.id, {
+			onDelete: "set null"
+		}),
+		name: varchar("name", { length: 64 }).notNull(),
+		enabled: boolean("enabled").default(true).notNull(),
+		filters: json("filters")
+			.$type<import("@/lib/features/notifications/types").AnySubscriptionFilters>()
+			.notNull(),
+		mode: varchar("mode", { length: 16 })
+			.$type<import("@/lib/features/notifications/scheduleTypes").SubscriptionMode>()
+			.default("manual")
+			.notNull(),
+		schedule:
+			json("schedule").$type<
+				import("@/lib/features/notifications/scheduleTypes").NotificationSchedule
+			>(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
+	},
+	(table) => ({
+		guildTypeNameUnique: uniqueIndex("notification_channel_sub_guild_name_unique").on(
+			table.guildId,
+			table.type,
+			table.name
+		),
+		guildIdIdx: index("notification_channel_sub_guild_id_idx").on(table.guildId),
+		typeIdx: index("notification_channel_sub_type_idx").on(table.type)
+	})
+);
+
+export type NotificationChannelSubscription = typeof notificationChannelSubscription.$inferSelect;
+
 // A user-drawn polygon scoped to notifications only — separate from scan_area (which exists to
 // drive Dragonite worker scanning/allotment). No workers/mode/schedule/Dragonite mirroring here,
 // just a named geofence a subscription's `areaId`/`areaSource: "notificationArea"` can point at.

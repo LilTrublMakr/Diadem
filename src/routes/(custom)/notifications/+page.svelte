@@ -2,9 +2,7 @@
 	import TemplateEditor from "@/components/custom/notifications/TemplateEditor.svelte";
 	import NotificationScheduleEditor from "@/components/custom/notifications/NotificationScheduleEditor.svelte";
 	import NotificationAreaMap from "@/components/custom/notifications/NotificationAreaMap.svelte";
-	import AreaPicker from "@/components/custom/notifications/AreaPicker.svelte";
-	import PokemonPicker from "@/components/custom/notifications/PokemonPicker.svelte";
-	import PokemonFormPicker from "@/components/custom/notifications/PokemonFormPicker.svelte";
+	import PokemonFilterEditor from "@/components/custom/notifications/PokemonFilterEditor.svelte";
 	import RaidFilterEditor from "@/components/custom/notifications/RaidFilterEditor.svelte";
 	import MaxBattleFilterEditor from "@/components/custom/notifications/MaxBattleFilterEditor.svelte";
 	import QuestFilterEditor from "@/components/custom/notifications/QuestFilterEditor.svelte";
@@ -66,22 +64,6 @@
 	import Switch from "@/components/ui/input/Switch.svelte";
 	import { Dialog } from "bits-ui";
 	import { Download, Loader2, Pencil, Plus, Trash2, Upload, X } from "@lucide/svelte";
-
-	type NumericFilterKey =
-		| "minIv"
-		| "maxIv"
-		| "minCp"
-		| "maxCp"
-		| "minLevel"
-		| "maxLevel"
-		| "minAtk"
-		| "maxAtk"
-		| "minDef"
-		| "maxDef"
-		| "minSta"
-		| "maxSta"
-		| "minSize"
-		| "maxSize";
 
 	const notifState = getNotificationsState();
 	const scanAreasState = getScanAreasState();
@@ -493,15 +475,6 @@
 		subscriptionMode = "idle";
 	}
 
-	function togglePvpLeague(league: "little" | "great" | "ultra", checked: boolean) {
-		const leagues = new Set(subFilters.pvpLeagues ?? []);
-		if (checked) leagues.add(league);
-		else leagues.delete(league);
-		subFilters.pvpLeagues = leagues.size > 0 ? [...leagues] : undefined;
-		if (leagues.size > 0) subFilters.pvpMaxRank ??= 25;
-		else subFilters.pvpMaxRank = undefined;
-	}
-
 	function activeFilters(): AnySubscriptionFilters {
 		if (subType === "raid") return raidFilters;
 		if (subType === "maxbattle") return maxBattleFilters;
@@ -751,35 +724,6 @@
 	}
 </script>
 
-{#snippet minMax(label: string, minKey: NumericFilterKey, maxKey: NumericFilterKey)}
-	<div class="flex flex-col gap-1 text-sm">
-		<span class="text-zinc-500 dark:text-zinc-400">{label}</span>
-		<div class="flex items-center gap-1">
-			<input
-				type="number"
-				placeholder="Min"
-				value={subFilters[minKey] ?? ""}
-				oninput={(e) => {
-					const v = e.currentTarget.value;
-					subFilters[minKey] = v ? Number(v) : undefined;
-				}}
-				class="w-full min-w-0 rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1 text-sm text-zinc-900 dark:text-zinc-100"
-			/>
-			<span class="text-xs text-zinc-400 shrink-0">–</span>
-			<input
-				type="number"
-				placeholder="Max"
-				value={subFilters[maxKey] ?? ""}
-				oninput={(e) => {
-					const v = e.currentTarget.value;
-					subFilters[maxKey] = v ? Number(v) : undefined;
-				}}
-				class="w-full min-w-0 rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1 text-sm text-zinc-900 dark:text-zinc-100"
-			/>
-		</div>
-	</div>
-{/snippet}
-
 {#snippet categoryTabs(selected: NotificationType, onSelect: (t: NotificationType) => void)}
 	<div class="flex gap-1">
 		{#each Object.entries(CATEGORY_LABELS) as [value, label] (value)}
@@ -928,110 +872,13 @@
 									notificationAreas={notificationAreasState.areas}
 								/>
 							{:else}
-								<label class="flex flex-col gap-1 text-sm">
-									<span class="text-zinc-500 dark:text-zinc-400"
-										>Species (optional, pick any number)</span
-									>
-									<PokemonPicker bind:selected={subFilters.pokemonIds} />
-								</label>
-
-								{#if subFilters.pokemonIds?.length === 1}
-									<PokemonFormPicker
-										pokemonId={subFilters.pokemonIds[0]}
-										bind:form={subFilters.form}
-									/>
-								{/if}
-
-								<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-									{@render minMax("IV %", "minIv", "maxIv")}
-									{@render minMax("CP", "minCp", "maxCp")}
-									{@render minMax("Level", "minLevel", "maxLevel")}
-									{@render minMax("Attack IV", "minAtk", "maxAtk")}
-									{@render minMax("Defense IV", "minDef", "maxDef")}
-									{@render minMax("Stamina IV", "minSta", "maxSta")}
-									{@render minMax("Size (1-5, XXS-XXL)", "minSize", "maxSize")}
-								</div>
-
-								<label class="flex flex-col gap-1 text-sm">
-									<span class="text-zinc-500 dark:text-zinc-400">Gender</span>
-									<select
-										value={subFilters.gender ?? ""}
-										onchange={(e) =>
-											(subFilters.gender = e.currentTarget.value
-												? (Number(e.currentTarget.value) as 1 | 2 | 3)
-												: undefined)}
-										class="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
-									>
-										<option value="">Any gender</option>
-										<option value="1">Male</option>
-										<option value="2">Female</option>
-										<option value="3">Genderless</option>
-									</select>
-								</label>
-
-								<label class="flex flex-col gap-1 text-sm">
-									<span class="text-zinc-500 dark:text-zinc-400">PVP League (optional)</span>
-									<div class="flex items-center gap-3 flex-wrap">
-										{#each [["little", "Little Cup"], ["great", "Great League"], ["ultra", "Ultra League"]] as [value, label] (value)}
-											<label class="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
-												<input
-													type="checkbox"
-													checked={subFilters.pvpLeagues?.includes(
-														value as "little" | "great" | "ultra"
-													) ?? false}
-													onchange={(e) =>
-														togglePvpLeague(
-															value as "little" | "great" | "ultra",
-															e.currentTarget.checked
-														)}
-												/>
-												{label}
-											</label>
-										{/each}
-									</div>
-									{#if subFilters.pvpLeagues && subFilters.pvpLeagues.length > 0}
-										<div class="flex items-center gap-2 mt-1">
-											<input
-												type="number"
-												min="1"
-												placeholder="Max rank"
-												value={subFilters.pvpMaxRank ?? 25}
-												oninput={(e) => {
-													const v = e.currentTarget.value;
-													subFilters.pvpMaxRank = v ? Number(v) : undefined;
-												}}
-												class="w-24 rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
-											/>
-											<span class="text-xs text-zinc-400 shrink-0"
-												>rank or better in any checked league</span
-											>
-										</div>
-									{/if}
-								</label>
-
-								{#if getConfig().general.shinyPrediction}
-									<label class="flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
-										<input
-											type="checkbox"
-											checked={subFilters.predictedShinyOnly ?? false}
-											onchange={(e) =>
-												(subFilters.predictedShinyOnly = e.currentTarget.checked || undefined)}
-										/>
-										Only when predicted shiny for one of my linked accounts
-										<a href="/profile" class="text-xs text-indigo-500 hover:underline">(manage)</a>
-									</label>
-								{/if}
-
-								<label class="flex flex-col gap-1 text-sm">
-									<span class="text-zinc-500 dark:text-zinc-400">Area (optional)</span>
-									<AreaPicker
-										ownAreas={scanAreasState.areas}
-										kojiAreas={kojiGeofences}
-										notificationAreas={notificationAreasState.areas}
-										bind:areaSource={subFilters.areaSource}
-										bind:areaId={subFilters.areaId}
-									/>
-								</label>
+								<PokemonFilterEditor
+									bind:filters={subFilters}
+									ownAreas={scanAreasState.areas}
+									kojiAreas={kojiGeofences}
+									notificationAreas={notificationAreasState.areas}
+									showPredictedShiny={getConfig().general.shinyPrediction}
+								/>
 							{/if}
 
 							<label class="flex flex-col gap-1 text-sm">

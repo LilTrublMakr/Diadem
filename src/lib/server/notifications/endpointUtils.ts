@@ -1,16 +1,21 @@
 import type {
 	NotificationArea,
+	NotificationChannelSubscription,
 	NotificationSubscription,
 	NotificationTemplate
 } from "@/lib/server/db/internal/schema";
 import { hasNotificationAccess } from "@/lib/server/notifications/access";
 import { NotificationError } from "@/lib/server/notifications/service";
+import { getDiscordAccessToken } from "@/lib/server/auth/betterAuth";
+import { isGuildManageableByUser } from "@/lib/server/notifications/channelAccess";
 import type {
 	NotificationAreaDto,
+	NotificationChannelSubscriptionDto,
 	NotificationSubscriptionDto,
 	NotificationTemplateDto
 } from "@/lib/features/notifications/types";
 import { json } from "@sveltejs/kit";
+import type { RequestEvent } from "@sveltejs/kit";
 
 /**
  * Shared guard for notification endpoints. Returns the caller's user id,
@@ -26,6 +31,29 @@ export function guardNotificationRequest(
 		return { ok: false, response: json({ error: "forbidden" }, { status: 403 }) };
 	}
 	return { ok: true, userId: locals.user.id };
+}
+
+/**
+ * Guard for channel-notification endpoints - needs the full RequestEvent (not just locals)
+ * to resolve the caller's Discord access token, then re-verifies live Manage Server/Administrator
+ * permission on guildId. Never trust a client-supplied guildId without this re-check.
+ */
+export async function guardChannelRequest(
+	event: RequestEvent,
+	guildId: string
+): Promise<{ ok: true; userId: string } | { ok: false; response: Response }> {
+	const base = guardNotificationRequest(event.locals);
+	if (!base.ok) return base;
+
+	const accessToken = await getDiscordAccessToken(event);
+	if (!accessToken) {
+		return { ok: false, response: json({ error: "missing_discord_token" }, { status: 401 }) };
+	}
+	const manageable = await isGuildManageableByUser(accessToken, guildId);
+	if (!manageable) {
+		return { ok: false, response: json({ error: "forbidden" }, { status: 403 }) };
+	}
+	return { ok: true, userId: base.userId };
 }
 
 export function notificationErrorResponse(error: unknown): Response {
@@ -54,6 +82,24 @@ export function toTemplateDto(row: NotificationTemplate): NotificationTemplateDt
 export function toSubscriptionDto(row: NotificationSubscription): NotificationSubscriptionDto {
 	return {
 		id: row.id,
+		type: row.type,
+		templateId: row.templateId,
+		name: row.name,
+		enabled: row.enabled,
+		filters: row.filters,
+		mode: row.mode,
+		schedule: row.schedule,
+		createdAt: toIso(row.createdAt),
+		updatedAt: toIso(row.updatedAt)
+	};
+}
+
+export function toChannelSubscriptionDto(
+	row: NotificationChannelSubscription
+): NotificationChannelSubscriptionDto {
+	return {
+		id: row.id,
+		channelId: row.channelId,
 		type: row.type,
 		templateId: row.templateId,
 		name: row.name,

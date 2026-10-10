@@ -73,7 +73,11 @@ export const auth = IS_AUTH_ENABLED && authSecret
 					clientId: discordConfig?.clientId ?? "",
 					clientSecret: discordConfig?.clientSecret ?? "",
 					disableDefaultScope: true,
-					scope: ["identify", "guilds.members.read"],
+					// "guilds" (distinct from "guilds.members.read") unlocks GET /users/@me/guilds, which
+					// returns each guild with a precomputed `permissions` bitfield for the current user -
+					// needed to check ADMINISTRATOR/MANAGE_GUILD for channel-notification admin gating.
+					// Existing sessions won't have this scope until the user logs out and back in.
+					scope: ["identify", "guilds.members.read", "guilds"],
 					mapProfileToUser: (profile) => ({
 						discordId: profile.id,
 						name: profile.global_name || profile.username,

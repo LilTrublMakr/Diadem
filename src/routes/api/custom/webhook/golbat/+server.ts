@@ -4,10 +4,15 @@ import {
 	getTracker,
 	getUserDiscordId
 } from "@/lib/server/db/internal/repository";
-import type { NotificationSubscription } from "@/lib/server/db/internal/schema";
+import type {
+	NotificationChannelSubscription,
+	NotificationSubscription
+} from "@/lib/server/db/internal/schema";
 import { getServerConfig } from "@/lib/services/config/config.server";
-import { sendDirectMessage } from "@/lib/server/notifications/bot";
+import { sendChannelMessage, sendDirectMessage } from "@/lib/server/notifications/bot";
 import {
+	getChannelSubscriptionCandidates,
+	getChannelSubscriptionsByType,
 	getPokemonSubscriptionCandidates,
 	getSubscriptionsByType
 } from "@/lib/server/notifications/matchCache";
@@ -476,13 +481,20 @@ function matchesGymFilters(context: GymTemplateContext, filters: GymSubscription
 	return true;
 }
 
-function isSubscriptionActiveNow(subscription: NotificationSubscription): boolean {
+// Narrowed to the two fields actually used, so both NotificationSubscription (DM, keyed by
+// userId) and NotificationChannelSubscription (admin-configured, keyed by guildId) satisfy it.
+function isSubscriptionActiveNow(
+	subscription: Pick<NotificationSubscription, "mode" | "schedule">
+): boolean {
 	if (subscription.mode !== "scheduled") return true;
 	return !!subscription.schedule && isScheduleActiveNow(subscription.schedule);
 }
 
 async function matchesArea(
-	subscription: NotificationSubscription,
+	// ownerId resolves "own"/"notificationArea" geofences — a DM subscription's recipient for
+	// NotificationSubscription, the configuring admin for a channel subscription (there's no
+	// single "recipient" to scope a channel post's own-area to, so the admin's own areas stand in).
+	subscription: { filters: NotificationSubscription["filters"]; ownerId: string },
 	// Structural — only latitude/longitude are ever read, so any type's context satisfies this.
 	context: { latitude: number; longitude: number },
 	thisFetch: typeof fetch
@@ -498,18 +510,45 @@ async function matchesArea(
 	}
 
 	if (areaSource === "notificationArea") {
-		const area = await getNotificationArea(subscription.userId, areaId);
+		const area = await getNotificationArea(subscription.ownerId, areaId);
 		if (!area) return false;
 		return booleanPointInPolygon(pt, area.geofence);
 	}
 
-	const area = await getScanArea(subscription.userId, areaId);
+	const area = await getScanArea(subscription.ownerId, areaId);
 	if (!area) return false;
 	return booleanPointInPolygon(pt, area.geofence);
 }
 
 const MAP_IMAGE_TAG = "attachment://map.png";
 const POKEMON_IMAGE_TAG = "attachment://pokemon.png";
+
+const DEFAULT_POKEMON_EMBED = {
+	content:
+		'{{pokemonName}} · {{iv}}% · {{cp}}  CP{{#if (isnt weather "None")}} {{{weatherEmoji}}}{{/if}}',
+	title: "{{{type1Emoji}}}{{{type2Emoji}}} {{pokemonName}}",
+	description:
+		'Despawns <t:{{despawnUnix}}:R> at {{despawnTime}}\n{{#if (or trackedShundo trackedHundo trackedShiny trackedNundo)}}\nYour Collection:{{#if trackedShundoEmoji}} {{trackedShundoEmoji}}{{/if}}{{#if trackedHundoEmoji}} {{trackedHundoEmoji}}{{/if}}{{#if trackedShinyEmoji}} {{trackedShinyEmoji}}{{/if}}{{#if trackedNundoEmoji}} {{trackedNundoEmoji}}{{/if}}\n{{/if}}\n{{#if (isnt weather "None")}}\nWeather boosted: {{weather}} {{{weatherEmoji}}}\n{{/if}}\n{{#if evolvesTo.length}}\nCan evolve into: {{#each evolvesTo}}[{{fullName}}](https://pogovt.com/pokedex/{{pokemonId}}){{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}\nQuick: {{{quickMoveEmoji}}} {{quickMove}}, Charge: {{{chargeMoveEmoji}}} {{chargeMove}}\nShiny Rate: {{shinyRateReduced}} ({{shinyRatePercent}})\n{{#with (filterRank pvpLittle 25) as |ranked|}}\n{{#if ranked.length}}\n**Little League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}\n{{#with (filterRank pvpGreat 25) as |ranked|}}\n{{#if ranked.length}}\n**Great League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}\n{{#with (filterRank pvpUltra 25) as |ranked|}}\n{{#if ranked.length}}\n**Ultra League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}',
+	color: "#FF8000",
+	thumbnailUrl: "{{{pokemonImageUrl}}}",
+	imageUrl: "{{{mapImageUrl}}}",
+	footerText: "",
+	url: "",
+	fields: [
+		{
+			name: "Directions",
+			value:
+				"[Waze]({{{wazeMapUrl}}}) | [Google]({{{googleMapsUrl}}}) | [Apple]({{{appleMapsUrl}}})",
+			inline: false
+		},
+		{
+			name: "Links",
+			value:
+				"[View on Map]({{{diademUrl}}}) | [Pokemon Page](https://pogovt.com/pokemon/{{pokemonId}})",
+			inline: false
+		}
+	]
+};
 
 async function deliver(
 	subscription: NotificationSubscription,
@@ -528,7 +567,14 @@ async function deliver(
 	);
 	if ((subscription.filters as PokemonSubscriptionFilters).predictedShinyOnly && !shinyFor.length)
 		return;
-	if (!(await matchesArea(subscription, context, thisFetch))) return;
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.userId },
+			context,
+			thisFetch
+		))
+	)
+		return;
 
 	// Tracked-collection badges are per-recipient, not a fact about the event — resolve this
 	// user's own pokemon_tracker row before rendering (see applyTrackedBadges' docs).
@@ -546,35 +592,7 @@ async function deliver(
 
 	const embed = template
 		? renderEmbed(template.embed, userContext)
-		: renderEmbed(
-				{
-					content:
-						'{{pokemonName}} · {{iv}}% · {{cp}}  CP{{#if (isnt weather "None")}} {{{weatherEmoji}}}{{/if}}',
-					title: "{{{type1Emoji}}}{{{type2Emoji}}} {{pokemonName}}",
-					description:
-						'Despawns <t:{{despawnUnix}}:R> at {{despawnTime}}\n{{#if (or trackedShundo trackedHundo trackedShiny trackedNundo)}}\nYour Collection:{{#if trackedShundoEmoji}} {{trackedShundoEmoji}}{{/if}}{{#if trackedHundoEmoji}} {{trackedHundoEmoji}}{{/if}}{{#if trackedShinyEmoji}} {{trackedShinyEmoji}}{{/if}}{{#if trackedNundoEmoji}} {{trackedNundoEmoji}}{{/if}}\n{{/if}}\n{{#if (isnt weather "None")}}\nWeather boosted: {{weather}} {{{weatherEmoji}}}\n{{/if}}\n{{#if evolvesTo.length}}\nCan evolve into: {{#each evolvesTo}}[{{fullName}}](https://pogovt.com/pokedex/{{pokemonId}}){{#unless @last}}, {{/unless}}{{/each}}\n{{/if}}\nQuick: {{{quickMoveEmoji}}} {{quickMove}}, Charge: {{{chargeMoveEmoji}}} {{chargeMove}}\nShiny Rate: {{shinyRateReduced}} ({{shinyRatePercent}})\n{{#with (filterRank pvpLittle 25) as |ranked|}}\n{{#if ranked.length}}\n**Little League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}\n{{#with (filterRank pvpGreat 25) as |ranked|}}\n{{#if ranked.length}}\n**Great League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}\n{{#with (filterRank pvpUltra 25) as |ranked|}}\n{{#if ranked.length}}\n**Ultra League:**\n{{#each ranked}} - {{fullName}} #{{rank}} @{{cp}}CP (Lvl. {{levelWithCap}})\n{{/each}}\n{{/if}}\n{{/with}}',
-					color: "#FF8000",
-					thumbnailUrl: "{{{pokemonImageUrl}}}",
-					imageUrl: "{{{mapImageUrl}}}",
-					footerText: "",
-					url: "",
-					fields: [
-						{
-							name: "Directions",
-							value:
-								"[Waze]({{{wazeMapUrl}}}) | [Google]({{{googleMapsUrl}}}) | [Apple]({{{appleMapsUrl}}})",
-							inline: false
-						},
-						{
-							name: "Links",
-							value:
-								"[View on Map]({{{diademUrl}}}) | [Pokemon Page](https://pogovt.com/pokemon/{{pokemonId}})",
-							inline: false
-						}
-					]
-				},
-				userContext
-			);
+		: renderEmbed(DEFAULT_POKEMON_EMBED, userContext);
 
 	const usesMapImage = embed.imageUrl === MAP_IMAGE_TAG || embed.thumbnailUrl === MAP_IMAGE_TAG;
 	const usesSpriteImage =
@@ -593,6 +611,53 @@ async function deliver(
 	}
 
 	await sendDirectMessage(discordId, {
+		content: embed.content,
+		embed,
+		attachments: [
+			mapImage ? { filename: "map.png", data: mapImage } : null,
+			spriteImage ? { filename: "pokemon.png", data: spriteImage } : null
+		]
+	});
+}
+
+// Channel equivalent of deliver() - no per-recipient personalization (predictShiny,
+// applyTrackedBadges) since a channel has no single linked account; renders the raw event
+// context instead of a user-specific one. Missing tracked*/predictedShiny fields in the default
+// embed's handlebars conditionals just evaluate falsy, so those lines simply don't render.
+async function deliverPokemonChannel(
+	subscription: NotificationChannelSubscription,
+	context: PokemonTemplateContext,
+	getMapImage: (style: string | undefined) => Promise<Buffer | null>,
+	getSpriteImage: () => Promise<Buffer | null>,
+	thisFetch: typeof fetch
+) {
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.createdByUserId },
+			context,
+			thisFetch
+		))
+	)
+		return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.createdByUserId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return; // template was deleted, skip silently
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(DEFAULT_POKEMON_EMBED, context);
+
+	const usesMapImage = embed.imageUrl === MAP_IMAGE_TAG || embed.thumbnailUrl === MAP_IMAGE_TAG;
+	const usesSpriteImage =
+		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
+	const [mapImage, spriteImage] = await Promise.all([
+		usesMapImage ? getMapImage(embed.mapStyle) : Promise.resolve(null),
+		usesSpriteImage ? getSpriteImage() : Promise.resolve(null)
+	]);
+
+	await sendChannelMessage(subscription.channelId, {
 		content: embed.content,
 		embed,
 		attachments: [
@@ -636,24 +701,54 @@ async function handlePokemon(message: GolbatPokemonMessage, thisFetch: typeof fe
 		return spriteImage;
 	};
 
-	await Promise.all(
-		matches.map((sub) =>
-			deliver(sub, context, message.encounter_id, getMapImage, getSpriteImage, thisFetch)
-		)
+	const channelCandidates = await getChannelSubscriptionCandidates(message.pokemon_id);
+	const channelMatches = channelCandidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesFilters(context, sub.filters as PokemonSubscriptionFilters)
 	);
+
+	await Promise.all([
+		...matches.map((sub) =>
+			deliver(sub, context, message.encounter_id, getMapImage, getSpriteImage, thisFetch)
+		),
+		...channelMatches.map((sub) =>
+			deliverPokemonChannel(sub, context, getMapImage, getSpriteImage, thisFetch)
+		)
+	]);
 }
 
 // No tracked-badges overlay (pokemon-only) and no map thumbnail yet (no verified Rampardos raid
 // template — see buildRaidContext's mapImageUrl comment) — otherwise the same shape as deliver()
 // above: area check, render, resolve Discord id, send. Boss sprite reuses the same
 // attachment-based sprite fetch pokemon spawns use (species-only, no wild-encounter dependency).
+const DEFAULT_RAID_EMBED = {
+	content: "{{#if isEgg}}Level {{level}} egg{{else}}{{pokemonName}} raid{{/if}} at {{gymName}}",
+	title: "{{#if isEgg}}Level {{level}} Egg{{else}}{{pokemonName}} Raid{{/if}}",
+	description: "{{gymName}}{{#unless isEgg}}\nCP/Moves: {{quickMove}} / {{chargeMove}}{{/unless}}",
+	color: "3447003",
+	thumbnailUrl: "{{{pokemonImageUrl}}}",
+	imageUrl: "",
+	footerText:
+		"{{#if isEgg}}Hatches at {{hatchTime}}{{else}}Despawns at {{raidEndTime}}{{/if}} ({{minutesLeft}}m left)",
+	url: "{{{googleMapsUrl}}}",
+	fields: []
+};
+
 async function deliverRaid(
 	subscription: NotificationSubscription,
 	context: RaidTemplateContext,
 	getSpriteImage: () => Promise<Buffer | null>,
 	thisFetch: typeof fetch
 ) {
-	if (!(await matchesArea(subscription, context, thisFetch))) return;
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.userId },
+			context,
+			thisFetch
+		))
+	)
+		return;
 
 	const template = subscription.templateId
 		? await getNotificationTemplate(subscription.userId, subscription.templateId)
@@ -662,23 +757,7 @@ async function deliverRaid(
 
 	const embed = template
 		? renderEmbed(template.embed, context)
-		: renderEmbed(
-				{
-					content:
-						"{{#if isEgg}}Level {{level}} egg{{else}}{{pokemonName}} raid{{/if}} at {{gymName}}",
-					title: "{{#if isEgg}}Level {{level}} Egg{{else}}{{pokemonName}} Raid{{/if}}",
-					description:
-						"{{gymName}}{{#unless isEgg}}\nCP/Moves: {{quickMove}} / {{chargeMove}}{{/unless}}",
-					color: "3447003",
-					thumbnailUrl: "{{{pokemonImageUrl}}}",
-					imageUrl: "",
-					footerText:
-						"{{#if isEgg}}Hatches at {{hatchTime}}{{else}}Despawns at {{raidEndTime}}{{/if}} ({{minutesLeft}}m left)",
-					url: "{{{googleMapsUrl}}}",
-					fields: []
-				},
-				context
-			);
+		: renderEmbed(DEFAULT_RAID_EMBED, context);
 
 	const usesSpriteImage =
 		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
@@ -691,6 +770,41 @@ async function deliverRaid(
 	}
 
 	await sendDirectMessage(discordId, {
+		content: embed.content,
+		embed,
+		attachments: [spriteImage ? { filename: "pokemon.png", data: spriteImage } : null]
+	});
+}
+
+async function deliverRaidChannel(
+	subscription: NotificationChannelSubscription,
+	context: RaidTemplateContext,
+	getSpriteImage: () => Promise<Buffer | null>,
+	thisFetch: typeof fetch
+) {
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.createdByUserId },
+			context,
+			thisFetch
+		))
+	)
+		return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.createdByUserId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return;
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(DEFAULT_RAID_EMBED, context);
+
+	const usesSpriteImage =
+		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
+	const spriteImage = usesSpriteImage ? await getSpriteImage() : null;
+
+	await sendChannelMessage(subscription.channelId, {
 		content: embed.content,
 		embed,
 		attachments: [spriteImage ? { filename: "pokemon.png", data: spriteImage } : null]
@@ -728,18 +842,47 @@ async function handleRaid(message: GolbatRaidMessage, thisFetch: typeof fetch) {
 		return spriteImage;
 	};
 
-	await Promise.all(matches.map((sub) => deliverRaid(sub, context, getSpriteImage, thisFetch)));
+	const channelCandidates = await getChannelSubscriptionsByType("raid");
+	const channelMatches = channelCandidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesRaidFilters(context, sub.filters as RaidSubscriptionFilters)
+	);
+
+	await Promise.all([
+		...matches.map((sub) => deliverRaid(sub, context, getSpriteImage, thisFetch)),
+		...channelMatches.map((sub) => deliverRaidChannel(sub, context, getSpriteImage, thisFetch))
+	]);
 }
 
 // Same shape as deliverRaid — no tracked badges, boss sprite reuses the shared species-only
 // sprite fetch, no map thumbnail yet.
+const DEFAULT_MAXBATTLE_EMBED = {
+	content: "{{#if gmax}}Gigantamax {{/if}}{{pokemonName}} battle at {{stationName}}",
+	title: "{{#if gmax}}Gigantamax {{/if}}{{pokemonName}} Max Battle",
+	description: "{{stationName}} — Level {{level}}",
+	color: "3447003",
+	thumbnailUrl: "{{{pokemonImageUrl}}}",
+	imageUrl: "",
+	footerText: "Battle ends at {{battleEndTime}} ({{minutesLeft}}m left)",
+	url: "{{{googleMapsUrl}}}",
+	fields: []
+};
+
 async function deliverMaxBattle(
 	subscription: NotificationSubscription,
 	context: MaxBattleTemplateContext,
 	getSpriteImage: () => Promise<Buffer | null>,
 	thisFetch: typeof fetch
 ) {
-	if (!(await matchesArea(subscription, context, thisFetch))) return;
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.userId },
+			context,
+			thisFetch
+		))
+	)
+		return;
 
 	const template = subscription.templateId
 		? await getNotificationTemplate(subscription.userId, subscription.templateId)
@@ -748,20 +891,7 @@ async function deliverMaxBattle(
 
 	const embed = template
 		? renderEmbed(template.embed, context)
-		: renderEmbed(
-				{
-					content: "{{#if gmax}}Gigantamax {{/if}}{{pokemonName}} battle at {{stationName}}",
-					title: "{{#if gmax}}Gigantamax {{/if}}{{pokemonName}} Max Battle",
-					description: "{{stationName}} — Level {{level}}",
-					color: "3447003",
-					thumbnailUrl: "{{{pokemonImageUrl}}}",
-					imageUrl: "",
-					footerText: "Battle ends at {{battleEndTime}} ({{minutesLeft}}m left)",
-					url: "{{{googleMapsUrl}}}",
-					fields: []
-				},
-				context
-			);
+		: renderEmbed(DEFAULT_MAXBATTLE_EMBED, context);
 
 	const usesSpriteImage =
 		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
@@ -774,6 +904,41 @@ async function deliverMaxBattle(
 	}
 
 	await sendDirectMessage(discordId, {
+		content: embed.content,
+		embed,
+		attachments: [spriteImage ? { filename: "pokemon.png", data: spriteImage } : null]
+	});
+}
+
+async function deliverMaxBattleChannel(
+	subscription: NotificationChannelSubscription,
+	context: MaxBattleTemplateContext,
+	getSpriteImage: () => Promise<Buffer | null>,
+	thisFetch: typeof fetch
+) {
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.createdByUserId },
+			context,
+			thisFetch
+		))
+	)
+		return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.createdByUserId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return;
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(DEFAULT_MAXBATTLE_EMBED, context);
+
+	const usesSpriteImage =
+		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
+	const spriteImage = usesSpriteImage ? await getSpriteImage() : null;
+
+	await sendChannelMessage(subscription.channelId, {
 		content: embed.content,
 		embed,
 		attachments: [spriteImage ? { filename: "pokemon.png", data: spriteImage } : null]
@@ -804,20 +969,47 @@ async function handleMaxBattle(message: GolbatMaxBattleMessage, thisFetch: typeo
 		return spriteImage;
 	};
 
-	await Promise.all(
-		matches.map((sub) => deliverMaxBattle(sub, context, getSpriteImage, thisFetch))
+	const channelCandidates = await getChannelSubscriptionsByType("maxbattle");
+	const channelMatches = channelCandidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesMaxBattleFilters(context, sub.filters as MaxBattleSubscriptionFilters)
 	);
+
+	await Promise.all([
+		...matches.map((sub) => deliverMaxBattle(sub, context, getSpriteImage, thisFetch)),
+		...channelMatches.map((sub) => deliverMaxBattleChannel(sub, context, getSpriteImage, thisFetch))
+	]);
 }
 
 // Same shape as deliverRaid/deliverMaxBattle — no tracked badges, sprite reuses the shared
 // species-only sprite fetch (only meaningful for a pokemon-encounter reward), no map thumbnail.
+const DEFAULT_QUEST_EMBED = {
+	content: "{{questTitle}} at {{pokestopName}}",
+	title: "Field Research",
+	description: "{{pokestopName}}\nReward: {{rewardString}}",
+	color: "3447003",
+	thumbnailUrl: "{{{pokemonImageUrl}}}",
+	imageUrl: "",
+	footerText: "{{#if withAr}}AR Quest{{else}}Standard Quest{{/if}}",
+	url: "{{{googleMapsUrl}}}",
+	fields: []
+};
+
 async function deliverQuest(
 	subscription: NotificationSubscription,
 	context: QuestTemplateContext,
 	getSpriteImage: () => Promise<Buffer | null>,
 	thisFetch: typeof fetch
 ) {
-	if (!(await matchesArea(subscription, context, thisFetch))) return;
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.userId },
+			context,
+			thisFetch
+		))
+	)
+		return;
 
 	const template = subscription.templateId
 		? await getNotificationTemplate(subscription.userId, subscription.templateId)
@@ -826,20 +1018,7 @@ async function deliverQuest(
 
 	const embed = template
 		? renderEmbed(template.embed, context)
-		: renderEmbed(
-				{
-					content: "{{questTitle}} at {{pokestopName}}",
-					title: "Field Research",
-					description: "{{pokestopName}}\nReward: {{rewardString}}",
-					color: "3447003",
-					thumbnailUrl: "{{{pokemonImageUrl}}}",
-					imageUrl: "",
-					footerText: "{{#if withAr}}AR Quest{{else}}Standard Quest{{/if}}",
-					url: "{{{googleMapsUrl}}}",
-					fields: []
-				},
-				context
-			);
+		: renderEmbed(DEFAULT_QUEST_EMBED, context);
 
 	const usesSpriteImage =
 		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
@@ -852,6 +1031,41 @@ async function deliverQuest(
 	}
 
 	await sendDirectMessage(discordId, {
+		content: embed.content,
+		embed,
+		attachments: [spriteImage ? { filename: "pokemon.png", data: spriteImage } : null]
+	});
+}
+
+async function deliverQuestChannel(
+	subscription: NotificationChannelSubscription,
+	context: QuestTemplateContext,
+	getSpriteImage: () => Promise<Buffer | null>,
+	thisFetch: typeof fetch
+) {
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.createdByUserId },
+			context,
+			thisFetch
+		))
+	)
+		return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.createdByUserId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return;
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(DEFAULT_QUEST_EMBED, context);
+
+	const usesSpriteImage =
+		embed.imageUrl === POKEMON_IMAGE_TAG || embed.thumbnailUrl === POKEMON_IMAGE_TAG;
+	const spriteImage = usesSpriteImage ? await getSpriteImage() : null;
+
+	await sendChannelMessage(subscription.channelId, {
 		content: embed.content,
 		embed,
 		attachments: [spriteImage ? { filename: "pokemon.png", data: spriteImage } : null]
@@ -882,17 +1096,47 @@ async function handleQuest(message: GolbatQuestMessage, thisFetch: typeof fetch)
 		return spriteImage;
 	};
 
-	await Promise.all(matches.map((sub) => deliverQuest(sub, context, getSpriteImage, thisFetch)));
+	const channelCandidates = await getChannelSubscriptionsByType("quest");
+	const channelMatches = channelCandidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesQuestFilters(context, sub.filters as QuestSubscriptionFilters)
+	);
+
+	await Promise.all([
+		...matches.map((sub) => deliverQuest(sub, context, getSpriteImage, thisFetch)),
+		...channelMatches.map((sub) => deliverQuestChannel(sub, context, getSpriteImage, thisFetch))
+	]);
 }
 
 // No sprite/map image — an invasion isn't about one specific pokemon the way a raid/maxbattle
 // boss or quest reward is (lineup is a list, not a single subject).
+const DEFAULT_INVASION_EMBED = {
+	content: "Pokestop invasion at {{pokestopName}}",
+	title: "Pokestop Invasion",
+	description:
+		'{{pokestopName}}\n{{#if (eq kind "grunt")}}{{characterName}}{{else}}{{kind}}{{/if}}',
+	color: "3447003",
+	thumbnailUrl: "",
+	imageUrl: "",
+	footerText: "Ends {{minutesLeft}}m from now",
+	url: "{{{googleMapsUrl}}}",
+	fields: []
+};
+
 async function deliverInvasion(
 	subscription: NotificationSubscription,
 	context: InvasionTemplateContext,
 	thisFetch: typeof fetch
 ) {
-	if (!(await matchesArea(subscription, context, thisFetch))) return;
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.userId },
+			context,
+			thisFetch
+		))
+	)
+		return;
 
 	const template = subscription.templateId
 		? await getNotificationTemplate(subscription.userId, subscription.templateId)
@@ -901,21 +1145,7 @@ async function deliverInvasion(
 
 	const embed = template
 		? renderEmbed(template.embed, context)
-		: renderEmbed(
-				{
-					content: "Pokestop invasion at {{pokestopName}}",
-					title: "Pokestop Invasion",
-					description:
-						'{{pokestopName}}\n{{#if (eq kind "grunt")}}{{characterName}}{{else}}{{kind}}{{/if}}',
-					color: "3447003",
-					thumbnailUrl: "",
-					imageUrl: "",
-					footerText: "Ends {{minutesLeft}}m from now",
-					url: "{{{googleMapsUrl}}}",
-					fields: []
-				},
-				context
-			);
+		: renderEmbed(DEFAULT_INVASION_EMBED, context);
 
 	const discordId = await getUserDiscordId(subscription.userId);
 	if (!discordId) {
@@ -924,6 +1154,36 @@ async function deliverInvasion(
 	}
 
 	await sendDirectMessage(discordId, { content: embed.content, embed, attachments: [] });
+}
+
+async function deliverInvasionChannel(
+	subscription: NotificationChannelSubscription,
+	context: InvasionTemplateContext,
+	thisFetch: typeof fetch
+) {
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.createdByUserId },
+			context,
+			thisFetch
+		))
+	)
+		return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.createdByUserId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return;
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(DEFAULT_INVASION_EMBED, context);
+
+	await sendChannelMessage(subscription.channelId, {
+		content: embed.content,
+		embed,
+		attachments: []
+	});
 }
 
 async function handleInvasion(message: GolbatInvasionMessage, thisFetch: typeof fetch) {
@@ -937,16 +1197,45 @@ async function handleInvasion(message: GolbatInvasionMessage, thisFetch: typeof 
 			matchesInvasionFilters(context, sub.filters as InvasionSubscriptionFilters)
 	);
 
-	await Promise.all(matches.map((sub) => deliverInvasion(sub, context, thisFetch)));
+	const channelCandidates = await getChannelSubscriptionsByType("invasion");
+	const channelMatches = channelCandidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesInvasionFilters(context, sub.filters as InvasionSubscriptionFilters)
+	);
+
+	await Promise.all([
+		...matches.map((sub) => deliverInvasion(sub, context, thisFetch)),
+		...channelMatches.map((sub) => deliverInvasionChannel(sub, context, thisFetch))
+	]);
 }
 
 // No sprite/map image, same reasoning as invasion — a lure isn't about one specific pokemon.
+const DEFAULT_LURE_EMBED = {
+	content: "{{lureTypeName}} at {{pokestopName}}",
+	title: "{{lureTypeName}}",
+	description: "{{pokestopName}}",
+	color: "3447003",
+	thumbnailUrl: "",
+	imageUrl: "",
+	footerText: "Expires {{minutesLeft}}m from now",
+	url: "{{{googleMapsUrl}}}",
+	fields: []
+};
+
 async function deliverLure(
 	subscription: NotificationSubscription,
 	context: LureTemplateContext,
 	thisFetch: typeof fetch
 ) {
-	if (!(await matchesArea(subscription, context, thisFetch))) return;
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.userId },
+			context,
+			thisFetch
+		))
+	)
+		return;
 
 	const template = subscription.templateId
 		? await getNotificationTemplate(subscription.userId, subscription.templateId)
@@ -955,20 +1244,7 @@ async function deliverLure(
 
 	const embed = template
 		? renderEmbed(template.embed, context)
-		: renderEmbed(
-				{
-					content: "{{lureTypeName}} at {{pokestopName}}",
-					title: "{{lureTypeName}}",
-					description: "{{pokestopName}}",
-					color: "3447003",
-					thumbnailUrl: "",
-					imageUrl: "",
-					footerText: "Expires {{minutesLeft}}m from now",
-					url: "{{{googleMapsUrl}}}",
-					fields: []
-				},
-				context
-			);
+		: renderEmbed(DEFAULT_LURE_EMBED, context);
 
 	const discordId = await getUserDiscordId(subscription.userId);
 	if (!discordId) {
@@ -977,6 +1253,36 @@ async function deliverLure(
 	}
 
 	await sendDirectMessage(discordId, { content: embed.content, embed, attachments: [] });
+}
+
+async function deliverLureChannel(
+	subscription: NotificationChannelSubscription,
+	context: LureTemplateContext,
+	thisFetch: typeof fetch
+) {
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.createdByUserId },
+			context,
+			thisFetch
+		))
+	)
+		return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.createdByUserId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return;
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(DEFAULT_LURE_EMBED, context);
+
+	await sendChannelMessage(subscription.channelId, {
+		content: embed.content,
+		embed,
+		attachments: []
+	});
 }
 
 async function handleLure(message: GolbatLureMessage, thisFetch: typeof fetch) {
@@ -990,16 +1296,45 @@ async function handleLure(message: GolbatLureMessage, thisFetch: typeof fetch) {
 			matchesLureFilters(context, sub.filters as LureSubscriptionFilters)
 	);
 
-	await Promise.all(matches.map((sub) => deliverLure(sub, context, thisFetch)));
+	const channelCandidates = await getChannelSubscriptionsByType("lure");
+	const channelMatches = channelCandidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesLureFilters(context, sub.filters as LureSubscriptionFilters)
+	);
+
+	await Promise.all([
+		...matches.map((sub) => deliverLure(sub, context, thisFetch)),
+		...channelMatches.map((sub) => deliverLureChannel(sub, context, thisFetch))
+	]);
 }
 
 // No sprite/map image, same reasoning as invasion/lure — a gym change isn't about one pokemon.
+const DEFAULT_GYM_EMBED = {
+	content: "{{gymName}} is now {{teamName}}",
+	title: "Gym Update",
+	description: "{{gymName}}\n{{oldTeamName}} → {{teamName}}",
+	color: "3447003",
+	thumbnailUrl: "",
+	imageUrl: "",
+	footerText: "{{slotsAvailable}}/6 slots open{{#if inBattle}} — In Battle!{{/if}}",
+	url: "{{{googleMapsUrl}}}",
+	fields: []
+};
+
 async function deliverGym(
 	subscription: NotificationSubscription,
 	context: GymTemplateContext,
 	thisFetch: typeof fetch
 ) {
-	if (!(await matchesArea(subscription, context, thisFetch))) return;
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.userId },
+			context,
+			thisFetch
+		))
+	)
+		return;
 
 	const template = subscription.templateId
 		? await getNotificationTemplate(subscription.userId, subscription.templateId)
@@ -1008,20 +1343,7 @@ async function deliverGym(
 
 	const embed = template
 		? renderEmbed(template.embed, context)
-		: renderEmbed(
-				{
-					content: "{{gymName}} is now {{teamName}}",
-					title: "Gym Update",
-					description: "{{gymName}}\n{{oldTeamName}} → {{teamName}}",
-					color: "3447003",
-					thumbnailUrl: "",
-					imageUrl: "",
-					footerText: "{{slotsAvailable}}/6 slots open{{#if inBattle}} — In Battle!{{/if}}",
-					url: "{{{googleMapsUrl}}}",
-					fields: []
-				},
-				context
-			);
+		: renderEmbed(DEFAULT_GYM_EMBED, context);
 
 	const discordId = await getUserDiscordId(subscription.userId);
 	if (!discordId) {
@@ -1030,6 +1352,36 @@ async function deliverGym(
 	}
 
 	await sendDirectMessage(discordId, { content: embed.content, embed, attachments: [] });
+}
+
+async function deliverGymChannel(
+	subscription: NotificationChannelSubscription,
+	context: GymTemplateContext,
+	thisFetch: typeof fetch
+) {
+	if (
+		!(await matchesArea(
+			{ filters: subscription.filters, ownerId: subscription.createdByUserId },
+			context,
+			thisFetch
+		))
+	)
+		return;
+
+	const template = subscription.templateId
+		? await getNotificationTemplate(subscription.createdByUserId, subscription.templateId)
+		: null;
+	if (!template && subscription.templateId) return;
+
+	const embed = template
+		? renderEmbed(template.embed, context)
+		: renderEmbed(DEFAULT_GYM_EMBED, context);
+
+	await sendChannelMessage(subscription.channelId, {
+		content: embed.content,
+		embed,
+		attachments: []
+	});
 }
 
 async function handleGym(message: GolbatGymMessage, thisFetch: typeof fetch) {
@@ -1082,7 +1434,17 @@ async function handleGym(message: GolbatGymMessage, thisFetch: typeof fetch) {
 			matchesGymFilters(context, sub.filters as GymSubscriptionFilters)
 	);
 
-	await Promise.all(matches.map((sub) => deliverGym(sub, context, thisFetch)));
+	const channelCandidates = await getChannelSubscriptionsByType("gym");
+	const channelMatches = channelCandidates.filter(
+		(sub) =>
+			isSubscriptionActiveNow(sub) &&
+			matchesGymFilters(context, sub.filters as GymSubscriptionFilters)
+	);
+
+	await Promise.all([
+		...matches.map((sub) => deliverGym(sub, context, thisFetch)),
+		...channelMatches.map((sub) => deliverGymChannel(sub, context, thisFetch))
+	]);
 }
 
 export const POST: RequestHandler = async ({ request, fetch }) => {

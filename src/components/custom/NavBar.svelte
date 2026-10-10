@@ -213,6 +213,13 @@
 								>
 									My Notifications
 								</a>
+								<a
+									href="/notifications/channels"
+									onclick={() => (dropdownOpen = false)}
+									class="block px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+								>
+									Channel Notifications
+								</a>
 							{/if}
 							<button
 								onclick={logout}
@@ -373,6 +380,13 @@
 							class="py-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
 						>
 							My Notifications
+						</a>
+						<a
+							href="/notifications/channels"
+							onclick={closeMenu}
+							class="py-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+						>
+							Channel Notifications
 						</a>
 					{/if}
 					<button
