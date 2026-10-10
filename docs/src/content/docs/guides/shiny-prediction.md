@@ -26,8 +26,11 @@ It is off by default.
 
 For each linked account the server computes
 `SHA1(encounter id as uint64 little-endian ‖ player id)`, uses the first 8 bytes (little-endian)
-as a `java.util.Random` seed, and rolls `nextInt(N)` for the species' current 1/N shiny odds. A
-roll of 0 means shiny for that account.
+as a `java.util.Random` seed, takes its first `next(31)` and computes `(N × next(31)) >> 31` for
+the species' current 1/N shiny odds. A result of 0 means shiny for that account. This is Java's
+`nextInt` power-of-two shortcut, which the game applies to every N (Java's real `nextInt` uses a
+modulo for odds like 1/25, the game doesn't), so a spawn shiny at 1/512 is shiny at every better
+odds too.
 
 The odds N come from the stats DB: each species' last-24h scanner shiny rate is matched to the
 closest known odds (1/512, 1/128, 1/64, 1/25, 1/10), with a strong lean toward 1/512 when there
