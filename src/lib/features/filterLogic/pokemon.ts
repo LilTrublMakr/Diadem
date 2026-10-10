@@ -45,6 +45,8 @@ function pokemonMatchesFilterset(data: PokemonData, filterset: FiltersetPokemon)
 		if (!rank || !inRange(rank, filterset.pvpRankUltra)) return false;
 	}
 
+	if (filterset.predictedShiny && !data.predicted_shiny) return false;
+
 	return true;
 }
 

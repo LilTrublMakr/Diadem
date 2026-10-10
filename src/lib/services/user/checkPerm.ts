@@ -181,6 +181,8 @@ export function isPointInAllowedArea(
 export class FeaturePermissionContext {
 	private readonly everywhere = new Set<FeaturesKey>();
 	private readonly areaPolygons = new Map<FeaturesKey, Feature<Polygon>[]>();
+	// The requesting user, for per-user data like personal shiny prediction (undefined = anonymous)
+	userId?: string;
 
 	constructor(perms: Perms, features: FeaturesKey[]) {
 		for (const feature of features) {

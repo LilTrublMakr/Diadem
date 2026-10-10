@@ -13,6 +13,8 @@ import {
 } from "@/lib/server/notifications/matchCache";
 import { isScheduleActiveNow } from "@/lib/features/notifications/scheduleActive";
 import { getKojiAreaById } from "@/lib/server/notifications/kojiAreaCache";
+import { predictShiny } from "@/lib/server/shinyPrediction/service";
+import { recordSpawn } from "@/lib/server/shinyPrediction/spawnIndex";
 import {
 	generatePokemonMapImage,
 	generatePokemonSpriteImage
@@ -512,16 +514,30 @@ const POKEMON_IMAGE_TAG = "attachment://pokemon.png";
 async function deliver(
 	subscription: NotificationSubscription,
 	context: PokemonTemplateContext,
+	encounterId: string,
 	getMapImage: (style: string | undefined) => Promise<Buffer | null>,
 	getSpriteImage: () => Promise<Buffer | null>,
 	thisFetch: typeof fetch
 ) {
+	// Per-recipient like tracked badges — shiny rolls differ per linked player id
+	const { accounts: shinyFor } = await predictShiny(
+		subscription.userId,
+		encounterId,
+		context.pokemonId,
+		context.form
+	);
+	if ((subscription.filters as PokemonSubscriptionFilters).predictedShinyOnly && !shinyFor.length)
+		return;
 	if (!(await matchesArea(subscription, context, thisFetch))) return;
 
 	// Tracked-collection badges are per-recipient, not a fact about the event — resolve this
 	// user's own pokemon_tracker row before rendering (see applyTrackedBadges' docs).
 	const tracker = await getTracker(subscription.userId, context.pokemonId, context.form);
-	const userContext = applyTrackedBadges(context, tracker);
+	const userContext = {
+		...applyTrackedBadges(context, tracker),
+		predictedShiny: shinyFor.length > 0,
+		predictedShinyAccounts: shinyFor.join(", ")
+	};
 
 	const template = subscription.templateId
 		? await getNotificationTemplate(subscription.userId, subscription.templateId)
@@ -587,6 +603,8 @@ async function deliver(
 }
 
 async function handlePokemon(message: GolbatPokemonMessage, thisFetch: typeof fetch) {
+	// Before dedup — every re-fire keeps the map's shiny-prediction spawn index fresh
+	recordSpawn(message);
 	if (isDuplicate(message)) return;
 
 	const context = await buildPokemonContext(message, thisFetch);
@@ -619,7 +637,9 @@ async function handlePokemon(message: GolbatPokemonMessage, thisFetch: typeof fe
 	};
 
 	await Promise.all(
-		matches.map((sub) => deliver(sub, context, getMapImage, getSpriteImage, thisFetch))
+		matches.map((sub) =>
+			deliver(sub, context, message.encounter_id, getMapImage, getSpriteImage, thisFetch)
+		)
 	);
 }
 

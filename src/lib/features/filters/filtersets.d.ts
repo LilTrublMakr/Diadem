@@ -80,6 +80,8 @@ export type FiltersetPokemon = BaseFilterset & {
 	pvpRankGreat?: MinMax;
 	pvpRankUltra?: MinMax;
 	notify?: boolean;
+	// Only spawns predicted shiny for one of the viewer's linked accounts (matched server-side)
+	predictedShiny?: boolean;
 };
 
 export type FiltersetPokestopPlain = BaseFilterset & {

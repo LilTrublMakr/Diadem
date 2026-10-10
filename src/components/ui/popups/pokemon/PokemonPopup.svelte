@@ -78,6 +78,7 @@
 		getFeaturedAttacks
 	} from "$lib/features/featuredAttacks.svelte";
 	import { findActiveFeaturedAttack } from "$lib/utils/featuredAttack";
+	import { getPersonalShiny } from "$lib/features/personalShiny.svelte";
 
 	export { image, overview, main };
 
@@ -216,6 +217,14 @@
 				title="Featured Attack available"
 			>
 				⚔️
+			</span>
+		{/if}
+		{#if getUserDetails().details && getPersonalShiny(data.id, data.pokemon_id, data.form ?? 0).length}
+			<span
+				class="absolute -top-0.5 -left-0.5 text-sm leading-none select-none pointer-events-none"
+				title="Predicted shiny for one of your linked accounts"
+			>
+				✨
 			</span>
 		{/if}
 	</div>
@@ -404,6 +413,17 @@
 					league: pvpNotice
 				})}
 			</BasicMainCard>
+		{/if}
+
+		<!--Personal shiny prediction-->
+		{#if getUserDetails().details}
+			{@const shinyFor = getPersonalShiny(data.id, data.pokemon_id, data.form ?? 0)}
+			{#if shinyFor.length}
+				<BasicMainCard class="flex gap-2 font-medium justify-center">
+					<Sparkles class="size-4 mt-1 text-yellow-500" />
+					Predicted shiny for you ({shinyFor.join(", ")})
+				</BasicMainCard>
+			{/if}
 		{/if}
 
 		<!--Featured Attack-->

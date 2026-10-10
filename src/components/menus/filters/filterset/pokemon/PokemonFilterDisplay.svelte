@@ -56,6 +56,9 @@
 	{#if data.size}
 		<AttributeDisplay label={m.pokemon_size()} value={getAttributeLabelSize(data.size)} />
 	{/if}
+	{#if data.predictedShiny}
+		<AttributeDisplay label="✨" value={m.predicted_shiny_for_me()} />
+	{/if}
 	{#if data.gender}
 		<AttributeDisplay
 			label={m.pokemon_gender()}

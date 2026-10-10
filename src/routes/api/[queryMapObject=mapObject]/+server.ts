@@ -114,6 +114,7 @@ export const POST: RequestHandler = async ({ request, locals, params, getClientA
 	}
 
 	const permissionContext = new FeaturePermissionContext(locals.perms, family);
+	permissionContext.userId = locals.user?.id;
 
 	const result = await queryMapObjects(
 		type,

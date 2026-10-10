@@ -6,6 +6,7 @@ import type {
 	NotificationTemplate,
 	PokemonTracker,
 	ScanArea,
+	ShinyAccount,
 	UserCollection
 } from "@/lib/server/db/internal/schema";
 import type { RawExportPokemon } from "@/lib/types/collectionExport";
@@ -176,6 +177,24 @@ export async function saveUserCollection(
 
 export async function deleteUserCollection(userId: string): Promise<void> {
 	await db.delete(table.userCollection).where(eq(table.userCollection.userId, userId));
+}
+
+export async function getShinyAccounts(userId: string): Promise<ShinyAccount[]> {
+	return db.select().from(table.shinyAccount).where(eq(table.shinyAccount.userId, userId));
+}
+
+export async function insertShinyAccount(
+	userId: string,
+	label: string,
+	playerId: string
+): Promise<void> {
+	await db.insert(table.shinyAccount).values({ userId, label, playerId });
+}
+
+export async function deleteShinyAccountRow(userId: string, id: number): Promise<void> {
+	await db
+		.delete(table.shinyAccount)
+		.where(and(eq(table.shinyAccount.userId, userId), eq(table.shinyAccount.id, id)));
 }
 
 // mysql2 doesn't auto-parse JSON columns, so drizzle returns them as raw strings

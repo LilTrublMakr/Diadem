@@ -5,7 +5,8 @@ import {
 } from "@/lib/constants";
 import { matchRaidFilterset, shouldDisplayRaid } from "@/lib/features/filterLogic/gym";
 import { shouldDisplayNest } from "@/lib/features/filterLogic/nest";
-import { matchPokemonFilterset } from "@/lib/features/filterLogic/pokemon";
+import { matchPokemonFilterset, matchPokemonFiltersets } from "@/lib/features/filterLogic/pokemon";
+import { MODIFIER_COLORS } from "@/lib/features/filters/modifierPresets";
 import {
 	matchInvasionFilterset,
 	matchQuestFilterset,
@@ -14,7 +15,11 @@ import {
 	shouldDisplayQuest
 } from "@/lib/features/filterLogic/pokestop";
 import { matchMaxBattleFilterset, shouldDisplayStation } from "@/lib/features/filterLogic/station";
-import type { AnyFilterset, FiltersetQuest } from "@/lib/features/filters/filtersets";
+import type {
+	AnyFilterset,
+	FiltersetPokemon,
+	FiltersetQuest
+} from "@/lib/features/filters/filtersets";
 import { filterTitle } from "@/lib/features/filters/filtersetUtils.svelte";
 import {
 	getCircleFeature,
@@ -497,6 +502,17 @@ class GymRenderer extends MapObjectRenderer<GymData> {
 	}
 }
 
+// Fallback styling for spawns predicted shiny for the viewer (see queryPokemon) when none of
+// their own "predicted shiny" filtersets matched — so they always stand out on the map
+const PREDICTED_SHINY_FILTERSET: FiltersetPokemon = {
+	id: "predicted-shiny",
+	title: { message: "Predicted shiny for you" },
+	enabled: true,
+	icon: { isUserSelected: true, emoji: "✨" },
+	predictedShiny: true,
+	modifiers: { glow: { color: MODIFIER_COLORS.yellow }, showBadge: true }
+};
+
 class PokemonRenderer extends MapObjectRenderer<PokemonData> {
 	public render(data: PokemonData, isSelected: boolean, isSelectedOverwrite: boolean) {
 		const selectedScale = isSelected ? SELECTED_MAP_OBJECT_SCALE : 1;
@@ -507,7 +523,9 @@ class PokemonRenderer extends MapObjectRenderer<PokemonData> {
 		return this.renderVisualModifiers(
 			data,
 			data.id,
-			matchPokemonFilterset(data),
+			data.predicted_shiny
+				? (matchPokemonFiltersets(data).find((f) => f.predictedShiny) ?? PREDICTED_SHINY_FILTERSET)
+				: matchPokemonFilterset(data),
 			this.getBasicProps(data, selectedScale, { expires: data.expire_timestamp })
 		);
 	}

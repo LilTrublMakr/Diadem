@@ -318,7 +318,10 @@ export async function buildPokemonContext(
 		trackedNundoEmoji: "",
 		trackedShundo: false,
 		trackedShundoYesNo: "No",
-		trackedShundoEmoji: ""
+		trackedShundoEmoji: "",
+		// Also per-recipient — filled in by the webhook route's deliver()
+		predictedShiny: false,
+		predictedShinyAccounts: ""
 	};
 }
 

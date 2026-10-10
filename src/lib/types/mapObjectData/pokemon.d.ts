@@ -73,4 +73,7 @@ export type PokemonData = {
 	};
 	is_event?: number;
 	strong?: number;
+	// Set by the map query (server-side) when the spawn is predicted shiny for one of the
+	// viewer's linked accounts — never sent for anyone else's accounts
+	predicted_shiny?: boolean;
 } & PokemonVisual;

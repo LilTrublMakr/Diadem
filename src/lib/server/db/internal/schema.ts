@@ -146,6 +146,29 @@ export const userCollection = mysqlTable(
 
 export type UserCollection = typeof userCollection.$inferSelect;
 
+// A user's linked Pokemon GO accounts for personal shiny prediction (see shinyPrediction/).
+// playerId is server-only — API responses only ever expose a masked hint.
+export const shinyAccount = mysqlTable(
+	"shiny_account",
+	{
+		id: int("id").autoincrement().primaryKey(),
+		userId: varchar("user_id", { length: 255 })
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		label: varchar("label", { length: 64 }).notNull(),
+		playerId: varchar("player_id", { length: 32 }).notNull(),
+		createdAt: timestamp("created_at").defaultNow()
+	},
+	(table) => ({
+		userPlayerUnique: uniqueIndex("shiny_account_user_player_unique").on(
+			table.userId,
+			table.playerId
+		)
+	})
+);
+
+export type ShinyAccount = typeof shinyAccount.$inferSelect;
+
 export const scanArea = mysqlTable(
 	"scan_area",
 	{

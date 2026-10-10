@@ -45,6 +45,9 @@ type General = {
 	mapName: string;
 	defaultLocale: string;
 	customHome: boolean;
+	// Personal shiny prediction (linked player ids → "shiny for you" in map popups + DM filter).
+	// Off by default — relies on an unofficial per-account RNG that Niantic can patch any time.
+	shinyPrediction?: boolean;
 	filterCaretStyle?: "caret" | "chevron";
 	defaultLat?: number;
 	defaultLon?: number;

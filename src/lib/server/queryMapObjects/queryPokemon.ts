@@ -1,4 +1,9 @@
-import { shouldDisplayPokemon } from "@/lib/features/filterLogic/pokemon";
+import { matchPokemonFilterset, shouldDisplayPokemon } from "@/lib/features/filterLogic/pokemon";
+import { getShinyPredictor } from "@/lib/server/shinyPrediction/service";
+import { getIndexedSpawns } from "@/lib/server/shinyPrediction/spawnIndex";
+import { getLogger } from "@/lib/utils/logger";
+
+const log = getLogger("q:pokemon");
 import type { FilterPokemon } from "@/lib/features/filters/filters";
 import type { Bounds } from "@/lib/mapObjects/mapBounds";
 import { MapObjectType, type MinMapObject } from "@/lib/mapObjects/mapObjectTypes";
@@ -18,7 +23,15 @@ import type { PokemonData, PvpStats } from "@/lib/types/mapObjectData/pokemon";
 import type { FiltersetPokemon, MinMax } from "@/lib/features/filters/filtersets";
 import { Features } from "@/lib/utils/features";
 import { round } from "@/lib/utils/numberFormat";
-import { getNormalizedForm, getBestRank, League, showGreat, showLittle, showPvp, showUltra } from "@/lib/utils/pokemonUtils";
+import {
+	getNormalizedForm,
+	getBestRank,
+	League,
+	showGreat,
+	showLittle,
+	showPvp,
+	showUltra
+} from "@/lib/utils/pokemonUtils";
 import { error } from "@sveltejs/kit";
 import { booleanPointInPolygon, point } from "@turf/turf";
 
@@ -34,7 +47,29 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 		limit?: number,
 		context?: FeaturePermissionContext
 	): Promise<MapObjectResponse<MinMapObject<PokemonData>>> {
-		const golbatQueries = this.buildGolbatQueries(filter, context);
+		// Personal shiny prediction can't be pushed to Golbat (it depends on the viewer's linked
+		// player ids). The webhook-fed spawn index narrows "predicted shiny" filtersets to the
+		// species actually predicted in view; the post-filter below does the exact matching.
+		const isShinyFor = await getShinyPredictor(context?.userId);
+		const hasShinyFilterset = !!filter?.filters?.some((f) => f.enabled && f.predictedShiny);
+		let shinySpecies: Set<number> | undefined;
+		if (hasShinyFilterset) {
+			const indexed = isShinyFor ? await getIndexedSpawns(bounds) : [];
+			if (indexed && isShinyFor) {
+				shinySpecies = new Set(
+					indexed
+						.filter((s) =>
+							isShinyFor(s.encounterId, s.pokemonId, getNormalizedForm(s.pokemonId, s.form))
+						)
+						.map((s) => s.pokemonId)
+				);
+			} else if (indexed) {
+				shinySpecies = new Set(); // not logged in / no linked accounts: nothing can match
+			}
+		}
+
+		const golbatQueries = this.buildGolbatQueries(filter, context, shinySpecies);
+		if (golbatQueries.length === 0) return { data: [], examined: 0 };
 
 		const actualLimit = Math.min(limit ?? this.limit, this.limit);
 
@@ -52,7 +87,13 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 			let examined = result.examined;
 
 			if (result.limit_reached) {
-				return { data: [], examined, limitReached: true }
+				if (hasShinyFilterset)
+					log.info(
+						"Limit reached with a predicted-shiny filterset (shiny species in view: %s) — Golbat queries: %s",
+						shinySpecies ? [...shinySpecies].join(",") || "none" : "index not ready",
+						JSON.stringify(golbatQueries)
+					);
+				return { data: [], examined, limitReached: true };
 			}
 
 			for (const p of result.pokemon) {
@@ -66,6 +107,10 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 				const pokemon = this.makePokemon(p, filter, context);
 				// need to re-check pvp filters after removing mega evolutions
 				if (!this.matchesCleanedPvpRanks(pokemon, filter)) continue;
+
+				if (isShinyFor?.(pokemon.id, pokemon.pokemon_id, pokemon.form ?? 0))
+					pokemon.predicted_shiny = true;
+				if (hasShinyFilterset && !matchPokemonFilterset(pokemon, filter)) continue;
 
 				data.push(pokemon);
 			}
@@ -222,9 +267,12 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 		return rank >= range.min && rank <= range.max;
 	}
 
+	// shinySpecies (from the spawn index) narrows "predicted shiny" filtersets to those species;
+	// undefined = index not ready, query them unnarrowed. Can return [] = nothing to ask Golbat.
 	private buildGolbatQueries(
 		filter: FilterPokemon | undefined,
-		context?: FeaturePermissionContext
+		context?: FeaturePermissionContext,
+		shinySpecies?: Set<number>
 	): GolbatPokemonQuery[] {
 		// Numeric iv/pvp constraints would leak whether unseen mons match. Only push them to
 		// Golbat when the tier is granted globally; otherwise drop them and strip per-object.
@@ -236,12 +284,14 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 			return [{ pokemon: [] }];
 		}
 
-		return enabledFilters.map((filter) => {
+		return enabledFilters.flatMap((filter) => {
 			const query: GolbatPokemonQuery = {};
+			const narrowTo = filter.predictedShiny ? shinySpecies : undefined;
 			if (filter.pokemon) {
 				query.pokemon = [];
 
 				for (const filterPokemon of filter.pokemon) {
+					if (narrowTo && !narrowTo.has(filterPokemon.pokemon_id)) continue;
 					const pokemonQuery: GolbatPokemonSpecies = { id: filterPokemon.pokemon_id };
 
 					// @ts-ignore backward compat; used to be form_id, now form
@@ -268,7 +318,11 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 
 					query.pokemon.push(pokemonQuery);
 				}
+			} else if (narrowTo) {
+				query.pokemon = [...narrowTo].map((id) => ({ id }));
 			}
+			// An empty species list means "any" to Golbat — never send one for a narrowed filterset
+			if (narrowTo && !query.pokemon?.length) return [];
 
 			if (ivConstraintsAllowed) {
 				if (filter.iv) query.iv = filter.iv;
@@ -288,7 +342,7 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 				if (filter.pvpRankUltra) query.pvp_ultra = filter.pvpRankUltra;
 			}
 
-			return query;
+			return [query];
 		});
 	}
 }

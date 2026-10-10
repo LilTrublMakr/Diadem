@@ -80,6 +80,18 @@ export const POKEMON_TEMPLATE_FIELDS: TemplateField[] = [
 		sample: "No"
 	},
 	{ tag: "trackedShundoEmoji", label: "Shundo Emoji", category: "Your Collection", sample: "🌟" },
+	{
+		tag: "predictedShiny",
+		label: "Predicted Shiny For You (true/false)",
+		category: "Your Collection",
+		sample: "true"
+	},
+	{
+		tag: "predictedShinyAccounts",
+		label: "Predicted Shiny Account Names",
+		category: "Your Collection",
+		sample: "Main, Alt"
+	},
 
 	{
 		tag: "shinyRatePercent",
@@ -881,6 +893,13 @@ export const PRESET_TEMPLATE_FIELDS: TemplateField[] = [
 	{
 		tag: "{{#if hasFeaturedAttack}}\n⚔️ Evolve for a {{featuredAttackEvolvesTo}} with {{featuredAttackMoveName}}!\n{{/if}}",
 		label: "Featured Attack note",
+		category: "Presets",
+		sample: "",
+		raw: true
+	},
+	{
+		tag: "{{#if predictedShiny}}\n✨ Predicted shiny for {{predictedShinyAccounts}}!\n{{/if}}",
+		label: "Predicted shiny note (your linked accounts)",
 		category: "Presets",
 		sample: "",
 		raw: true

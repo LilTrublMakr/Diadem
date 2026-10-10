@@ -6,6 +6,8 @@
 	import { getTrackers, isTrackerLoaded, setTrackerEntry, trackerKey, loadTrackers } from '$lib/features/trackerState.svelte';
 	import TrackedPokemonImg from '@/components/custom/TrackedPokemonImg.svelte';
 	import ExportParsePanel from '@/components/custom/ExportParsePanel.svelte';
+	import ShinyAccountsPanel from '@/components/custom/ShinyAccountsPanel.svelte';
+	import { getConfig } from '@/lib/services/config/config';
 	import { aggregateTrackerImport } from '@/lib/utils/collectionTrackerImport';
 	import type { ExportFormat } from '@/lib/utils/collectionImportUtils';
 	import type { RawExportPokemon } from '@/lib/types/collectionExport';
@@ -301,6 +303,9 @@
 				{/if}
 			</div>
 		</details>
+		{#if getConfig().general.shinyPrediction}
+			<ShinyAccountsPanel />
+		{/if}
 	{/if}
 
 	{#if !loggedIn}

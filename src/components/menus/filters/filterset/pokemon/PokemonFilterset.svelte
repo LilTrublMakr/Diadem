@@ -25,6 +25,7 @@
 	import { getSpawnablePokemon } from "@/lib/features/masterStats.svelte";
 	import { hasFeatureAnywhere } from "@/lib/services/user/checkPerm";
 	import { getUserDetails } from "@/lib/services/user/userDetails.svelte";
+	import { getConfig } from "@/lib/services/config/config";
 	import { Features } from "@/lib/utils/features";
 	import AttributeToggle from "@/components/menus/filters/filterset/AttributeToggle.svelte";
 	import Separator from "@/components/ui/Separator.svelte";
@@ -54,19 +55,30 @@
 	{#snippet base()}
 		{#if data}
 			<PokemonFilterDisplay {data} />
+			{#if getConfig().general.shinyPrediction && getUserDetails().details}
+				<Separator class="my-3" text="✨" />
+				<AttributeToggle
+					label={m.predicted_shiny_only()}
+					value={data.predictedShiny ?? false}
+					onchange={(v) => {
+						if (v) data.predictedShiny = true;
+						else delete data.predictedShiny;
+					}}
+				/>
+			{/if}
 			{#if isNotificationsSupported()}
 				<Separator class="my-3" text={m.notifications()} />
 				<AttributeToggle
 					label={m.browser_notifications()}
 					value={data.notify ?? false}
 					onchange={async (v) => {
-						if (v && Notification.permission !== 'granted') {
+						if (v && Notification.permission !== "granted") {
 							await requestNotificationPermission();
 						}
 						data.notify = v;
 					}}
 				/>
-				{#if data.notify && Notification.permission === 'denied'}
+				{#if data.notify && Notification.permission === "denied"}
 					<p class="text-xs text-destructive px-4 mt-1">{m.notifications_blocked()}</p>
 				{/if}
 			{/if}

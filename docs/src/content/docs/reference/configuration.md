@@ -278,6 +278,7 @@ image = ""
 description = ""
 allowCrawlers = false
 disallowedPaths = []
+# shinyPrediction = false
 ```
 
 - branding and defaults for map and metadata
@@ -286,6 +287,7 @@ disallowedPaths = []
 - `minZoom`, `maxZoom`: Locking users into a map zoom range
 - `url`, `image`, `description`: SEO/OpenGraph metadata
 - `allowCrawlers`, `disallowedPaths`: robots.txt config
+- `shinyPrediction`: Enables [personal shiny prediction](/guides/shiny-prediction/) (off by default)
 
 ## `server.staticMap`
 

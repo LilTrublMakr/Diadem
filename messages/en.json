@@ -727,5 +727,7 @@
 	"scout_location": "Scout location",
 	"address_unavailable": "Address unavailable",
 	"my_location": "My Location",
-	"in_range": "In Range"
+	"in_range": "In Range",
+	"predicted_shiny_only": "Only predicted shinies for me",
+	"predicted_shiny_for_me": "Predicted shiny for me"
 }

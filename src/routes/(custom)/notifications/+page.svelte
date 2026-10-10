@@ -41,6 +41,7 @@
 		RaidSubscriptionFilters
 	} from "@/lib/features/notifications/types";
 	import { getUserDetails } from "@/lib/services/user/userDetails.svelte";
+	import { getConfig } from "@/lib/services/config/config";
 	import { getScanAreasState, loadScanAreas } from "@/lib/features/scanAreas/scanAreasState.svelte";
 	import { getKojiGeofences, loadKojiGeofences, type KojiFeatures } from "@/lib/features/koji";
 	import {
@@ -705,6 +706,7 @@
 			}
 			if (f.pvpLeagues && f.pvpLeagues.length > 0)
 				parts.push(`${f.pvpLeagues.join("/")} rank ≤ ${f.pvpMaxRank ?? "?"}`);
+			if (f.predictedShinyOnly) parts.push("✨ shiny for me");
 		}
 
 		const area = areaLabel(filters);
@@ -1006,6 +1008,19 @@
 										</div>
 									{/if}
 								</label>
+
+								{#if getConfig().general.shinyPrediction}
+									<label class="flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
+										<input
+											type="checkbox"
+											checked={subFilters.predictedShinyOnly ?? false}
+											onchange={(e) =>
+												(subFilters.predictedShinyOnly = e.currentTarget.checked || undefined)}
+										/>
+										Only when predicted shiny for one of my linked accounts
+										<a href="/profile" class="text-xs text-indigo-500 hover:underline">(manage)</a>
+									</label>
+								{/if}
 
 								<label class="flex flex-col gap-1 text-sm">
 									<span class="text-zinc-500 dark:text-zinc-400">Area (optional)</span>

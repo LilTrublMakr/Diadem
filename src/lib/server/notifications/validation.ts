@@ -116,6 +116,8 @@ export const pokemonFiltersSchema = z.object({
 	// true = only notify when this exact species+form currently grants a Featured Attack move on
 	// evolution/catch (see featuredAttackProvider) — absent/false = no filtering on this.
 	featuredAttackOnly: z.boolean().optional(),
+	// true = only notify when the spawn is predicted shiny for one of the user's linked accounts
+	predictedShinyOnly: z.boolean().optional(),
 	...baseFiltersShape
 });
 

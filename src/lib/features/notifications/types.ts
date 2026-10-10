@@ -87,8 +87,9 @@ export type PokemonSubscriptionFilters = BaseSubscriptionFilters & {
 	minSize?: number; // 1-5, matches getPokemonSize()'s XXS..XXL scale
 	maxSize?: number;
 	gender?: 1 | 2 | 3; // Male, Female, Genderless (matches PokemonData.gender)
-	// No shinyOnly filter — shiny is per scanner-account, not the same catch for every player,
-	// so it's not a valid "notify me" signal (unlike hundo, which is universal).
+	// No plain shinyOnly filter — Golbat's shiny flag is per scanner-account, not the same catch
+	// for every player. predictedShinyOnly instead checks the recipient's OWN linked accounts.
+	predictedShinyOnly?: boolean;
 	// Empty/absent = no PVP filter. Multiple leagues = OR match (notify if it ranks within
 	// pvpMaxRank in ANY of these leagues) — one shared rank threshold across all of them.
 	pvpLeagues?: PvpLeagueFilter[];
@@ -260,6 +261,10 @@ export type PokemonTemplateContext = {
 	trackedShundo: boolean;
 	trackedShundoYesNo: string;
 	trackedShundoEmoji: string;
+	// Per-recipient, filled in by deliver() from the user's linked shiny_account rows (see
+	// shinyPrediction/service.ts) — false/"" when the feature is off or no account is linked.
+	predictedShiny: boolean;
+	predictedShinyAccounts: string; // comma-separated labels of the accounts it's shiny for
 	// This species' all-time shiny rate (pokemon_summary, time_slot='all') — public scanner
 	// data, not per-user. "?" for any of these means no scan data exists yet for this species.
 	shinyRatePercent: string; // "4.8%"
