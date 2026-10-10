@@ -224,9 +224,17 @@ export type ServerConfig = {
 	auth: Auth;
 	permissions?: Permissions[];
 	staticMap?: StaticMap;
-	// Personal shiny prediction: species id → 1/N odds, overriding the stats-based estimate
-	// (e.g. { 570 = 25 } for a Zorua Community Day). Remove once the event ends.
-	shinyOddsOverrides?: Record<string, number>;
+	// Personal shiny prediction odds overrides, winning over the stats-based estimate. Table form
+	// ({ 570 = 25 }) is always on; array form ([[server.shinyOddsOverrides]] with pokemon/odds
+	// and optional start/end strings) is scheduled.
+	shinyOddsOverrides?:
+		| Record<string, number>
+		| { pokemon: number; odds: number; start?: string; end?: string }[];
+	// IANA zone for override/Community Day times without an offset (ScrapedDuck's are local
+	// wall-clock). Unset = the server's own zone, often UTC in Docker — set it.
+	shinyEventTimezone?: string;
+	// 1/25 for Community Day featured spawns from the ScrapedDuck event feed (default true)
+	shinyAutoCommunityDay?: boolean;
 	limits?: {
 		enableRateLimiting?: boolean;
 		nonDeltaMultiplier?: number;

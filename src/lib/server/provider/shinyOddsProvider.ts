@@ -20,6 +20,9 @@ const ODDS_PRIORS: [odds: number, logPrior: number][] = [
 export const DEFAULT_ODDS = 512;
 // All-time encounters with zero shinies at/above this = treat as shiny-locked (not yet released).
 const LOCKED_MIN_TOTAL = 2000;
+const COMMUNITY_DAY_ODDS = 25;
+const EVENTS_URL =
+	"https://raw.githubusercontent.com/bigfoott/ScrapedDuck/refs/heads/data/events.json";
 
 type SummaryRow = {
 	pokemon_id: number;
@@ -31,12 +34,109 @@ type SummaryRow = {
 
 type Counts = { shiny: number; total: number };
 
-class ShinyOddsProvider extends BaseDataProvider<Map<string, number | null>> {
+// A forced 1/N for one species between two instants (epoch ms, ±Infinity = open-ended)
+type OddsWindow = { pokemonId: number; odds: number; start: number; end: number };
+
+export type ShinyOddsTable = {
+	estimated: Map<string, number | null>; // `${pokemonId}-${normalizedForm}` → 1/N, null = locked
+	windows: OddsWindow[]; // later entries win
+};
+
+type ScrapedDuckEvent = {
+	eventType: string;
+	name: string;
+	start: string;
+	end: string;
+	extraData?: { communityday?: { spawns?: { name: string; image: string }[] } };
+};
+
+/** Epoch ms for an ISO-ish time; without an explicit offset it's wall-clock time in `timeZone`. */
+function parseEventTime(value: string, timeZone: string | undefined): number {
+	if (!timeZone || /(?:z|[+-]\d\d:?\d\d)$/i.test(value)) return Date.parse(value);
+	const asUtc = Date.parse(value.replace(" ", "T") + "Z");
+	const offsetAt = (instant: number) => {
+		const parts = Object.fromEntries(
+			new Intl.DateTimeFormat("en-US", {
+				timeZone,
+				hourCycle: "h23",
+				year: "numeric",
+				month: "2-digit",
+				day: "2-digit",
+				hour: "2-digit",
+				minute: "2-digit",
+				second: "2-digit"
+			})
+				.formatToParts(instant)
+				.map((p) => [p.type, Number(p.value)])
+		);
+		return (
+			Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) -
+			Math.floor(instant / 1000) * 1000
+		);
+	};
+	// Two passes so a time right after a DST switch resolves with the right offset
+	const guess = asUtc - offsetAt(asUtc);
+	return asUtc - offsetAt(guess);
+}
+
+let lastCommunityDays: OddsWindow[] = [];
+
+// Community Day = 1/25 for its featured spawns, straight from the ScrapedDuck feed the events
+// page already uses. Its times are local wall-clock time, read in [server] shinyEventTimezone.
+async function fetchCommunityDayWindows(timeZone: string | undefined): Promise<OddsWindow[]> {
+	try {
+		const res = await fetch(EVENTS_URL);
+		if (!res.ok) throw new Error(`HTTP ${res.status}`);
+		const events: ScrapedDuckEvent[] = await res.json();
+		lastCommunityDays = events
+			.filter((e) => e.eventType === "community-day")
+			.flatMap((e) =>
+				(e.extraData?.communityday?.spawns ?? []).flatMap((spawn) => {
+					// Icons are named like pm570.icon.png / pm570.fHISUIAN.icon.png
+					const pokemonId = Number(/pm(\d+)\./.exec(spawn.image)?.[1]);
+					if (!pokemonId) return [];
+					return [
+						{
+							pokemonId,
+							odds: COMMUNITY_DAY_ODDS,
+							start: parseEventTime(e.start, timeZone),
+							end: parseEventTime(e.end, timeZone)
+						}
+					];
+				})
+			);
+	} catch (e) {
+		log.warning("Couldn't refresh Community Day schedule, keeping the last one: %s", e);
+	}
+	return lastCommunityDays;
+}
+
+function configuredWindows(timeZone: string | undefined): OddsWindow[] {
+	const overrides = getServerConfig().shinyOddsOverrides;
+	if (!overrides) return [];
+	// Table form ({ 570 = 25 }) = always on; array form = optionally scheduled
+	if (!Array.isArray(overrides)) {
+		return Object.entries(overrides).map(([id, odds]) => ({
+			pokemonId: Number(id),
+			odds,
+			start: -Infinity,
+			end: Infinity
+		}));
+	}
+	return overrides.map((o) => ({
+		pokemonId: o.pokemon,
+		odds: o.odds,
+		start: o.start ? parseEventTime(String(o.start), timeZone) : -Infinity,
+		end: o.end ? parseEventTime(String(o.end), timeZone) : Infinity
+	}));
+}
+
+class ShinyOddsProvider extends BaseDataProvider<ShinyOddsTable> {
 	constructor() {
 		super(REFRESH_SHINY_RATE);
 	}
 
-	protected async query(): Promise<Map<string, number | null>> {
+	protected async query(): Promise<ShinyOddsTable> {
 		await masterfileProvider.get();
 		const rows = await queryStats<SummaryRow[]>(
 			"SELECT pokemon_id, form, time_slot, shiny_count, total_count FROM pokemon_summary WHERE time_slot IN ('1d', 'all')"
@@ -54,10 +154,10 @@ class ShinyOddsProvider extends BaseDataProvider<Map<string, number | null>> {
 			bucket.set(key, counts);
 		}
 
-		const odds = new Map<string, number | null>();
+		const estimated = new Map<string, number | null>();
 		for (const [key, all] of allTime) {
 			if (all.shiny === 0 && all.total >= LOCKED_MIN_TOTAL) {
-				odds.set(key, null);
+				estimated.set(key, null);
 				continue;
 			}
 			// Maximum a-posteriori over the known odds, from the last 24h only — events change
@@ -69,11 +169,23 @@ class ShinyOddsProvider extends BaseDataProvider<Map<string, number | null>> {
 				const score = shiny * Math.log(1 / n) + (total - shiny) * Math.log(1 - 1 / n) + logPrior;
 				if (score > bestScore) [best, bestScore] = [n, score];
 			}
-			odds.set(key, best);
+			estimated.set(key, best);
 		}
 
-		log.info("Updated shiny odds for %d species/forms", odds.size);
-		return odds;
+		const config = getServerConfig();
+		const windows = [
+			...(config.shinyAutoCommunityDay === false
+				? []
+				: await fetchCommunityDayWindows(config.shinyEventTimezone)),
+			...configuredWindows(config.shinyEventTimezone) // config wins over the feed
+		];
+
+		log.info(
+			"Updated shiny odds for %d species/forms, %d scheduled overrides",
+			estimated.size,
+			windows.length
+		);
+		return { estimated, windows };
 	}
 }
 
@@ -81,17 +193,20 @@ export const shinyOddsProvider = new ShinyOddsProvider();
 
 /**
  * 1/N odds for a species+form (form already normalized) from a loaded odds table; null = looks
- * shiny-locked. `[server.shinyOddsOverrides]` wins over the estimate — for events like Community
- * Day, where the 24h stats lag behind the boost for the first hour or more.
+ * shiny-locked. An active scheduled override (Community Day feed, or [server.shinyOddsOverrides])
+ * wins over the 24h-stats estimate, which lags the first hour or more of a boost.
  */
 export function lookupShinyOdds(
-	odds: Map<string, number | null>,
+	table: ShinyOddsTable,
 	pokemonId: number,
 	form: number
 ): number | null {
-	const override = getServerConfig().shinyOddsOverrides?.[String(pokemonId)];
-	if (override) return override;
-	const value = odds.get(`${pokemonId}-${form}`);
+	const now = Date.now();
+	const override = table.windows.findLast(
+		(w) => w.pokemonId === pokemonId && w.start <= now && now < w.end
+	);
+	if (override) return override.odds;
+	const value = table.estimated.get(`${pokemonId}-${form}`);
 	return value === undefined ? DEFAULT_ODDS : value;
 }
 

@@ -287,7 +287,9 @@ disallowedPaths = []
 - `minZoom`, `maxZoom`: Locking users into a map zoom range
 - `url`, `image`, `description`: SEO/OpenGraph metadata
 - `allowCrawlers`, `disallowedPaths`: robots.txt config
-- `shinyPrediction`: Enables [personal shiny prediction](/guides/shiny-prediction/) (off by default)
+- `shinyPrediction`: Enables [personal shiny prediction](/guides/shiny-prediction/) (off by default).
+  Related server keys: `shinyEventTimezone`, `shinyAutoCommunityDay`, `shinyOddsOverrides`
+  (see the guide)
 
 ## `server.staticMap`
 

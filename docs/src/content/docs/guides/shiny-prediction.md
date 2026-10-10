@@ -73,16 +73,34 @@ Using a modified client is against Niantic's terms of service and puts that acco
    shinyPrediction = true
    ```
 
-3. Optional, during events: the odds estimate uses 24h stats, so for the first hour or more of a
-   Community Day it still treats the featured species as 1/512 (it misses shinies, it never
-   invents them). Force the odds per species id and restart, then remove it after the event:
+3. Event odds. The stats-based estimate uses 24h data, so it lags the first hour or more of a
+   boost (it misses shinies then, it never invents them). Two things cover that:
 
-   ```toml
-   [server.shinyOddsOverrides]
-   570 = 25 # Zorua Community Day
-   ```
+   - **Community Day is automatic**: while the [ScrapedDuck](https://github.com/bigfoott/ScrapedDuck)
+     event feed (the same one the events page uses) lists a Community Day as running, its featured
+     spawns use 1/25. The feed's times are local wall-clock times, so set your timezone, since
+     Docker containers usually run in UTC:
 
-   Disguised spawns (Zorua, Ditto) are listed under their disguise species until a scanner
+     ```toml
+     [server]
+     shinyEventTimezone = "America/New_York"
+     # shinyAutoCommunityDay = false   # to turn the automatic CD odds off
+     ```
+
+   - **Manual overrides** for anything else. Scheduled (times without an offset use
+     `shinyEventTimezone`; leave `start`/`end` out for open-ended), and later entries win:
+
+     ```toml
+     [[server.shinyOddsOverrides]]
+     pokemon = 570
+     odds = 25
+     start = "2026-10-10T14:00:00"
+     end = "2026-10-10T17:00:00"
+     ```
+
+     or always-on: `[server.shinyOddsOverrides]` with `570 = 25` (one form or the other, not both).
+
+   Overrides and the feed are re-read every 5 minutes along with the stats. Disguised spawns (Zorua, Ditto) are listed under their disguise species until a scanner
    encounters them, so those only get the right odds once encountered.
 
 4. Users link accounts under **Profile → ✨ Personal shiny prediction** (up to 10 per user).
