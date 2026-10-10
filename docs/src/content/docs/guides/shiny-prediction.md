@@ -73,4 +73,16 @@ Using a modified client is against Niantic's terms of service and puts that acco
    shinyPrediction = true
    ```
 
-3. Users link accounts under **Profile → ✨ Personal shiny prediction** (up to 10 per user).
+3. Optional, during events: the odds estimate uses 24h stats, so for the first hour or more of a
+   Community Day it still treats the featured species as 1/512 (it misses shinies, it never
+   invents them). Force the odds per species id and restart, then remove it after the event:
+
+   ```toml
+   [server.shinyOddsOverrides]
+   570 = 25 # Zorua Community Day
+   ```
+
+   Disguised spawns (Zorua, Ditto) are listed under their disguise species until a scanner
+   encounters them, so those only get the right odds once encountered.
+
+4. Users link accounts under **Profile → ✨ Personal shiny prediction** (up to 10 per user).

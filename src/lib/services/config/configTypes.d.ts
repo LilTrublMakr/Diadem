@@ -224,6 +224,9 @@ export type ServerConfig = {
 	auth: Auth;
 	permissions?: Permissions[];
 	staticMap?: StaticMap;
+	// Personal shiny prediction: species id → 1/N odds, overriding the stats-based estimate
+	// (e.g. { 570 = 25 } for a Zorua Community Day). Remove once the event ends.
+	shinyOddsOverrides?: Record<string, number>;
 	limits?: {
 		enableRateLimiting?: boolean;
 		nonDeltaMultiplier?: number;

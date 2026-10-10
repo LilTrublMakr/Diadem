@@ -6,8 +6,8 @@ import {
 import type { ShinyAccount } from "@/lib/server/db/internal/schema";
 import { getClientConfig } from "@/lib/services/config/config.server";
 import {
-	DEFAULT_ODDS,
 	getShinyOdds,
+	lookupShinyOdds,
 	shinyOddsProvider
 } from "@/lib/server/provider/shinyOddsProvider";
 import { rollShinyDie } from "@/lib/server/shinyPrediction/shinyRoll";
@@ -85,9 +85,9 @@ export async function getShinyPredictor(
 
 	return (encounterId, pokemonId, form) => {
 		if (!ENCOUNTER_ID_PATTERN.test(encounterId)) return false;
-		const n = odds.get(`${pokemonId}-${form}`);
+		const n = lookupShinyOdds(odds, pokemonId, form);
 		if (n === null) return false; // shiny-locked
-		return accounts.some((a) => rollShinyDie(encounterId, a.playerId, n ?? DEFAULT_ODDS) === 0);
+		return accounts.some((a) => rollShinyDie(encounterId, a.playerId, n) === 0);
 	};
 }
 

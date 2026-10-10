@@ -2,6 +2,7 @@ import { REFRESH_SHINY_RATE } from "@/lib/constants";
 import { queryStats } from "@/lib/server/db/stats";
 import { masterfileProvider } from "@/lib/server/provider/masterfileProvider";
 import { BaseDataProvider } from "@/lib/server/provider/dataProvider";
+import { getServerConfig } from "@/lib/services/config/config.server";
 import { getLogger } from "@/lib/utils/logger";
 import { getNormalizedForm } from "@/lib/utils/pokemonUtils";
 
@@ -78,9 +79,26 @@ class ShinyOddsProvider extends BaseDataProvider<Map<string, number | null>> {
 
 export const shinyOddsProvider = new ShinyOddsProvider();
 
-/** Current 1/N shiny odds for a species+form; null = looks shiny-locked. */
-export async function getShinyOdds(pokemonId: number, form: number): Promise<number | null> {
-	const odds = await shinyOddsProvider.get();
-	const value = odds.get(`${pokemonId}-${getNormalizedForm(pokemonId, form)}`);
+/**
+ * 1/N odds for a species+form (form already normalized) from a loaded odds table; null = looks
+ * shiny-locked. `[server.shinyOddsOverrides]` wins over the estimate — for events like Community
+ * Day, where the 24h stats lag behind the boost for the first hour or more.
+ */
+export function lookupShinyOdds(
+	odds: Map<string, number | null>,
+	pokemonId: number,
+	form: number
+): number | null {
+	const override = getServerConfig().shinyOddsOverrides?.[String(pokemonId)];
+	if (override) return override;
+	const value = odds.get(`${pokemonId}-${form}`);
 	return value === undefined ? DEFAULT_ODDS : value;
+}
+
+export async function getShinyOdds(pokemonId: number, form: number): Promise<number | null> {
+	return lookupShinyOdds(
+		await shinyOddsProvider.get(),
+		pokemonId,
+		getNormalizedForm(pokemonId, form)
+	);
 }
