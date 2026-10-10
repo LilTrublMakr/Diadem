@@ -412,8 +412,8 @@ You might be able to use the Svelte MCP server, where you have access to compreh
       `updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
       CONSTRAINT `notification_channel_subscription_id` PRIMARY KEY(`id`),
       CONSTRAINT `notification_channel_sub_guild_name_unique` UNIQUE(`guild_id`, `type`, `name`),
-      CONSTRAINT `notification_channel_subscription_created_by_user_id_user_id_fk` FOREIGN KEY (`created_by_user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE,
-      CONSTRAINT `notification_channel_subscription_template_id_notification_template_id_fk` FOREIGN KEY (`template_id`) REFERENCES `notification_template`(`id`) ON DELETE SET NULL
+      CONSTRAINT `notification_channel_sub_created_by_fk` FOREIGN KEY (`created_by_user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE,
+      CONSTRAINT `notification_channel_sub_template_fk` FOREIGN KEY (`template_id`) REFERENCES `notification_template`(`id`) ON DELETE SET NULL
   );
   CREATE INDEX `notification_channel_sub_guild_id_idx` ON `notification_channel_subscription` (`guild_id`);
   CREATE INDEX `notification_channel_sub_type_idx` ON `notification_channel_subscription` (`type`);
