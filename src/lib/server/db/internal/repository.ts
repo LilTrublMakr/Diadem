@@ -184,12 +184,25 @@ export async function getShinyAccounts(userId: string): Promise<ShinyAccount[]> 
 	return db.select().from(table.shinyAccount).where(eq(table.shinyAccount.userId, userId));
 }
 
+type ShinyAccountValues = Pick<ShinyAccount, "label"> &
+	Partial<Pick<ShinyAccount, "playerId" | "status" | "ticketId" | "friendCode">>;
+
 export async function insertShinyAccount(
 	userId: string,
-	label: string,
-	playerId: string
+	values: ShinyAccountValues
 ): Promise<void> {
-	await db.insert(table.shinyAccount).values({ userId, label, playerId });
+	await db.insert(table.shinyAccount).values({ userId, ...values });
+}
+
+export async function updateShinyAccountRow(
+	userId: string,
+	id: number,
+	values: Partial<ShinyAccountValues>
+): Promise<void> {
+	await db
+		.update(table.shinyAccount)
+		.set(values)
+		.where(and(eq(table.shinyAccount.userId, userId), eq(table.shinyAccount.id, id)));
 }
 
 export async function deleteShinyAccountRow(userId: string, id: number): Promise<void> {
@@ -477,7 +490,10 @@ export async function insertChannelSubscription(row: {
 	mode: SubscriptionMode;
 	schedule: NotificationSchedule | null;
 }): Promise<NotificationChannelSubscription> {
-	const [result] = await db.insert(table.notificationChannelSubscription).values(row).$returningId();
+	const [result] = await db
+		.insert(table.notificationChannelSubscription)
+		.values(row)
+		.$returningId();
 	return (await getChannelSubscription(row.guildId, result.id))!;
 }
 

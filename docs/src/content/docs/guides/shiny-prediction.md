@@ -42,12 +42,28 @@ characters, and predictions are worked out server-side (`/api/custom/shiny-predi
 
 ## Getting a player id
 
-The id is **not** shown anywhere in the normal game. It is the `invited_player_ids` value seen by
-another account that invites this one to a private raid lobby, read with a modified game client.
-It is either 16 lowercase hex characters, or 21 digits for Google-signup accounts. The obfuscated
-`E:...` id exposed for gym defenders does not work.
+The id is **not** shown anywhere in the normal game. There are two ways to link an account:
 
-Using a modified client is against Niantic's terms of service and puts that account at risk.
+- **Friend code (recommended).** With a [PlayerID](https://playerid.mew.is) API key configured,
+  users just enter their 12-digit friend code. PlayerID's bot invites that trainer to a raid and
+  reads the player id from the invite, usually within seconds; the trainer name comes back with
+  it and becomes the account's default name. The profile panel polls while a lookup runs. If the
+  bot can't invite the trainer yet (typically their remote raid limit), the link shows as
+  "delayed" and PlayerID retries after about 12 hours. PlayerID's limits (10 requests/minute, 100
+  new lookups/day) apply to the whole map's key; a friend code anyone looked up before is answered
+  from its existing lookup without using the daily quota.
+
+  ```toml
+  [server.playerId]
+  url = "https://playerid.mew.is"
+  apiKey = "pid_..."
+  ```
+
+- **Raw player id.** It is the `invited_player_ids` value seen by another account that invites
+  this one to a private raid lobby, read with a modified game client: 16 lowercase hex
+  characters, or 21 digits for Google-signup accounts. The obfuscated `E:...` id exposed for gym
+  defenders does not work. Using a modified client is against Niantic's terms of service and puts
+  that account at risk.
 
 ## Setup
 
@@ -58,12 +74,25 @@ Using a modified client is against Niantic's terms of service and puts that acco
        `id` int AUTO_INCREMENT NOT NULL,
        `user_id` varchar(255) NOT NULL,
        `label` varchar(64) NOT NULL,
-       `player_id` varchar(32) NOT NULL,
+       `player_id` varchar(32),
+       `status` varchar(16) DEFAULT 'complete' NOT NULL,
+       `ticket_id` varchar(64),
+       `friend_code` varchar(12),
        `created_at` timestamp DEFAULT (now()),
        CONSTRAINT `shiny_account_id` PRIMARY KEY(`id`),
        CONSTRAINT `shiny_account_user_player_unique` UNIQUE(`user_id`, `player_id`),
        CONSTRAINT `shiny_account_user_id_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE
    );
+   ```
+
+   Upgrading from before friend-code linking? Update the existing table instead:
+
+   ```sql
+   ALTER TABLE `shiny_account`
+       MODIFY `player_id` varchar(32) NULL,
+       ADD `status` varchar(16) DEFAULT 'complete' NOT NULL,
+       ADD `ticket_id` varchar(64),
+       ADD `friend_code` varchar(12);
    ```
 
 2. Turn it on in `config.toml`:

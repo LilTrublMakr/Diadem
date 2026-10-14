@@ -156,7 +156,12 @@ export const shinyAccount = mysqlTable(
 			.notNull()
 			.references(() => user.id, { onDelete: "cascade" }),
 		label: varchar("label", { length: 64 }).notNull(),
-		playerId: varchar("player_id", { length: 32 }).notNull(),
+		// null while a friend-code lookup (PlayerID) is still running
+		playerId: varchar("player_id", { length: 32 }),
+		// "complete", or a PlayerID ticket status while looking up / after it failed
+		status: varchar("status", { length: 16 }).default("complete").notNull(),
+		ticketId: varchar("ticket_id", { length: 64 }),
+		friendCode: varchar("friend_code", { length: 12 }),
 		createdAt: timestamp("created_at").defaultNow()
 	},
 	(table) => ({

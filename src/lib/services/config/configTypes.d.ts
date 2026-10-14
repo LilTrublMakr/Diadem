@@ -235,6 +235,12 @@ export type ServerConfig = {
 	shinyEventTimezone?: string;
 	// 1/25 for Community Day featured spawns from the ScrapedDuck event feed (default true)
 	shinyAutoCommunityDay?: boolean;
+	// PlayerID (https://playerid.mew.is) friend code → player id lookup for linking shiny
+	// accounts; same key as upstream ccev/diadem#200. The API key stays server-side.
+	playerId?: {
+		url: string;
+		apiKey: string;
+	};
 	limits?: {
 		enableRateLimiting?: boolean;
 		nonDeltaMultiplier?: number;

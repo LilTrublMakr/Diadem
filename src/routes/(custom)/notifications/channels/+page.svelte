@@ -68,7 +68,11 @@
 		if (getConfig().general.shinyPrediction) {
 			void fetch("/api/custom/shiny-accounts")
 				.then((res) => (res.ok ? res.json() : []))
-				.then((accounts) => (shinyAccounts = accounts));
+				// Friend-code links still being looked up (or failed) have no player id to roll with
+				.then(
+					(accounts: ShinyAccountDto[]) =>
+						(shinyAccounts = accounts.filter((a) => a.status === "linked"))
+				);
 		}
 	});
 

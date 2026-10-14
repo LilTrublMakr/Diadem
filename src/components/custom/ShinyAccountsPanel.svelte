@@ -1,12 +1,17 @@
 <script lang="ts">
 	import { onMount } from "svelte";
-	import type { ShinyAccountDto } from "@/lib/features/shinyPrediction";
+	import { FRIEND_CODE_PATTERN, type ShinyAccountDto } from "@/lib/features/shinyPrediction";
 
 	let accounts = $state<ShinyAccountDto[]>([]);
 	let label = $state("");
-	let playerId = $state("");
+	let account = $state("");
 	let busy = $state(false);
 	let error = $state<string | null>(null);
+
+	// Friend codes are often copied as "1234 5678 9012" — names are optional for them, since the
+	// lookup returns the trainer name
+	let isFriendCode = $derived(FRIEND_CODE_PATTERN.test(account.replace(/[\s-]/g, "")));
+	let hasPending = $derived(accounts.some((a) => a.status === "pending"));
 
 	async function send(url: string, init?: RequestInit) {
 		busy = true;
@@ -26,6 +31,16 @@
 	}
 
 	onMount(() => send("/api/custom/shiny-accounts"));
+
+	// While a friend-code lookup runs, refresh quietly — known trainers resolve within seconds
+	$effect(() => {
+		if (!hasPending) return;
+		const timer = setInterval(async () => {
+			const res = await fetch("/api/custom/shiny-accounts").catch(() => null);
+			if (res?.ok) accounts = await res.json();
+		}, 5000);
+		return () => clearInterval(timer);
+	});
 </script>
 
 <details
@@ -38,10 +53,11 @@
 	</summary>
 	<div class="mt-4 flex flex-col gap-3 text-sm">
 		<p class="text-xs text-zinc-500 dark:text-zinc-400">
-			Link a Pokémon GO account's player id to see which wild spawns would be shiny for that account
-			— in map popups and as a notification filter. The id is the <code>invited_player_ids</code> value
-			(16 hex characters, or 21 digits for Google accounts), which the normal game never shows. It stays
-			on the server; only the last 4 characters are shown back.
+			Link a Pokémon GO account to see which wild spawns would be shiny for that account — in map
+			popups and as a notification filter. Enter its <b>friend code</b> and the map looks up the account's
+			internal player id for you (this takes a few seconds; the account gets a raid invite from a lookup
+			bot). If you already know the player id (16 hex characters, or 21 digits for Google accounts),
+			you can enter that instead. It stays on the server; only the last 4 characters are shown back.
 		</p>
 		<p class="text-xs text-amber-600 dark:text-amber-500">
 			This relies on an unofficial per-account RNG that Niantic can change at any time — treat
@@ -54,14 +70,24 @@
 					<li
 						class="flex items-center justify-between gap-2 rounded-md bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5"
 					>
-						<span class="text-zinc-800 dark:text-zinc-200">
-							{account.label}
-							<span class="text-xs text-zinc-400 dark:text-zinc-500">{account.playerIdHint}</span>
+						<span class="flex flex-col min-w-0">
+							<span class="text-zinc-800 dark:text-zinc-200">
+								{account.label}
+								<span class="text-xs text-zinc-400 dark:text-zinc-500">{account.playerIdHint}</span>
+							</span>
+							{#if account.detail}
+								<span
+									class="text-xs {account.status === 'failed'
+										? 'text-red-500'
+										: 'text-zinc-500 dark:text-zinc-400'}">{account.detail}</span
+								>
+							{/if}
 						</span>
 						<button
 							onclick={() => send(`/api/custom/shiny-accounts/${account.id}`, { method: "DELETE" })}
 							disabled={busy}
-							class="text-xs text-red-500 hover:text-red-400 disabled:opacity-50">Remove</button
+							class="text-xs text-red-500 hover:text-red-400 disabled:opacity-50 shrink-0"
+							>Remove</button
 						>
 					</li>
 				{/each}
@@ -75,30 +101,30 @@
 				const ok = await send("/api/custom/shiny-accounts", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ label, playerId })
+					body: JSON.stringify({ label, account })
 				});
 				if (ok) {
 					label = "";
-					playerId = "";
+					account = "";
 				}
 			}}
 		>
 			<input
-				bind:value={label}
-				placeholder="Account name"
-				maxlength="64"
-				class="w-36 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 text-zinc-800 dark:text-zinc-200 outline-none"
-			/>
-			<input
-				bind:value={playerId}
-				placeholder="Player id"
+				bind:value={account}
+				placeholder="Friend code or player id"
 				autocomplete="off"
 				spellcheck="false"
 				class="w-56 font-mono rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 text-zinc-800 dark:text-zinc-200 outline-none"
 			/>
+			<input
+				bind:value={label}
+				placeholder={isFriendCode ? "Name (optional)" : "Account name"}
+				maxlength="64"
+				class="w-36 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 text-zinc-800 dark:text-zinc-200 outline-none"
+			/>
 			<button
 				type="submit"
-				disabled={busy || !label.trim() || !playerId.trim()}
+				disabled={busy || !account.trim() || (!isFriendCode && !label.trim())}
 				class="px-3 py-1 rounded-md text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
 				>Link account</button
 			>
