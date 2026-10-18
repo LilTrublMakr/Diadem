@@ -32,6 +32,25 @@ export type ChannelNotificationsData = {
 
 export type ChannelApiError = { code: string; message: string };
 
+const LAST_GUILD_STORAGE_KEY = "channelNotifications.lastGuildId";
+
+function getStoredGuildId(): string | null {
+	try {
+		return localStorage.getItem(LAST_GUILD_STORAGE_KEY);
+	} catch {
+		return null;
+	}
+}
+
+function storeGuildId(guildId: string | null) {
+	try {
+		if (guildId) localStorage.setItem(LAST_GUILD_STORAGE_KEY, guildId);
+		else localStorage.removeItem(LAST_GUILD_STORAGE_KEY);
+	} catch {
+		// ignore - private browsing / blocked storage just means no remembered guild next visit
+	}
+}
+
 let state = $state<ChannelNotificationsData>({
 	guilds: [],
 	guildsLoading: false,
@@ -80,6 +99,13 @@ export async function loadManageableGuilds(): Promise<void> {
 		}
 		state.missingScope = false;
 		state.guilds = (await res.json()) as DiscordGuildOption[];
+
+		// Re-select whatever guild was picked last time (page refresh otherwise lands back on
+		// "Select a server…" with an empty subscriptions list even though the data is all still there).
+		const remembered = getStoredGuildId();
+		if (!state.selectedGuildId && remembered && state.guilds.some((g) => g.id === remembered)) {
+			await selectGuild(remembered);
+		}
 	} catch {
 		state.error = "Failed to load your Discord servers";
 	} finally {
@@ -93,16 +119,21 @@ export async function selectGuild(guildId: string | null): Promise<void> {
 	state.channels = [];
 	state.botNotInGuild = false;
 	state.subscriptions = [];
+	storeGuildId(guildId);
 	if (!guildId) return;
 
 	state.channelsLoading = true;
 	state.subscriptionsLoading = true;
 	state.error = null;
 	try {
-		const [channelsRes, subsRes] = await Promise.all([
-			fetch(`/api/custom/notifications/channels/${guildId}`),
-			fetch(`/api/custom/notifications/channel-subscriptions?guildId=${guildId}`)
-		]);
+		// Sequential, not Promise.all — each of these independently re-verifies live Discord admin
+		// permission via a fresh /users/@me/guilds call. Firing them concurrently let two token
+		// refreshes race (Discord rotates refresh tokens), occasionally making the loser's guild
+		// check fail with a transient 403 even though the admin really does have access.
+		const channelsRes = await fetch(`/api/custom/notifications/channels/${guildId}`);
+		const subsRes = await fetch(
+			`/api/custom/notifications/channel-subscriptions?guildId=${guildId}`
+		);
 
 		if (channelsRes.status === 403) {
 			const body = (await channelsRes.json().catch(() => null)) as { error?: string } | null;
@@ -116,6 +147,10 @@ export async function selectGuild(guildId: string | null): Promise<void> {
 
 		if (subsRes.ok) {
 			state.subscriptions = (await subsRes.json()) as NotificationChannelSubscriptionDto[];
+		} else {
+			const body = (await subsRes.json().catch(() => null)) as { message?: string } | null;
+			state.error =
+				body?.message ?? `Failed to load this server's subscriptions (${subsRes.status})`;
 		}
 	} catch {
 		state.error = "Failed to load this server's channels";
